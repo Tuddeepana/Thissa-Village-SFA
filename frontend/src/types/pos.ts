@@ -1,0 +1,44 @@
+export interface Product {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  cost: number; // Cost price for profit calculation
+  stock: number;
+  minStock: number; // Minimum stock level for warnings
+  barcode?: string;
+  image?: string;
+  description?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface BillItem {
+  product: Product;
+  quantity: number;
+  subtotal: number;
+}
+
+export interface Bill {
+  id: string;
+  items: BillItem[];
+  subtotal: number;
+  tax: number;
+  taxRate: number; // Tax rate as percentage (e.g., 15 for 15%)
+  discount: number;
+  discountRate: number; // Discount rate as percentage
+  total: number;
+  customerName?: string;
+  customerPhone?: string;
+  paymentMethod: 'cash' | 'card' | 'other';
+  amountPaid: number;
+  change: number;
+  createdAt: Date;
+}
+
+export interface StockWarning {
+  product: Product;
+  currentStock: number;
+  minStock: number;
+  requestedQuantity: number;
+}
