@@ -8,7 +8,10 @@ import {
     FileText,
     AlertCircle,
     ShoppingCart,
-    FolderTree, Warehouse,
+    FolderTree,
+    Warehouse,
+    Receipt,
+    Users,
 } from "lucide-react";
 import {
   Sidebar,
@@ -27,6 +30,8 @@ const sfaItems = [
   { title: "Products", url: "/products", icon: Package },
   { title: "My Stock", url: "/my-stock", icon: Warehouse },
   { title: "Invoices", url: "/invoices", icon: FileText },
+  { title: "Bills", url: "/bills", icon: Receipt },
+  { title: "Users", url: "/users", icon: Users },
   { title: "Low Stock", url: "/low-stock", icon: AlertCircle },
 ];
 

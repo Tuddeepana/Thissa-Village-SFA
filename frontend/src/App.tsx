@@ -13,6 +13,8 @@ import Invoices from "./pages/Invoices";
 import LowStock from "./pages/LowStock";
 import MyStock from "./pages/MyStock";
 import POS from "./pages/POS";
+import Bills from "./pages/Bills";
+import Users from "./pages/Users";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -66,6 +68,8 @@ const App = () => (
             <Route path="low-stock" element={<LowStock />} />
             <Route path="my-stock" element={<MyStock />} />
             <Route path="pos" element={<POS />} />
+            <Route path="bills" element={<Bills />} />
+            <Route path="users" element={<Users />} />
             <Route path="profile" element={<Profile />} />
             <Route path="settings" element={<Settings />} />
           </Route>

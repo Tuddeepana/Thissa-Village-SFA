@@ -23,7 +23,7 @@ export const printBill = (bill: Bill, storeName: string = "VinoPOS Pro") => {
       <style>
         @media print {
           @page {
-            size: 80mm auto;
+            size: 80mm 297mm;
             margin: 0;
           }
           body {
@@ -191,16 +191,29 @@ export const printBill = (bill: Bill, storeName: string = "VinoPOS Pro") => {
           <span>Payment Method:</span>
           <span class="bold">${bill.paymentMethod.toUpperCase()}</span>
         </div>
-        <div class="total-line">
-          <span>Amount Paid:</span>
-          <span>Rs. ${bill.amountPaid.toFixed(2)}</span>
-        </div>
-        ${bill.change > 0 ? `
+        ${bill.paymentMethod !== 'credit' ? `
           <div class="total-line">
-            <span>Change:</span>
-            <span>Rs. ${bill.change.toFixed(2)}</span>
+            <span>Amount Paid:</span>
+            <span>Rs. ${bill.amountPaid.toFixed(2)}</span>
           </div>
-        ` : ''}
+          ${bill.change > 0 ? `
+            <div class="total-line">
+              <span>Change:</span>
+              <span>Rs. ${bill.change.toFixed(2)}</span>
+            </div>
+          ` : ''}
+        ` : `
+          <div class="total-line">
+            <span>Status:</span>
+            <span class="bold" style="color: #d97706;">CREDIT SALE</span>
+          </div>
+          ${bill.creditDescription ? `
+            <div style="margin-top: 5px; padding: 5px; background: #fef3c7; border-radius: 3px;">
+              <div style="font-size: 10px; color: #92400e;"><strong>Credit Note:</strong></div>
+              <div style="font-size: 11px; color: #92400e;">${bill.creditDescription}</div>
+            </div>
+          ` : ''}
+        `}
       </div>
       
       <div class="footer">
@@ -241,7 +254,7 @@ export const printBillNewWindow = (bill: Bill, storeName: string = "VinoPOS Pro"
       <style>
         @media print {
           @page {
-            size: 80mm auto;
+            size: 80mm 297mm;
             margin: 0;
           }
         }
@@ -378,16 +391,29 @@ export const printBillNewWindow = (bill: Bill, storeName: string = "VinoPOS Pro"
           <span>Payment Method:</span>
           <span class="bold">${bill.paymentMethod.toUpperCase()}</span>
         </div>
-        <div class="total-line">
-          <span>Amount Paid:</span>
-          <span>Rs. ${bill.amountPaid.toFixed(2)}</span>
-        </div>
-        ${bill.change > 0 ? `
+        ${bill.paymentMethod !== 'credit' ? `
           <div class="total-line">
-            <span>Change:</span>
-            <span>Rs. ${bill.change.toFixed(2)}</span>
+            <span>Amount Paid:</span>
+            <span>Rs. ${bill.amountPaid.toFixed(2)}</span>
           </div>
-        ` : ''}
+          ${bill.change > 0 ? `
+            <div class="total-line">
+              <span>Change:</span>
+              <span>Rs. ${bill.change.toFixed(2)}</span>
+            </div>
+          ` : ''}
+        ` : `
+          <div class="total-line">
+            <span>Status:</span>
+            <span class="bold" style="color: #d97706;">CREDIT SALE</span>
+          </div>
+          ${bill.creditDescription ? `
+            <div style="margin-top: 5px; padding: 5px; background: #fef3c7; border-radius: 3px;">
+              <div style="font-size: 10px; color: #92400e;"><strong>Credit Note:</strong></div>
+              <div style="font-size: 11px; color: #92400e;">${bill.creditDescription}</div>
+            </div>
+          ` : ''}
+        `}
       </div>
       
       <div class="footer">
