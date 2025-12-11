@@ -2,13 +2,16 @@ import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
-  LayoutDashboard,
-  Wine,
-  Package,
-  FileText,
-  AlertCircle,
-  ShoppingCart,
-  FolderTree,
+    LayoutDashboard,
+    Wine,
+    Package,
+    FileText,
+    AlertCircle,
+    ShoppingCart,
+    FolderTree,
+    Warehouse,
+    Receipt,
+    Users,
 } from "lucide-react";
 import {
   Sidebar,
@@ -25,7 +28,10 @@ const sfaItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Categories", url: "/categories", icon: FolderTree },
   { title: "Products", url: "/products", icon: Package },
+  { title: "My Stock", url: "/my-stock", icon: Warehouse },
   { title: "Invoices", url: "/invoices", icon: FileText },
+  { title: "Bills", url: "/bills", icon: Receipt },
+  { title: "Users", url: "/users", icon: Users },
   { title: "Low Stock", url: "/low-stock", icon: AlertCircle },
 ];
 

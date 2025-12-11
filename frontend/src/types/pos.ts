@@ -30,9 +30,10 @@ export interface Bill {
   total: number;
   customerName?: string;
   customerPhone?: string;
-  paymentMethod: 'cash' | 'card' | 'other';
+  paymentMethod: 'cash' | 'card' | 'credit' | 'other';
   amountPaid: number;
   change: number;
+  creditDescription?: string; // Description when payment method is credit
   createdAt: Date;
 }
 
