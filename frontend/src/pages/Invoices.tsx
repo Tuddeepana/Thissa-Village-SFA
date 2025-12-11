@@ -91,20 +91,11 @@ const Invoices = () => {
     setCurrentPage(1);
   }, [filters]);
 
-  const handleAddInvoice = (invoiceNumber: string, date: Date) => {
-    // Create a new invoice with minimal data
+  const handleAddInvoice = (invoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>) => {
+    // Create a new invoice with full data
     const newInvoice: Invoice = {
-      id: `inv-${Math.random().toString(36).substr(2, 9)}`,
-      invoiceNumber,
-      date,
-      customerName: "New Customer",
-      items: [],
-      subtotal: 0,
-      tax: 0,
-      discount: 0,
-      total: 0,
-      paymentMethod: "cash",
-      status: "pending",
+      id: `inv-${Math.random().toString(36).slice(2, 11)}`,
+      ...invoiceData,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
