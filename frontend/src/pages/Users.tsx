@@ -42,58 +42,24 @@ import {
   Mail,
   CreditCard,
   Calendar,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { DeleteButton } from "@/components/common";
-
-interface User {
-  id: string;
-  email: string;
-  password: string;
-  nic: string;
-  role: "admin" | "cashier";
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Mock users data
-const initialUsers: User[] = [
-  {
-    id: "user-1",
-    email: "admin@vinopro.com",
-    password: "admin123",
-    nic: "199012345678",
-    role: "admin",
-    isActive: true,
-    createdAt: new Date("2024-01-15"),
-    updatedAt: new Date("2024-01-15"),
-  },
-  {
-    id: "user-2",
-    email: "cashier1@vinopro.com",
-    password: "cashier123",
-    nic: "199512345678",
-    role: "cashier",
-    isActive: true,
-    createdAt: new Date("2024-02-10"),
-    updatedAt: new Date("2024-02-10"),
-  },
-  {
-    id: "user-3",
-    email: "cashier2@vinopro.com",
-    password: "cashier456",
-    nic: "199812345678",
-    role: "cashier",
-    isActive: false,
-    createdAt: new Date("2024-03-20"),
-    updatedAt: new Date("2024-06-15"),
-  },
-];
+import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useToggleUserStatus } from "@/hooks/use-users";
+import { User, UserRole } from "@/types/user";
 
 const Users = () => {
-  const [users, setUsers] = useState<User[]>(initialUsers);
+  // API hooks
+  const { data: usersData, isLoading, error } = useUsers();
+  const createUserMutation = useCreateUser();
+  const updateUserMutation = useUpdateUser();
+  const deleteUserMutation = useDeleteUser();
+  const toggleStatusMutation = useToggleUserStatus();
+
+  const users = useMemo(() => usersData?.data || [], [usersData?.data]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -108,8 +74,9 @@ const Users = () => {
   // Form states
   const [formEmail, setFormEmail] = useState("");
   const [formPassword, setFormPassword] = useState("");
+  const [formName, setFormName] = useState("");
   const [formNic, setFormNic] = useState("");
-  const [formRole, setFormRole] = useState<"admin" | "cashier">("cashier");
+  const [formRole, setFormRole] = useState<UserRole>("CASHIER");
   const [showPassword, setShowPassword] = useState(false);
 
   // Filter users
@@ -120,7 +87,8 @@ const Users = () => {
         const query = searchQuery.toLowerCase();
         if (
           !user.email.toLowerCase().includes(query) &&
-          !user.nic.includes(query)
+          !user.nic.toLowerCase().includes(query) &&
+          !user.name.toLowerCase().includes(query)
         ) {
           return false;
         }
@@ -132,11 +100,11 @@ const Users = () => {
       }
 
       // Status filter
-      if (statusFilter === "active" && !user.isActive) {
-        return false;
+      if (statusFilter === "active") {
+        return user.status === "Active";
       }
-      if (statusFilter === "inactive" && user.isActive) {
-        return false;
+      if (statusFilter === "inactive") {
+        return user.status === "Inactive";
       }
 
       return true;
@@ -153,117 +121,88 @@ const Users = () => {
   // Statistics
   const stats = useMemo(() => {
     const totalUsers = users.length;
-    const adminCount = users.filter((u) => u.role === "admin").length;
-    const cashierCount = users.filter((u) => u.role === "cashier").length;
-    const activeCount = users.filter((u) => u.isActive).length;
-    const inactiveCount = users.filter((u) => !u.isActive).length;
+    const adminCount = users.filter((u) => u.role === "ADMIN").length;
+    const cashierCount = users.filter((u) => u.role === "CASHIER").length;
+    const activeCount = users.filter((u) => u.status === "Active").length;
+    const inactiveCount = users.filter((u) => u.status === "Inactive").length;
     return { totalUsers, adminCount, cashierCount, activeCount, inactiveCount };
   }, [users]);
 
   const resetForm = () => {
     setFormEmail("");
     setFormPassword("");
+    setFormName("");
     setFormNic("");
-    setFormRole("cashier");
+    setFormRole("CASHIER");
     setShowPassword(false);
   };
 
-  const handleAddUser = () => {
-    if (!formEmail || !formPassword || !formNic) {
+  const handleAddUser = async () => {
+    if (!formEmail || !formPassword || !formName || !formNic) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    // Check if email already exists
-    if (users.some((u) => u.email.toLowerCase() === formEmail.toLowerCase())) {
-      toast.error("Email already exists");
-      return;
-    }
-
-    const newUser: User = {
-      id: `user-${Date.now()}`,
-      email: formEmail,
-      password: formPassword,
-      nic: formNic,
-      role: formRole,
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    setUsers([...users, newUser]);
-    setIsAddDialogOpen(false);
-    resetForm();
-    toast.success("User created successfully!");
+    createUserMutation.mutate(
+      {
+        email: formEmail,
+        password: formPassword,
+        name: formName,
+        nic: formNic,
+        role: formRole,
+      },
+      {
+        onSuccess: () => {
+          setIsAddDialogOpen(false);
+          resetForm();
+        },
+      }
+    );
   };
 
-  const handleEditUser = () => {
+  const handleEditUser = async () => {
     if (!selectedUser) return;
 
-    if (!formEmail || !formNic) {
+    if (!formEmail || !formName || !formNic) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    // Check if email already exists (excluding current user)
-    if (
-      users.some(
-        (u) =>
-          u.id !== selectedUser.id &&
-          u.email.toLowerCase() === formEmail.toLowerCase()
-      )
-    ) {
-      toast.error("Email already exists");
-      return;
-    }
+    const payload = {
+      email: formEmail,
+      name: formName,
+      nic: formNic,
+      role: formRole,
+      ...(formPassword && { password: formPassword }),
+    };
 
-    const updatedUsers = users.map((user) => {
-      if (user.id === selectedUser.id) {
-        return {
-          ...user,
-          email: formEmail,
-          password: formPassword || user.password,
-          nic: formNic,
-          role: formRole,
-          updatedAt: new Date(),
-        };
+    updateUserMutation.mutate(
+      {
+        id: selectedUser.id,
+        payload,
+      },
+      {
+        onSuccess: () => {
+          setIsEditDialogOpen(false);
+          setSelectedUser(null);
+          resetForm();
+        },
       }
-      return user;
-    });
-
-    setUsers(updatedUsers);
-    setIsEditDialogOpen(false);
-    setSelectedUser(null);
-    resetForm();
-    toast.success("User updated successfully!");
+    );
   };
 
   const handleToggleStatus = (userId: string) => {
-    const updatedUsers = users.map((user) => {
-      if (user.id === userId) {
-        const newStatus = !user.isActive;
-        toast.success(
-          `User ${newStatus ? "activated" : "deactivated"} successfully!`
-        );
-        return {
-          ...user,
-          isActive: newStatus,
-          updatedAt: new Date(),
-        };
-      }
-      return user;
-    });
-    setUsers(updatedUsers);
+    toggleStatusMutation.mutate(userId);
   };
 
   const handleDeleteUser = (userId: string) => {
-    setUsers(users.filter((u) => u.id !== userId));
-    toast.success("User deleted successfully!");
+    deleteUserMutation.mutate(userId);
   };
 
   const openEditDialog = (user: User) => {
     setSelectedUser(user);
     setFormEmail(user.email);
+    setFormName(user.name);
     setFormPassword("");
     setFormNic(user.nic);
     setFormRole(user.role);
@@ -277,8 +216,8 @@ const Users = () => {
     setCurrentPage(1);
   };
 
-  const getRoleBadge = (role: string) => {
-    if (role === "admin") {
+  const getRoleBadge = (role: UserRole) => {
+    if (role === "ADMIN") {
       return (
         <Badge className="bg-purple-100 text-purple-800">
           <ShieldCheck className="h-3 w-3 mr-1" />
@@ -294,12 +233,45 @@ const Users = () => {
     );
   };
 
-  const getStatusBadge = (isActive: boolean) => {
-    if (isActive) {
+  const getStatusBadge = (status: string) => {
+    if (status === "Active") {
       return <Badge className="bg-green-100 text-green-800">Active</Badge>;
     }
     return <Badge className="bg-red-100 text-red-800">Inactive</Badge>;
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-3 md:p-6 flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading users...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="container mx-auto p-3 md:p-6 flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <CardTitle className="text-red-600">Error Loading Users</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              {error instanceof Error ? error.message : "Failed to load users. Please try again later."}
+            </p>
+            <Button onClick={() => globalThis.location.reload()} className="mt-4">
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
@@ -412,8 +384,8 @@ const Users = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="cashier">Cashier</SelectItem>
+                  <SelectItem value="ADMIN">Admin</SelectItem>
+                  <SelectItem value="CASHIER">Cashier</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -506,17 +478,17 @@ const Users = () => {
                         {getRoleBadge(user.role)}
                       </TableCell>
                       <TableCell className="text-center">
-                        {getStatusBadge(user.isActive)}
+                        {getStatusBadge(user.status)}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Calendar className="h-3 w-3" />
-                          {format(user.createdAt, "MMM dd, yyyy")}
+                          {format(new Date(user.createdAt), "MMM dd, yyyy")}
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
                         <Switch
-                          checked={user.isActive}
+                          checked={user.status === "Active"}
                           onCheckedChange={() => handleToggleStatus(user.id)}
                         />
                       </TableCell>
@@ -565,14 +537,14 @@ const Users = () => {
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       {getRoleBadge(user.role)}
-                      {getStatusBadge(user.isActive)}
+                      {getStatusBadge(user.status)}
                     </div>
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t">
                     <div className="flex items-center gap-2">
                       <Label className="text-xs">Active</Label>
                       <Switch
-                        checked={user.isActive}
+                        checked={user.status === "Active"}
                         onCheckedChange={() => handleToggleStatus(user.id)}
                       />
                     </div>
@@ -696,6 +668,17 @@ const Users = () => {
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
+              <Label htmlFor="name">Full Name *</Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="John Doe"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="email">Email *</Label>
               <Input
                 id="email"
@@ -745,13 +728,13 @@ const Users = () => {
 
             <div className="space-y-2">
               <Label htmlFor="role">Role *</Label>
-              <Select value={formRole} onValueChange={(val: "admin" | "cashier") => setFormRole(val)}>
+              <Select value={formRole} onValueChange={(val: UserRole) => setFormRole(val)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="cashier">Cashier</SelectItem>
+                  <SelectItem value="ADMIN">Admin</SelectItem>
+                  <SelectItem value="CASHIER">Cashier</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -789,6 +772,17 @@ const Users = () => {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Full Name *</Label>
+              <Input
+                id="edit-name"
+                type="text"
+                placeholder="John Doe"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="edit-email">Email *</Label>
               <Input
@@ -839,13 +833,13 @@ const Users = () => {
 
             <div className="space-y-2">
               <Label htmlFor="edit-role">Role *</Label>
-              <Select value={formRole} onValueChange={(val: "admin" | "cashier") => setFormRole(val)}>
+              <Select value={formRole} onValueChange={(val: UserRole) => setFormRole(val)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="cashier">Cashier</SelectItem>
+                  <SelectItem value="ADMIN">Admin</SelectItem>
+                  <SelectItem value="CASHIER">Cashier</SelectItem>
                 </SelectContent>
               </Select>
             </div>
