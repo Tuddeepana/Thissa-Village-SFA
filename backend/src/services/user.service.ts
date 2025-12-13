@@ -1,6 +1,7 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import prisma from '../lib/prisma';
 import {
   RegisterUserInput,
   LoginUserInput,
@@ -14,8 +15,6 @@ import {
   InternalServerError,
 } from '../errors/AppError';
 import { AuthResponse, UserResponse } from '../types/user.types';
-
-const prisma = new PrismaClient();
 
 export class UserService {
   /**
