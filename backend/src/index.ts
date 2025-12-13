@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
+import prisma from './lib/prisma';
 import userRoutes from './routes/user.routes';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 
@@ -10,7 +10,6 @@ dotenv.config();
 
 // Initialize Express app
 const app = express();
-const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
