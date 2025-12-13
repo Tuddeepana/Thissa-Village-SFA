@@ -131,10 +131,11 @@ const POS = () => {
   };
 
   const handleConfirmPayment = (
-    paymentMethod: 'cash' | 'card' | 'other',
+    paymentMethod: 'cash' | 'card' | 'credit' | 'other',
     amountPaid: number,
     customerName?: string,
-    customerPhone?: string
+    customerPhone?: string,
+    creditDescription?: string
   ) => {
     // Generate bill ID
     const billId = `BILL-${Date.now()}`;
@@ -153,7 +154,8 @@ const POS = () => {
       customerPhone,
       paymentMethod,
       amountPaid,
-      change: amountPaid - total,
+      change: paymentMethod === 'credit' ? 0 : amountPaid - total,
+      creditDescription,
       createdAt: now,
     };
 

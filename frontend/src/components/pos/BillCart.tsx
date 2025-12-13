@@ -3,9 +3,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Minus, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { Minus, Plus, AlertTriangle } from "lucide-react";
 import { BillItem, StockWarning } from "@/types/pos";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { DeleteButton } from "@/components/common";
 
 interface BillCartProps {
   items: BillItem[];
@@ -90,13 +91,10 @@ export function BillCart({
                       Rs. {item.product.price.toFixed(2)} each
                     </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onRemoveItem(item.product.id)}
-                  >
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
+                  <DeleteButton
+                    onDelete={() => onRemoveItem(item.product.id)}
+                    itemName={item.product.name}
+                  />
                 </div>
 
                 <div className="flex justify-between items-center">

@@ -18,16 +18,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 
 interface PaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   total: number;
   onConfirmPayment: (
-    paymentMethod: 'cash' | 'card' | 'other',
+    paymentMethod: 'cash' | 'card' | 'credit' | 'other',
     amountPaid: number,
     customerName?: string,
-    customerPhone?: string
+    customerPhone?: string,
+    creditDescription?: string
   ) => void;
 }
 
@@ -37,26 +39,31 @@ export function PaymentDialog({
   total,
   onConfirmPayment,
 }: PaymentDialogProps) {
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'other'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'credit' | 'other'>('cash');
   const [amountPaid, setAmountPaid] = useState(total.toString());
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [creditDescription, setCreditDescription] = useState("");
 
   const amountPaidNum = parseFloat(amountPaid) || 0;
   const change = Math.max(0, amountPaidNum - total);
+  const isCredit = paymentMethod === 'credit';
 
   const handleConfirm = () => {
-    if (amountPaidNum >= total) {
+    // For credit, amount paid can be 0, otherwise must be >= total
+    if (isCredit || amountPaidNum >= total) {
       onConfirmPayment(
         paymentMethod,
-        amountPaidNum,
+        isCredit ? 0 : amountPaidNum,
         customerName || undefined,
-        customerPhone || undefined
+        customerPhone || undefined,
+        isCredit ? creditDescription || undefined : undefined
       );
       // Reset form
       setAmountPaid(total.toString());
       setCustomerName("");
       setCustomerPhone("");
+      setCreditDescription("");
       setPaymentMethod('cash');
     }
   };
@@ -104,7 +111,7 @@ export function PaymentDialog({
             <Label htmlFor="paymentMethod">Payment Method</Label>
             <Select
               value={paymentMethod}
-              onValueChange={(value) => setPaymentMethod(value as 'cash' | 'card' | 'other')}
+              onValueChange={(value) => setPaymentMethod(value as 'cash' | 'card' | 'credit' | 'other')}
             >
               <SelectTrigger id="paymentMethod">
                 <SelectValue />
@@ -112,10 +119,25 @@ export function PaymentDialog({
               <SelectContent>
                 <SelectItem value="cash">Cash</SelectItem>
                 <SelectItem value="card">Card</SelectItem>
+                <SelectItem value="credit">Credit</SelectItem>
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {/* Credit Description - Only show when Credit is selected */}
+          {isCredit && (
+            <div className="space-y-2">
+              <Label htmlFor="creditDescription">Credit Description</Label>
+              <Textarea
+                id="creditDescription"
+                placeholder="Enter credit details (e.g., customer account, due date, terms...)"
+                value={creditDescription}
+                onChange={(e) => setCreditDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+          )}
 
           {/* Total Amount */}
           <div className="bg-muted p-4 rounded-lg">
@@ -125,19 +147,21 @@ export function PaymentDialog({
             </div>
           </div>
 
-          {/* Amount Paid */}
-          <div className="space-y-2">
-            <Label htmlFor="amountPaid">Amount Paid</Label>
-            <Input
-              id="amountPaid"
-              type="number"
-              min={total}
-              step="0.01"
-              value={amountPaid}
-              onChange={(e) => setAmountPaid(e.target.value)}
-              className="text-lg font-semibold"
-            />
-          </div>
+          {/* Amount Paid - Hide for Credit */}
+          {!isCredit && (
+            <div className="space-y-2">
+              <Label htmlFor="amountPaid">Amount Paid</Label>
+              <Input
+                id="amountPaid"
+                type="number"
+                min={total}
+                step="0.01"
+                value={amountPaid}
+                onChange={(e) => setAmountPaid(e.target.value)}
+                className="text-lg font-semibold"
+              />
+            </div>
+          )}
 
           {/* Quick Amount Buttons */}
           {paymentMethod === 'cash' && (
@@ -179,10 +203,20 @@ export function PaymentDialog({
           )}
 
           {/* Validation Message */}
-          {amountPaidNum < total && (
+          {!isCredit && amountPaidNum < total && (
             <p className="text-sm text-red-500">
               Amount paid must be at least Rs. {total.toFixed(2)}
             </p>
+          )}
+
+          {/* Credit Info Message */}
+          {isCredit && (
+            <div className="bg-yellow-50 dark:bg-yellow-950 p-4 rounded-lg">
+              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                <strong>Credit Sale:</strong> This transaction will be recorded as credit.
+                No payment is required at this time.
+              </p>
+            </div>
           )}
         </div>
 
@@ -192,9 +226,9 @@ export function PaymentDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={amountPaidNum < total}
+            disabled={!isCredit && amountPaidNum < total}
           >
-            Confirm & Print Bill
+            {isCredit ? "Confirm Credit Sale" : "Confirm & Print Bill"}
           </Button>
         </DialogFooter>
       </DialogContent>
