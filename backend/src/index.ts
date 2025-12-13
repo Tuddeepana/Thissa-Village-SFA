@@ -106,20 +106,24 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log('🚀 VinoPOS Backend Server Started!');
-  console.log(`📡 Server running on: http://localhost:${PORT}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📊 Database: ${process.env.DATABASE_URL?.split('@')[1]?.split('?')[0] || 'Not configured'}`);
-  console.log('\n📍 Available endpoints:');
-  console.log(`   GET  /              - Welcome message`);
-  console.log(`   GET  /health        - Health check`);
-  console.log(`   GET  /api           - API info`);
-  console.log(`   GET  /api/test-db   - Test database connection`);
-  console.log(`   GET  /api/categories - Get all categories`);
-  console.log(`   GET  /api/products  - Get all products`);
-  console.log('\n✨ Ready to accept requests!\n');
-});
+// Start server (only in development, not on Vercel)
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log('🚀 VinoPOS Backend Server Started!');
+    console.log(`📡 Server running on: http://localhost:${PORT}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`📊 Database: ${process.env.DATABASE_URL?.split('@')[1]?.split('?')[0] || 'Not configured'}`);
+    console.log('\n📍 Available endpoints:');
+    console.log(`   GET  /              - Welcome message`);
+    console.log(`   GET  /health        - Health check`);
+    console.log(`   GET  /api           - API info`);
+    console.log(`   GET  /api/test-db   - Test database connection`);
+    console.log(`   GET  /api/categories - Get all categories`);
+    console.log(`   GET  /api/products  - Get all products`);
+    console.log('\n✨ Ready to accept requests!\n');
+  });
+}
 
+// Export for Vercel
+export default app;
 export { app, prisma };
