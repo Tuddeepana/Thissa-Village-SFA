@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,64 +15,44 @@ import { Pencil, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useCategories, useCreateCategory } from "@/hooks/use-categories";
 import { DeleteButton } from "@/components/common";
 
-interface Category {
-  id: number;
+interface CategoryRow {
+  id: string;
   name: string;
-  description: string;
-  createdDate: string;
+  description?: string | null;
+  createdAt: string;
 }
 
 const Categories = () => {
   const { toast } = useToast();
-  const [categories, setCategories] = useState<Category[]>([
-    {
-      id: 1,
-      name: "Red Wine",
-      description: "Full-bodied red wines from various regions",
-      createdDate: "2024-01-15",
-    },
-    {
-      id: 2,
-      name: "White Wine",
-      description: "Crisp and refreshing white wines",
-      createdDate: "2024-01-16",
-    },
-    {
-      id: 3,
-      name: "Sparkling Wine",
-      description: "Champagne and sparkling varieties",
-      createdDate: "2024-01-17",
-    },
-  ]);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [search, setSearch] = useState("");
+  const { data, isLoading } = useCategories({ page, limit, search: search || undefined });
+  const createMutation = useCreateCategory();
+  const categories: CategoryRow[] = useMemo(() => {
+    return (data?.data || []).map((c) => ({
+      id: c.id,
+      name: c.name,
+      description: c.description ?? "",
+      createdAt: new Date(c.createdAt).toISOString().split("T")[0],
+    }));
+  }, [data]);
 
   const [formData, setFormData] = useState({ name: "", description: "" });
   const [open, setOpen] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newCategory: Category = {
-      id: categories.length + 1,
-      name: formData.name,
-      description: formData.description,
-      createdDate: new Date().toISOString().split("T")[0],
-    };
-    setCategories([...categories, newCategory]);
+    await createMutation.mutateAsync({ name: formData.name, description: formData.description || undefined });
     setFormData({ name: "", description: "" });
     setOpen(false);
-    toast({
-      title: "Success",
-      description: "Category added successfully",
-    });
   };
 
-  const handleDelete = (id: number) => {
-    setCategories(categories.filter((cat) => cat.id !== id));
-    toast({
-      title: "Deleted",
-      description: "Category removed successfully",
-    });
+  const handleDelete = (id: string) => {
+    toast({ title: "Info", description: "Delete will be integrated later" });
   };
 
   return (
@@ -134,12 +114,21 @@ const Categories = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {categories.map((category) => (
-                <TableRow key={category.id}>
-                  <TableCell>{category.id}</TableCell>
-                  <TableCell className="font-medium">{category.name}</TableCell>
-                  <TableCell>{category.description}</TableCell>
-                  <TableCell>{category.createdDate}</TableCell>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={5}>Loading...</TableCell>
+                </TableRow>
+              ) : categories.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5}>No categories</TableCell>
+                </TableRow>
+              ) : (
+                categories.map((category) => (
+                  <TableRow key={category.id}>
+                    <TableCell>{category.id}</TableCell>
+                    <TableCell className="font-medium">{category.name}</TableCell>
+                    <TableCell>{category.description}</TableCell>
+                    <TableCell>{category.createdAt}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button variant="ghost" size="icon">
@@ -152,9 +141,21 @@ const Categories = () => {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
+          <div className="flex items-center justify-between pt-4">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="search">Search</Label>
+              <Input id="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Prev</Button>
+              <span>Page {data?.page ?? page}</span>
+              <Button variant="outline" disabled={(data?.page ?? 1) * (data?.limit ?? limit) >= (data?.total ?? 0)} onClick={() => setPage((p) => p + 1)}>Next</Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
