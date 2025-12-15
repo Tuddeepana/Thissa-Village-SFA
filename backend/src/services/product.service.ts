@@ -1,0 +1,75 @@
+import prisma from "../lib/prisma";
+import {
+  ProductCreateInput,
+  ProductDTO,
+  ProductUpdateInput,
+  PaginatedResult,
+  PaginationQuery,
+} from "../types/product.types";
+
+export const createProduct = async (payload: ProductCreateInput): Promise<ProductDTO> => {
+  const created = await (prisma as any).product.create({
+    data: {
+      name: payload.name,
+      description: payload.description ?? null,
+      litres: payload.litres,
+      cost_price: payload.cost_price,
+      selling_price: payload.selling_price,
+      low_stock: payload.low_stock,
+      categoryId: payload.categoryId,
+    },
+  });
+  return created;
+};
+
+export const getProductById = async (id: string): Promise<ProductDTO | null> => {
+  return (prisma as any).product.findUnique({ where: { id } });
+};
+
+export const listProducts = async (
+  query: PaginationQuery
+): Promise<PaginatedResult<ProductDTO>> => {
+  const page = query.page && query.page > 0 ? query.page : 1;
+  const limit = query.limit && query.limit > 0 ? query.limit : 10;
+  const skip = (page - 1) * limit;
+
+  const where: any = query.search
+    ? { name: { contains: query.search, mode: "insensitive" } }
+    : {};
+
+  const [data, total] = await Promise.all([
+    (prisma as any).product.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+    }),
+    (prisma as any).product.count({ where }),
+  ]);
+
+  return { data, page, limit, total };
+};
+
+export const updateProduct = async (
+  id: string,
+  payload: ProductUpdateInput
+): Promise<ProductDTO> => {
+  const updated = await (prisma as any).product.update({
+    where: { id },
+    data: {
+      name: payload.name,
+      description: payload.description ?? undefined,
+      litres: payload.litres,
+      cost_price: payload.cost_price,
+      selling_price: payload.selling_price,
+      low_stock: payload.low_stock,
+      categoryId: payload.categoryId,
+    },
+  });
+  return updated;
+};
+
+export const deleteProduct = async (id: string): Promise<ProductDTO> => {
+  const deleted = await (prisma as any).product.delete({ where: { id } });
+  return deleted;
+};

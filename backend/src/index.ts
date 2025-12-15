@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import prisma from './lib/prisma';
 import userRoutes from './routes/user.routes';
 import categoryRoutes from './routes/category.routes';
+import productRoutes from './routes/product.routes';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 
 // Load environment variables
@@ -30,6 +31,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // API Routes
 app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/products', productRoutes);
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {
@@ -59,6 +61,7 @@ app.get('/api', (req: Request, res: Response) => {
     endpoints: {
       users: '/api/users',
       categories: '/api/categories',
+      products: '/api/products',
     },
   });
 });
