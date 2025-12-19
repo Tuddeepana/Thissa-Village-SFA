@@ -35,12 +35,10 @@ router.put('/me', authenticate, asyncHandler(userController.updateProfile.bind(u
  * @desc    Register a new user
  * @access  Private (Admin only)
  */
-router.post(
-  '/register',
-  authenticate,
-  adminOnly,
-  asyncHandler(userController.register.bind(userController))
-);
+// NOTE: Changed to public registration. Remove authenticate/adminOnly to allow
+// users to self-register. If you'd rather keep registration restricted to admins,
+// revert this change.
+router.post('/register', asyncHandler(userController.register.bind(userController)));
 
 /**
  * @route   GET /api/users

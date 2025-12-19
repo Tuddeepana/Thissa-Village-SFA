@@ -9,6 +9,7 @@ import {
   userIdParamSchema,
 } from '../validations/user.validation';
 import { createSuccessResponse } from '../errors/ErrorResponse';
+import { Role } from '@prisma/client';
 
 export class UserController {
   /**
@@ -19,6 +20,12 @@ export class UserController {
   async register(req: AuthRequest, res: Response): Promise<void> {
     // Validate request body
     const validatedData = registerUserSchema.parse(req.body);
+
+    // If the request is unauthenticated or the requester is not ADMIN,
+    // force the new user's role to CASHIER to avoid public users creating ADMIN accounts.
+    if (!req.user || req.user.role !== Role.ADMIN) {
+      validatedData.role = Role.CASHIER;
+    }
 
     // Register user
     const result = await userService.register(validatedData);

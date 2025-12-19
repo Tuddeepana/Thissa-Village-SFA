@@ -22,12 +22,14 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const isAuthenticated = localStorage.getItem("isAuthenticated");
+  const token = localStorage.getItem("authToken");
+  const isAuthenticated = token || localStorage.getItem("isAuthenticated");
   return isAuthenticated ? <>{children}</> : <Navigate to="/auth" />;
 };
 
 const ModuleRoute = ({ children }: { children: React.ReactNode }) => {
-  const isAuthenticated = localStorage.getItem("isAuthenticated");
+  const token = localStorage.getItem("authToken");
+  const isAuthenticated = token || localStorage.getItem("isAuthenticated");
   const selectedModule = localStorage.getItem("selectedModule");
   
   if (!isAuthenticated) return <Navigate to="/auth" />;

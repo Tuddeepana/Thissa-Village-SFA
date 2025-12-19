@@ -11,19 +11,54 @@ const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock authentication - in real app, validate credentials
-    if (email && password) {
-      localStorage.setItem("isAuthenticated", "true");
-      toast({
-        title: "Welcome!",
-        description: isLogin ? "Successfully logged in" : "Account created successfully",
+    if (!email || !password) return;
+
+    setLoading(true);
+    try {
+      const apiEnv = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env;
+      const apiBase = apiEnv?.VITE_API_URL || "http://localhost:5000";
+      const res = await fetch(`${apiBase}/api/users/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
+
+      const data = await res.json();
+
+      if (!res.ok || !data?.success) {
+        const msg = data?.message || "Invalid credentials";
+        toast({ title: "Login failed", description: msg, variant: "destructive" });
+        return;
+      }
+
+      // Expected response: { success: true, message: string, data: { user, token } }
+      const token = data?.data?.token;
+      const user = data?.data?.user;
+
+      if (!token) {
+        toast({ title: "Login failed", description: "No token received", variant: "destructive" });
+        return;
+      }
+
+      // Persist auth to localStorage (quick/dev approach)
+      localStorage.setItem("authToken", token);
+      if (user) localStorage.setItem("authUser", JSON.stringify(user));
+      localStorage.setItem("isAuthenticated", "true");
+
+      toast({ title: "Welcome!", description: "Successfully logged in" });
       navigate("/modules");
+    } catch (err: unknown) {
+      console.error("Login error:", err);
+      const message = err instanceof Error ? err.message : String(err);
+      toast({ title: "Login error", description: message, variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -65,9 +100,18 @@ const Auth = () => {
                 required
               />
             </div>
-            <Button type="submit" className="w-full" size="lg">
-              {isLogin ? "Sign In" : "Create Account"}
-            </Button>
+            {
+              (() => {
+                let buttonLabel = "";
+                if (loading) buttonLabel = isLogin ? "Signing in..." : "Creating...";
+                else buttonLabel = isLogin ? "Sign In" : "Create Account";
+                return (
+                  <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                    {buttonLabel}
+                  </Button>
+                );
+              })()
+            }
           </form>
           <div className="mt-6 text-center">
             <button
