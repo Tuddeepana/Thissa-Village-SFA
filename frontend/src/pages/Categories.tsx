@@ -109,7 +109,7 @@ const Categories = () => {
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  required
+                  placeholder="Optional"
                 />
               </div>
               <Button type="submit" className="w-full">Add Category</Button>
