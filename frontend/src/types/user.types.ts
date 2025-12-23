@@ -28,3 +28,29 @@ export interface ApiResponse<T> {
 	timestamp?: string;
 }
 
+// Backend query and payload types for user operations
+export type ListUsersQuery = {
+	search?: string;
+	role?: Role;
+	status?: string; // 'Active' | 'Inactive'
+	page?: number;
+	limit?: number;
+};
+
+export type RegisterUserPayload = {
+	email: string;
+	password: string;
+	name: string;
+	nic: string;
+	role?: Role; // defaults to CASHIER on backend
+};
+
+export type UpdateUserPayload = Partial<{
+	email: string;
+	password: string;
+	name: string;
+	nic: string;
+	role: Role;
+	status: string; // 'Active' | 'Inactive'
+}>;
+

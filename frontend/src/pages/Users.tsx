@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,54 +46,20 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { DeleteButton } from "@/components/common";
+import { useQuery } from "@tanstack/react-query";
+import { userService } from "@/api/services/userService";
+import type { User, Role } from "@/types/user.types";
 
-interface User {
-  id: string;
-  email: string;
-  password: string;
-  nic: string;
-  role: "admin" | "cashier";
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Mock users data
-const initialUsers: User[] = [
-  {
-    id: "user-1",
-    email: "admin@vinopro.com",
-    password: "admin123",
-    nic: "199012345678",
-    role: "admin",
-    isActive: true,
-    createdAt: new Date("2024-01-15"),
-    updatedAt: new Date("2024-01-15"),
-  },
-  {
-    id: "user-2",
-    email: "cashier1@vinopro.com",
-    password: "cashier123",
-    nic: "199512345678",
-    role: "cashier",
-    isActive: true,
-    createdAt: new Date("2024-02-10"),
-    updatedAt: new Date("2024-02-10"),
-  },
-  {
-    id: "user-3",
-    email: "cashier2@vinopro.com",
-    password: "cashier456",
-    nic: "199812345678",
-    role: "cashier",
-    isActive: false,
-    createdAt: new Date("2024-03-20"),
-    updatedAt: new Date("2024-06-15"),
-  },
-];
+// Helper mappers for role/status casing
+const toBackendRole = (role: "admin" | "cashier"): Role =>
+  role === "admin" ? "ADMIN" : "CASHIER";
+const toUIRole = (role: Role): "admin" | "cashier" =>
+  role === "ADMIN" ? "admin" : "cashier";
+const toBackendStatus = (status: string | undefined) =>
+  status === "active" ? "Active" : status === "inactive" ? "Inactive" : undefined;
 
 const Users = () => {
-  const [users, setUsers] = useState<User[]>(initialUsers);
+  const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -109,39 +75,19 @@ const Users = () => {
   const [formEmail, setFormEmail] = useState("");
   const [formPassword, setFormPassword] = useState("");
   const [formNic, setFormNic] = useState("");
+  const [formName, setFormName] = useState("");
   const [formRole, setFormRole] = useState<"admin" | "cashier">("cashier");
   const [showPassword, setShowPassword] = useState(false);
 
-  // Filter users
+  // Filter users (server applies most filters; local guard remains for UI-side checks)
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
-      // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        if (
-          !user.email.toLowerCase().includes(query) &&
-          !user.nic.includes(query)
-        ) {
-          return false;
-        }
-      }
-
-      // Role filter
-      if (roleFilter !== "all" && user.role !== roleFilter) {
-        return false;
-      }
-
-      // Status filter
-      if (statusFilter === "active" && !user.isActive) {
-        return false;
-      }
-      if (statusFilter === "inactive" && user.isActive) {
-        return false;
-      }
-
+      if (roleFilter !== "all" && toUIRole(user.role) !== roleFilter) return false;
+      if (statusFilter === "active" && user.status !== "Active") return false;
+      if (statusFilter === "inactive" && user.status !== "Inactive") return false;
       return true;
     });
-  }, [users, searchQuery, roleFilter, statusFilter]);
+  }, [users, roleFilter, statusFilter]);
 
   // Pagination
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
@@ -153,10 +99,10 @@ const Users = () => {
   // Statistics
   const stats = useMemo(() => {
     const totalUsers = users.length;
-    const adminCount = users.filter((u) => u.role === "admin").length;
-    const cashierCount = users.filter((u) => u.role === "cashier").length;
-    const activeCount = users.filter((u) => u.isActive).length;
-    const inactiveCount = users.filter((u) => !u.isActive).length;
+    const adminCount = users.filter((u) => u.role === "ADMIN").length;
+    const cashierCount = users.filter((u) => u.role === "CASHIER").length;
+    const activeCount = users.filter((u) => u.status === "Active").length;
+    const inactiveCount = users.filter((u) => u.status === "Inactive").length;
     return { totalUsers, adminCount, cashierCount, activeCount, inactiveCount };
   }, [users]);
 
@@ -164,101 +110,78 @@ const Users = () => {
     setFormEmail("");
     setFormPassword("");
     setFormNic("");
+    setFormName("");
     setFormRole("cashier");
     setShowPassword(false);
   };
 
-  const handleAddUser = () => {
-    if (!formEmail || !formPassword || !formNic) {
+  const handleAddUser = async () => {
+    if (!formEmail || !formPassword || !formNic || !formName) {
       toast.error("Please fill in all required fields");
       return;
     }
-
-    // Check if email already exists
-    if (users.some((u) => u.email.toLowerCase() === formEmail.toLowerCase())) {
-      toast.error("Email already exists");
-      return;
+    try {
+      await userService.registerUser({
+        email: formEmail,
+        password: formPassword,
+        name: formName,
+        nic: formNic,
+        role: toBackendRole(formRole),
+      });
+      toast.success("User created successfully!");
+      setIsAddDialogOpen(false);
+      resetForm();
+      refetch();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? "Failed to create user");
     }
-
-    const newUser: User = {
-      id: `user-${Date.now()}`,
-      email: formEmail,
-      password: formPassword,
-      nic: formNic,
-      role: formRole,
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    setUsers([...users, newUser]);
-    setIsAddDialogOpen(false);
-    resetForm();
-    toast.success("User created successfully!");
   };
 
-  const handleEditUser = () => {
+  const handleEditUser = async () => {
     if (!selectedUser) return;
-
-    if (!formEmail || !formNic) {
+    if (!formEmail || !formNic || !formName) {
       toast.error("Please fill in all required fields");
       return;
     }
-
-    // Check if email already exists (excluding current user)
-    if (
-      users.some(
-        (u) =>
-          u.id !== selectedUser.id &&
-          u.email.toLowerCase() === formEmail.toLowerCase()
-      )
-    ) {
-      toast.error("Email already exists");
-      return;
+    try {
+      await userService.updateUser(selectedUser.id, {
+        email: formEmail,
+        password: formPassword || undefined,
+        name: formName,
+        nic: formNic,
+        role: toBackendRole(formRole),
+      });
+      toast.success("User updated successfully!");
+      setIsEditDialogOpen(false);
+      setSelectedUser(null);
+      resetForm();
+      refetch();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? "Failed to update user");
     }
-
-    const updatedUsers = users.map((user) => {
-      if (user.id === selectedUser.id) {
-        return {
-          ...user,
-          email: formEmail,
-          password: formPassword || user.password,
-          nic: formNic,
-          role: formRole,
-          updatedAt: new Date(),
-        };
-      }
-      return user;
-    });
-
-    setUsers(updatedUsers);
-    setIsEditDialogOpen(false);
-    setSelectedUser(null);
-    resetForm();
-    toast.success("User updated successfully!");
   };
 
-  const handleToggleStatus = (userId: string) => {
-    const updatedUsers = users.map((user) => {
-      if (user.id === userId) {
-        const newStatus = !user.isActive;
-        toast.success(
-          `User ${newStatus ? "activated" : "deactivated"} successfully!`
-        );
-        return {
-          ...user,
-          isActive: newStatus,
-          updatedAt: new Date(),
-        };
-      }
-      return user;
-    });
-    setUsers(updatedUsers);
+  const handleToggleStatus = async (userId: string) => {
+    const user = users.find((u) => u.id === userId);
+    if (!user) return;
+    const nextStatus = user.status === "Active" ? "Inactive" : "Active";
+    try {
+      await userService.updateUser(userId, { status: nextStatus });
+      toast.success(`User ${nextStatus === 'Active' ? 'activated' : 'deactivated'} successfully!`);
+      refetch();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? "Failed to update status");
+    }
   };
 
-  const handleDeleteUser = (userId: string) => {
-    setUsers(users.filter((u) => u.id !== userId));
-    toast.success("User deleted successfully!");
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      await userService.permanentlyDeleteUser(userId);
+      toast.success("User deleted successfully!");
+      refetch();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? "Failed to delete user");
+    }
   };
 
   const openEditDialog = (user: User) => {
@@ -266,7 +189,8 @@ const Users = () => {
     setFormEmail(user.email);
     setFormPassword("");
     setFormNic(user.nic);
-    setFormRole(user.role);
+    setFormName(user.name ?? "");
+    setFormRole(toUIRole(user.role));
     setIsEditDialogOpen(true);
   };
 
@@ -277,8 +201,31 @@ const Users = () => {
     setCurrentPage(1);
   };
 
-  const getRoleBadge = (role: string) => {
-    if (role === "admin") {
+  // Fetch users from backend when filters change
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: [
+      "users",
+      { searchQuery, roleFilter, statusFilter },
+    ],
+    queryFn: async () => {
+      const { users, count } = await userService.listUsers({
+        search: searchQuery || undefined,
+        role: roleFilter !== "all" ? toBackendRole(roleFilter as "admin" | "cashier") : undefined,
+        status: toBackendStatus(statusFilter),
+      });
+      return { users, count };
+    },
+    staleTime: 10_000,
+  });
+
+  useEffect(() => {
+    if (data?.users) {
+      setUsers(data.users);
+    }
+  }, [data]);
+
+  const getRoleBadge = (role: Role) => {
+    if (role === "ADMIN") {
       return (
         <Badge className="bg-purple-100 text-purple-800">
           <ShieldCheck className="h-3 w-3 mr-1" />
@@ -294,8 +241,8 @@ const Users = () => {
     );
   };
 
-  const getStatusBadge = (isActive: boolean) => {
-    if (isActive) {
+  const getStatusBadge = (status: string | undefined) => {
+    if (status === "Active") {
       return <Badge className="bg-green-100 text-green-800">Active</Badge>;
     }
     return <Badge className="bg-red-100 text-red-800">Inactive</Badge>;
@@ -506,17 +453,17 @@ const Users = () => {
                         {getRoleBadge(user.role)}
                       </TableCell>
                       <TableCell className="text-center">
-                        {getStatusBadge(user.isActive)}
+                        {getStatusBadge(user.status)}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Calendar className="h-3 w-3" />
-                          {format(user.createdAt, "MMM dd, yyyy")}
+                          {user.createdAt ? format(new Date(user.createdAt), "MMM dd, yyyy") : "-"}
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
                         <Switch
-                          checked={user.isActive}
+                          checked={user.status === "Active"}
                           onCheckedChange={() => handleToggleStatus(user.id)}
                         />
                       </TableCell>
@@ -565,14 +512,14 @@ const Users = () => {
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       {getRoleBadge(user.role)}
-                      {getStatusBadge(user.isActive)}
+                      {getStatusBadge(user.status)}
                     </div>
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t">
                     <div className="flex items-center gap-2">
                       <Label className="text-xs">Active</Label>
                       <Switch
-                        checked={user.isActive}
+                        checked={user.status === "Active"}
                         onCheckedChange={() => handleToggleStatus(user.id)}
                       />
                     </div>
@@ -744,6 +691,16 @@ const Users = () => {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="name">Full Name *</Label>
+              <Input
+                id="name"
+                placeholder="Enter full name"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="role">Role *</Label>
               <Select value={formRole} onValueChange={(val: "admin" | "cashier") => setFormRole(val)}>
                 <SelectTrigger>
@@ -834,6 +791,16 @@ const Users = () => {
                 placeholder="Enter NIC number"
                 value={formNic}
                 onChange={(e) => setFormNic(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Full Name *</Label>
+              <Input
+                id="edit-name"
+                placeholder="Enter full name"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
               />
             </div>
 
