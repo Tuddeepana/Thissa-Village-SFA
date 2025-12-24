@@ -55,18 +55,15 @@ export function InvoiceTable({
             <TableRow>
               <TableHead>Invoice #</TableHead>
               <TableHead>Date</TableHead>
-              <TableHead>Customer</TableHead>
               <TableHead>Items</TableHead>
               <TableHead>Total</TableHead>
-              <TableHead>Payment</TableHead>
-              <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {invoices.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground">
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
                   No invoices found
                 </TableCell>
               </TableRow>
@@ -75,16 +72,9 @@ export function InvoiceTable({
                 <TableRow key={invoice.id}>
                   <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                   <TableCell>{format(invoice.date, "MMM dd, yyyy")}</TableCell>
-                  <TableCell>{invoice.customerName}</TableCell>
                   <TableCell>{invoice.items.length}</TableCell>
                   <TableCell>Rs. {invoice.total.toFixed(2)}</TableCell>
-                  <TableCell className="capitalize">{invoice.paymentMethod}</TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(invoice.status)}>
-                      {invoice.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right flex justify-end gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
