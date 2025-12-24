@@ -202,15 +202,15 @@ export function AddInvoiceDialog({ open, onOpenChange, onAdd }: AddInvoiceDialog
                         !date && "text-muted-foreground"
                       )}
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {date ? format(date, "PPP") : <span>Pick a date</span>}
+                      {date ? format(date, "PPP") : "Pick a date"}
+                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
+                  <PopoverContent className="w-auto p-0">
                     <Calendar
                       mode="single"
                       selected={date}
-                      onSelect={(newDate) => newDate && setDate(newDate)}
+                      onSelect={setDate}
                       initialFocus
                     />
                   </PopoverContent>
@@ -218,204 +218,104 @@ export function AddInvoiceDialog({ open, onOpenChange, onAdd }: AddInvoiceDialog
               </div>
             </div>
 
-            {/* Customer Details Section */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Product Selection Section */}
+            <div className="grid gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="customerName">Customer Name</Label>
-                <Input
-                  id="customerName"
-                  placeholder="Enter customer name"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                />
+                <Label htmlFor="product">Select Product</Label>
+                <Select
+                  value={selectedProductId}
+                  onValueChange={(val) => setSelectedProductId(val)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.map((product) => (
+                      <SelectItem key={product.id} value={product.id}>
+                        {product.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="customerPhone">Customer Phone</Label>
-                <Input
-                  id="customerPhone"
-                  placeholder="Enter phone number"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* Add Product Section */}
-            <div className="border rounded-lg p-4 bg-muted/30">
-              <Label className="text-sm font-semibold mb-3 block">Add Products</Label>
-              <div className="grid grid-cols-12 gap-2 items-end">
-                <div className="col-span-6">
-                  <Label className="text-xs">Product</Label>
-                  <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a product" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {products.map((product) => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name} - Rs.{product.price.toFixed(2)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="col-span-3">
-                  <Label className="text-xs">Quantity</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={quantity}
-                    onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                  />
-                </div>
-                <div className="col-span-3">
+              {selectedProduct && (
+                <div className="grid grid-cols-3 gap-4 items-center">
+                  <div className="grid gap-2">
+                    <Label>Unit Price</Label>
+                    <Input
+                      value={selectedProduct.price}
+                      readOnly
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="quantity">Quantity</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      value={quantity}
+                      onChange={(e) => setQuantity(Number.parseInt(e.target.value) || 1)}
+                    />
+                  </div>
                   <Button
+                    className="mt-6"
                     onClick={handleAddItem}
-                    disabled={!selectedProductId}
-                    className="w-full"
                   >
-                    <Plus className="h-4 w-4 mr-1" /> Add
+                    Add Item
                   </Button>
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* Items List */}
-            {items.length > 0 && (
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted">
-                    <tr>
-                      <th className="text-left p-2">Product</th>
-                      <th className="text-left p-2">Category</th>
-                      <th className="text-center p-2">Qty</th>
-                      <th className="text-right p-2">Price</th>
-                      <th className="text-right p-2">Total</th>
-                      <th className="text-center p-2">Action</th>
+            {/* Items Table Section */}
+            <div className="grid gap-4">
+              <Label>Items</Label>
+              <table className="table-auto w-full">
+                <thead>
+                  <tr>
+                    <th className="px-4 py-2">Product</th>
+                    <th className="px-4 py-2">Category</th>
+                    <th className="px-4 py-2">Quantity</th>
+                    <th className="px-4 py-2">Unit Price</th>
+                    <th className="px-4 py-2">Total</th>
+                    <th className="px-4 py-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.productId}>
+                      <td className="border px-4 py-2">{item.productName}</td>
+                      <td className="border px-4 py-2">{item.category}</td>
+                      <td className="border px-4 py-2">
+                        <Input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => handleUpdateItemQuantity(item.productId, Number.parseInt(e.target.value) || 0)}
+                        />
+                      </td>
+                      <td className="border px-4 py-2">{item.unitPrice}</td>
+                      <td className="border px-4 py-2">{item.total}</td>
+                      <td className="border px-4 py-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveItem(item.productId)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((item) => (
-                      <tr key={item.productId} className="border-t">
-                        <td className="p-2">{item.productName}</td>
-                        <td className="p-2 text-muted-foreground">{item.category}</td>
-                        <td className="p-2 text-center">
-                          <Input
-                            type="number"
-                            min={1}
-                            value={item.quantity}
-                            onChange={(e) => handleUpdateItemQuantity(item.productId, parseInt(e.target.value) || 0)}
-                            className="w-16 text-center h-8"
-                          />
-                        </td>
-                        <td className="p-2 text-right">Rs.{item.unitPrice.toFixed(2)}</td>
-                        <td className="p-2 text-right font-medium">Rs.{item.total.toFixed(2)}</td>
-                        <td className="p-2 text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveItem(item.productId)}
-                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Payment & Status Section */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Payment Method</Label>
-                <Select value={paymentMethod} onValueChange={(val: 'cash' | 'card' | 'other') => setPaymentMethod(val)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="card">Card</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label>Status</Label>
-                <Select value={status} onValueChange={(val: 'paid' | 'pending' | 'cancelled') => setStatus(val)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
-
-            {/* Tax & Discount */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="taxRate">Tax Rate (%)</Label>
-                <Input
-                  id="taxRate"
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={taxRate}
-                  onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="discount">Discount (Rs.)</Label>
-                <Input
-                  id="discount"
-                  type="number"
-                  min={0}
-                  value={discount}
-                  onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-                />
-              </div>
-            </div>
-
-            {/* Totals Summary */}
-            {items.length > 0 && (
-              <div className="border rounded-lg p-4 bg-muted/30">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Subtotal:</span>
-                    <span>Rs.{subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tax ({taxRate}%):</span>
-                    <span>Rs.{tax.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Discount:</span>
-                    <span>-Rs.{discount.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-lg font-bold border-t pt-2">
-                    <span>Total:</span>
-                    <span>Rs.{total.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </ScrollArea>
         <DialogFooter>
-          <Button variant="outline" onClick={() => {
-            resetForm();
-            onOpenChange(false);
-          }}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={!isValid}>
-            Add Invoice
+          <Button
+            onClick={handleSubmit}
+            disabled={!isValid}
+          >
+            Save Invoice
           </Button>
         </DialogFooter>
       </DialogContent>
