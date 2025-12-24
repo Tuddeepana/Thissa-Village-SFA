@@ -2,7 +2,14 @@ import { Router } from 'express';
 import { userController } from '../controllers/user.controller';
 import { authenticate } from '../middleware/auth.middleware';
 import { adminOnly } from '../middleware/rbac.middleware';
-import { asyncHandler } from '../middleware/error.middleware';
+import { validate } from '../middleware/validate.middleware';
+import {
+  loginUserSchema,
+  registerUserSchema,
+  updateUserSchema,
+  userIdParamSchema,
+  userQuerySchema,
+} from '../validations/user.validation';
 
 const router = Router();
 
@@ -12,7 +19,7 @@ const router = Router();
  * @desc    Login user
  * @access  Public
  */
-router.post('/login', asyncHandler(userController.login.bind(userController)));
+router.post('/login', validate({ body: loginUserSchema }), userController.login);
 
 // Protected routes - Require authentication
 /**
@@ -20,14 +27,14 @@ router.post('/login', asyncHandler(userController.login.bind(userController)));
  * @desc    Get current user profile
  * @access  Private (Authenticated users)
  */
-router.get('/me', authenticate, asyncHandler(userController.getProfile.bind(userController)));
+router.get('/me', authenticate, userController.getProfile);
 
 /**
  * @route   PUT /api/users/me
  * @desc    Update current user profile
  * @access  Private (Authenticated users)
  */
-router.put('/me', authenticate, asyncHandler(userController.updateProfile.bind(userController)));
+router.put('/me', authenticate, validate({ body: updateUserSchema }), userController.updateProfile);
 
 // Admin only routes
 /**
@@ -35,71 +42,41 @@ router.put('/me', authenticate, asyncHandler(userController.updateProfile.bind(u
  * @desc    Register a new user
  * @access  Private (Admin only)
  */
-router.post(
-  '/register',
-  authenticate,
-  adminOnly,
-  asyncHandler(userController.register.bind(userController))
-);
+router.post('/register', authenticate, adminOnly, validate({ body: registerUserSchema }), userController.register);
 
 /**
  * @route   GET /api/users
  * @desc    Get all users
  * @access  Private (Admin only)
  */
-router.get(
-  '/',
-  authenticate,
-  adminOnly,
-  asyncHandler(userController.getUsers.bind(userController))
-);
+router.get('/', authenticate, adminOnly, validate({ query: userQuerySchema }), userController.getUsers);
 
 /**
  * @route   GET /api/users/:id
  * @desc    Get user by ID
  * @access  Private (Admin only)
  */
-router.get(
-  '/:id',
-  authenticate,
-  adminOnly,
-  asyncHandler(userController.getUserById.bind(userController))
-);
+router.get('/:id', authenticate, adminOnly, validate({ params: userIdParamSchema }), userController.getUserById);
 
 /**
  * @route   PUT /api/users/:id
  * @desc    Update user
  * @access  Private (Admin only)
  */
-router.put(
-  '/:id',
-  authenticate,
-  adminOnly,
-  asyncHandler(userController.updateUser.bind(userController))
-);
+router.put('/:id', authenticate, adminOnly, validate({ params: userIdParamSchema, body: updateUserSchema }), userController.updateUser);
 
 /**
  * @route   DELETE /api/users/:id
  * @desc    Delete user (soft delete)
  * @access  Private (Admin only)
  */
-router.delete(
-  '/:id',
-  authenticate,
-  adminOnly,
-  asyncHandler(userController.deleteUser.bind(userController))
-);
+router.delete('/:id', authenticate, adminOnly, validate({ params: userIdParamSchema }), userController.deleteUser);
 
 /**
  * @route   DELETE /api/users/:id/permanent
  * @desc    Permanently delete user
  * @access  Private (Admin only)
  */
-router.delete(
-  '/:id/permanent',
-  authenticate,
-  adminOnly,
-  asyncHandler(userController.permanentlyDeleteUser.bind(userController))
-);
+router.delete('/:id/permanent', authenticate, adminOnly, validate({ params: userIdParamSchema }), userController.permanentlyDeleteUser);
 
 export default router;

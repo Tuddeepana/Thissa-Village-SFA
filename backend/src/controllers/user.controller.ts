@@ -16,7 +16,7 @@ export class UserController {
    * POST /api/users/register
    * Access: Admin only
    */
-  async register(req: AuthRequest, res: Response): Promise<void> {
+  register = async (req: AuthRequest, res: Response): Promise<void> => {
     // Validate request body
     const validatedData = registerUserSchema.parse(req.body);
 
@@ -25,14 +25,14 @@ export class UserController {
 
     const response = createSuccessResponse(result, 'User registered successfully');
     res.status(201).json(response);
-  }
+  };
 
   /**
    * Login user
    * POST /api/users/login
    * Access: Public
    */
-  async login(req: AuthRequest, res: Response): Promise<void> {
+  login = async (req: AuthRequest, res: Response): Promise<void> => {
     // Validate request body
     const validatedData = loginUserSchema.parse(req.body);
 
@@ -41,14 +41,14 @@ export class UserController {
 
     const response = createSuccessResponse(result, 'Login successful');
     res.status(200).json(response);
-  }
+  };
 
   /**
    * Get current user profile
    * GET /api/users/me
    * Access: Authenticated users
    */
-  async getProfile(req: AuthRequest, res: Response): Promise<void> {
+  getProfile = async (req: AuthRequest, res: Response): Promise<void> => {
     if (!req.user) {
       throw new Error('User not authenticated');
     }
@@ -57,14 +57,14 @@ export class UserController {
 
     const response = createSuccessResponse(user);
     res.status(200).json(response);
-  }
+  };
 
   /**
    * Get all users
    * GET /api/users
    * Access: Admin only
    */
-  async getUsers(req: AuthRequest, res: Response): Promise<void> {
+  getUsers = async (req: AuthRequest, res: Response): Promise<void> => {
     // Validate query parameters
     const query = userQuerySchema.parse(req.query);
 
@@ -72,28 +72,28 @@ export class UserController {
 
     const response = createSuccessResponse(users, undefined, users.length);
     res.status(200).json(response);
-  }
+  };
 
   /**
    * Get user by ID
    * GET /api/users/:id
    * Access: Admin only
    */
-  async getUserById(req: AuthRequest, res: Response): Promise<void> {
+  getUserById = async (req: AuthRequest, res: Response): Promise<void> => {
     const { id } = userIdParamSchema.parse(req.params);
 
     const user = await userService.getUserById(id);
 
     const response = createSuccessResponse(user);
     res.status(200).json(response);
-  }
+  };
 
   /**
    * Update user
    * PUT /api/users/:id
    * Access: Admin only
    */
-  async updateUser(req: AuthRequest, res: Response): Promise<void> {
+  updateUser = async (req: AuthRequest, res: Response): Promise<void> => {
     const { id } = userIdParamSchema.parse(req.params);
 
     // Validate request body
@@ -103,14 +103,14 @@ export class UserController {
 
     const response = createSuccessResponse(user, 'User updated successfully');
     res.status(200).json(response);
-  }
+  };
 
   /**
    * Update own profile
    * PUT /api/users/me
    * Access: Authenticated users
    */
-  async updateProfile(req: AuthRequest, res: Response): Promise<void> {
+  updateProfile = async (req: AuthRequest, res: Response): Promise<void> => {
     if (!req.user) {
       throw new Error('User not authenticated');
     }
@@ -131,35 +131,35 @@ export class UserController {
 
     const response = createSuccessResponse(user, 'Profile updated successfully');
     res.status(200).json(response);
-  }
+  };
 
   /**
    * Delete user (soft delete)
    * DELETE /api/users/:id
    * Access: Admin only
    */
-  async deleteUser(req: AuthRequest, res: Response): Promise<void> {
+  deleteUser = async (req: AuthRequest, res: Response): Promise<void> => {
     const { id } = userIdParamSchema.parse(req.params);
 
     await userService.deleteUser(id);
 
     const response = createSuccessResponse(null, 'User deleted successfully');
     res.status(200).json(response);
-  }
+  };
 
   /**
    * Permanently delete user
    * DELETE /api/users/:id/permanent
    * Access: Admin only
    */
-  async permanentlyDeleteUser(req: AuthRequest, res: Response): Promise<void> {
+  permanentlyDeleteUser = async (req: AuthRequest, res: Response): Promise<void> => {
     const { id } = userIdParamSchema.parse(req.params);
 
     await userService.permanentlyDeleteUser(id);
 
     const response = createSuccessResponse(null, 'User permanently deleted successfully');
     res.status(200).json(response);
-  }
+  };
 }
 
 export const userController = new UserController();
