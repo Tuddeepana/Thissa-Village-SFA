@@ -32,6 +32,7 @@ interface Product {
      sellingPrice: number;
      stock: number;
      lowStockAlert: number;
+     bottleSize: string;
  }
 
 const Products = () => {
@@ -46,6 +47,7 @@ const Products = () => {
              sellingPrice: 650,
              stock: 24,
              lowStockAlert: 10,
+             bottleSize: "750ml",
          },
          {
              id: 2,
@@ -56,6 +58,7 @@ const Products = () => {
              sellingPrice: 55,
              stock: 8,
              lowStockAlert: 15,
+             bottleSize: "750ml",
          },
          {
              id: 3,
@@ -66,6 +69,7 @@ const Products = () => {
              sellingPrice: 35,
              stock: 42,
              lowStockAlert: 20,
+             bottleSize: "750ml",
          },
      ]);
 
@@ -74,11 +78,18 @@ const Products = () => {
     // Inline edit state for per-row editing of lowStockAlert
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editingLow, setEditingLow] = useState<number | "">("");
-
+    const [editingCostPrice, setEditingCostPrice] = useState<number | "">("");
+    const [editingSellingPrice, setEditingSellingPrice] = useState<number | "">("");
+    const [editingBottleSize, setEditingBottleSize] = useState(""); // New state for bottle size
+    const [editingBottleUnit, setEditingBottleUnit] = useState("ml"); // New state for bottle unit
      // Controlled form state for minimal add form
      const [newName, setNewName] = useState("");
      const [newCategory, setNewCategory] = useState("");
      const [newLowStockAlert, setNewLowStockAlert] = useState<number | "">("");
+     const [newCostPrice, setNewCostPrice] = useState<number | "">("");
+     const [newSellingPrice, setNewSellingPrice] = useState<number | "">("");
+     const [newBottleSize, setNewBottleSize] = useState(""); // New state for bottle size
+     const [newBottleUnit, setNewBottleUnit] = useState("ml"); // New state for bottle unit
 
      const handleDelete = (id: number) => {
          setProducts(products.filter((prod) => prod.id !== id));
@@ -92,27 +103,45 @@ const Products = () => {
     const startEditing = (product: Product) => {
         setEditingId(product.id);
         setEditingLow(product.lowStockAlert);
+        setEditingCostPrice(product.costPrice);
+        setEditingSellingPrice(product.sellingPrice);
+        const [size, unit] = product.bottleSize.split(" ");
+        setEditingBottleSize(size);
+        setEditingBottleUnit(unit);
     };
 
     const cancelEditing = () => {
         setEditingId(null);
         setEditingLow("");
+        setEditingCostPrice("");
+        setEditingSellingPrice("");
+        setEditingBottleSize(""); // Clear bottle size on cancel
+        setEditingBottleUnit("ml"); // Reset bottle unit on cancel
     };
 
     const saveEditing = () => {
         if (editingId == null) return;
         const alertLevel = typeof editingLow === "number" ? editingLow : Number.parseInt(String(editingLow || "0"), 10);
-        const finalAlert = Number.isNaN(alertLevel) ? 0 : alertLevel;
-        setProducts(prev => prev.map(p => p.id === editingId ? { ...p, lowStockAlert: finalAlert } : p));
-        toast({ title: "Updated", description: "Low stock alert updated" });
+        const costPrice = typeof editingCostPrice === "number" ? editingCostPrice : Number.parseFloat(String(editingCostPrice || "0"));
+        const sellingPrice = typeof editingSellingPrice === "number" ? editingSellingPrice : Number.parseFloat(String(editingSellingPrice || "0"));
+        setProducts(prev => prev.map(p => p.id === editingId ? { ...p, lowStockAlert: alertLevel, costPrice, sellingPrice, bottleSize: `${editingBottleSize} ${editingBottleUnit}` } : p));
+        toast({ title: "Updated", description: "Product details updated" });
         setEditingId(null);
         setEditingLow("");
+        setEditingCostPrice("");
+        setEditingSellingPrice("");
+        setEditingBottleSize("");
+        setEditingBottleUnit("ml");
     };
 
      const resetForm = () => {
          setNewName("");
          setNewCategory("");
          setNewLowStockAlert("");
+         setNewCostPrice("");
+         setNewSellingPrice("");
+         setNewBottleSize("");
+         setNewBottleUnit("ml");
      };
 
      const handleAddSubmit = (e: React.FormEvent) => {
@@ -126,7 +155,14 @@ const Products = () => {
              toast({ title: "Validation", description: "Category is required" });
              return;
          }
+         if (!newBottleSize.trim()) {
+             toast({ title: "Validation", description: "Bottle size is required" });
+             return;
+         }
+
          const alertLevel = typeof newLowStockAlert === "number" ? newLowStockAlert : Number.parseInt(String(newLowStockAlert || "0"), 10);
+         const costPrice = typeof newCostPrice === "number" ? newCostPrice : Number.parseFloat(String(newCostPrice || "0"));
+         const sellingPrice = typeof newSellingPrice === "number" ? newSellingPrice : Number.parseFloat(String(newSellingPrice || "0"));
 
          let categoryLabel = newCategory;
          if (newCategory === "red") {
@@ -144,10 +180,11 @@ const Products = () => {
              name: newName.trim(),
              category: categoryLabel,
              liter: "750ml", // default
-             costPrice: 0,
-             sellingPrice: 0,
+             costPrice: Number.isNaN(costPrice) ? 0 : costPrice,
+             sellingPrice: Number.isNaN(sellingPrice) ? 0 : sellingPrice,
              stock: 0,
              lowStockAlert: Number.isNaN(alertLevel) ? 0 : alertLevel,
+             bottleSize: `${newBottleSize.trim()} ${newBottleUnit}`,
          };
 
          setProducts(prev => [...prev, newProduct]);
@@ -176,16 +213,6 @@ const Products = () => {
                          </DialogHeader>
                          <form className="space-y-4" onSubmit={handleAddSubmit}>
                              <div className="space-y-2">
-                                 <Label htmlFor="productName">Product Name</Label>
-                                 <Input
-                                     id="productName"
-                                     required
-                                     value={newName}
-                                     onChange={(e) => setNewName(e.target.value)}
-                                 />
-                             </div>
-
-                             <div className="space-y-2">
                                  <Label htmlFor="category">Category</Label>
                                  <Select value={newCategory} onValueChange={(val) => setNewCategory(val)}>
                                      <SelectTrigger>
@@ -197,6 +224,65 @@ const Products = () => {
                                          <SelectItem value="sparkling">Sparkling Wine</SelectItem>
                                      </SelectContent>
                                  </Select>
+                             </div>
+
+                             <div className="space-y-2">
+                                 <Label htmlFor="productName">Product Name</Label>
+                                 <Input
+                                     id="productName"
+                                     required
+                                     value={newName}
+                                     onChange={(e) => setNewName(e.target.value)}
+                                 />
+                             </div>
+
+                             <div className="space-y-2">
+                                 <Label htmlFor="costPrice">Product Price</Label>
+                                 <Input
+                                     id="costPrice"
+                                     type="number"
+                                     placeholder="Enter cost price"
+                                     value={newCostPrice === "" ? "" : String(newCostPrice)}
+                                     onChange={(e) => {
+                                         const val = e.target.value;
+                                         setNewCostPrice(val === "" ? "" : Number(val));
+                                     }}
+                                 />
+                             </div>
+
+                             <div className="space-y-2">
+                                 <Label htmlFor="sellingPrice">Selling Price</Label>
+                                 <Input
+                                     id="sellingPrice"
+                                     type="number"
+                                     placeholder="Enter selling price"
+                                     value={newSellingPrice === "" ? "" : String(newSellingPrice)}
+                                     onChange={(e) => {
+                                         const val = e.target.value;
+                                         setNewSellingPrice(val === "" ? "" : Number(val));
+                                     }}
+                                 />
+                             </div>
+
+                             <div className="space-y-2">
+                                 <Label htmlFor="bottleSize">Bottle Size</Label>
+                                 <div className="flex gap-2">
+                                     <Input
+                                         id="bottleSize"
+                                         placeholder="Enter size"
+                                         value={newBottleSize}
+                                         onChange={(e) => setNewBottleSize(e.target.value)}
+                                     />
+                                     <Select value={newBottleUnit} onValueChange={(val) => setNewBottleUnit(val)}>
+                                         <SelectTrigger>
+                                             <SelectValue placeholder="Unit" />
+                                         </SelectTrigger>
+                                         <SelectContent>
+                                             <SelectItem value="ml">ML</SelectItem>
+                                             <SelectItem value="l">L</SelectItem>
+                                         </SelectContent>
+                                     </Select>
+                                 </div>
                              </div>
 
                              <div className="space-y-2">
@@ -229,6 +315,9 @@ const Products = () => {
                              <TableRow>
                                  <TableHead>Name</TableHead>
                                  <TableHead>Category</TableHead>
+                                 <TableHead>Bottle Size</TableHead>
+                                 <TableHead>Product Price</TableHead>
+                                 <TableHead>Selling Price</TableHead>
                                  <TableHead>Low Stock Alert</TableHead>
                                  <TableHead className="text-right">Actions</TableHead>
                              </TableRow>
@@ -238,24 +327,80 @@ const Products = () => {
                                  <TableRow key={product.id}>
                                      <TableCell className="font-medium">{product.name}</TableCell>
                                      <TableCell>{product.category}</TableCell>
-                                     <TableCell>{product.lowStockAlert}</TableCell>
+                                     <TableCell>
+                                         {editingId === product.id ? (
+                                             <div className="flex gap-2">
+                                                 <Input
+                                                     className="w-24"
+                                                     value={editingBottleSize}
+                                                     onChange={(e) => setEditingBottleSize(e.target.value)}
+                                                 />
+                                                 <Select value={editingBottleUnit} onValueChange={(val) => setEditingBottleUnit(val)}>
+                                                     <SelectTrigger>
+                                                         <SelectValue placeholder="Unit" />
+                                                     </SelectTrigger>
+                                                     <SelectContent>
+                                                         <SelectItem value="ml">ML</SelectItem>
+                                                         <SelectItem value="l">L</SelectItem>
+                                                     </SelectContent>
+                                                 </Select>
+                                             </div>
+                                         ) : (
+                                             product.bottleSize
+                                         )}
+                                     </TableCell>
+                                     <TableCell>
+                                         {editingId === product.id ? (
+                                             <Input
+                                                 className="w-24"
+                                                 type="number"
+                                                 value={editingCostPrice === "" ? "" : String(editingCostPrice)}
+                                                 onChange={(e) => {
+                                                     const val = e.target.value;
+                                                     setEditingCostPrice(val === "" ? "" : Number(val));
+                                                 }}
+                                             />
+                                         ) : (
+                                             product.costPrice
+                                         )}
+                                     </TableCell>
+                                     <TableCell>
+                                         {editingId === product.id ? (
+                                             <Input
+                                                 className="w-24"
+                                                 type="number"
+                                                 value={editingSellingPrice === "" ? "" : String(editingSellingPrice)}
+                                                 onChange={(e) => {
+                                                     const val = e.target.value;
+                                                     setEditingSellingPrice(val === "" ? "" : Number(val));
+                                                 }}
+                                             />
+                                         ) : (
+                                             product.sellingPrice
+                                         )}
+                                     </TableCell>
+                                     <TableCell>
+                                         {editingId === product.id ? (
+                                             <Input
+                                                 className="w-24"
+                                                 type="number"
+                                                 value={editingLow === "" ? "" : String(editingLow)}
+                                                 onChange={(e) => {
+                                                     const val = e.target.value;
+                                                     setEditingLow(val === "" ? "" : Number(val));
+                                                 }}
+                                             />
+                                         ) : (
+                                             product.lowStockAlert
+                                         )}
+                                     </TableCell>
                                      <TableCell className="text-right">
                                          <div className="flex justify-end gap-2">
-                                             {/* Edit lowStockAlert - inline editor */}
                                              {editingId === product.id ? (
-                                                 <div className="flex items-center gap-2">
-                                                     <Input
-                                                         className="w-24"
-                                                         type="number"
-                                                         value={editingLow === "" ? "" : String(editingLow)}
-                                                         onChange={(e) => {
-                                                             const val = e.target.value;
-                                                             setEditingLow(val === "" ? "" : Number(val));
-                                                         }}
-                                                     />
+                                                 <>
                                                      <Button type="button" size="sm" onClick={saveEditing}>Save</Button>
                                                      <Button type="button" size="sm" variant="ghost" onClick={cancelEditing}>Cancel</Button>
-                                                 </div>
+                                                 </>
                                              ) : (
                                                  <Button type="button" variant="ghost" size="icon" onClick={() => startEditing(product)}>
                                                      <Pencil className="h-4 w-4" />
