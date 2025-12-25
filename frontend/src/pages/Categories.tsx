@@ -141,7 +141,6 @@ const Categories = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Created</TableHead>
@@ -151,7 +150,6 @@ const Categories = () => {
             <TableBody>
               {categories.map((category) => (
                 <TableRow key={category.id}>
-                  <TableCell className="font-mono text-xs">{category.id.slice(0, 8)}…</TableCell>
                   <TableCell className="font-medium">{category.name}</TableCell>
                   <TableCell>{category.description ?? '-'}</TableCell>
                   <TableCell>{category.createdAt ? format(new Date(category.createdAt), 'yyyy-MM-dd') : '-'}</TableCell>
