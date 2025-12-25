@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,63 +16,78 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { DeleteButton } from "@/components/common";
-
-interface Category {
-  id: number;
-  name: string;
-  description: string;
-  createdDate: string;
-}
+import { useQuery } from "@tanstack/react-query";
+import { categoryService } from "@/api/services/categoryService";
+import type { Category } from "@/types/category.types";
+import { format } from "date-fns";
 
 const Categories = () => {
   const { toast } = useToast();
-  const [categories, setCategories] = useState<Category[]>([
-    {
-      id: 1,
-      name: "Red Wine",
-      description: "Full-bodied red wines from various regions",
-      createdDate: "2024-01-15",
-    },
-    {
-      id: 2,
-      name: "White Wine",
-      description: "Crisp and refreshing white wines",
-      createdDate: "2024-01-16",
-    },
-    {
-      id: 3,
-      name: "Sparkling Wine",
-      description: "Champagne and sparkling varieties",
-      createdDate: "2024-01-17",
-    },
-  ]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const [formData, setFormData] = useState({ name: "", description: "" });
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", description: "" });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const { categories } = await categoryService.list({ page: 1, limit: 100 });
+      return categories;
+    },
+    staleTime: 10_000,
+  });
+
+  useEffect(() => {
+    if (data) setCategories(data);
+  }, [data]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newCategory: Category = {
-      id: categories.length + 1,
-      name: formData.name,
-      description: formData.description,
-      createdDate: new Date().toISOString().split("T")[0],
-    };
-    setCategories([...categories, newCategory]);
-    setFormData({ name: "", description: "" });
-    setOpen(false);
-    toast({
-      title: "Success",
-      description: "Category added successfully",
-    });
+    try {
+      await categoryService.create({ name: formData.name, description: formData.description || undefined });
+      toast({ title: "Success", description: "Category added successfully" });
+      setFormData({ name: "", description: "" });
+      setOpen(false);
+      refetch();
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.response?.data?.message ?? "Failed to add category" });
+    }
   };
 
-  const handleDelete = (id: number) => {
-    setCategories(categories.filter((cat) => cat.id !== id));
-    toast({
-      title: "Deleted",
-      description: "Category removed successfully",
-    });
+  const handleDelete = async (id: string) => {
+    try {
+      await categoryService.softDelete(id);
+      toast({ title: "Deleted", description: "Category removed successfully" });
+      refetch();
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.response?.data?.message ?? "Failed to remove category" });
+    }
+  };
+
+  const openEditDialog = (category: Category) => {
+    setSelectedCategory(category);
+    setEditForm({ name: category.name, description: category.description ?? "" });
+    setEditOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCategory) return;
+    try {
+      await categoryService.update(selectedCategory.id, {
+        name: editForm.name,
+        description: editForm.description || null,
+      });
+      toast({ title: "Updated", description: "Category updated successfully" });
+      setEditOpen(false);
+      setSelectedCategory(null);
+      refetch();
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.response?.data?.message ?? "Failed to update category" });
+    }
   };
 
   return (
@@ -129,20 +144,20 @@ const Categories = () => {
                 <TableHead>ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>Created Date</TableHead>
+                <TableHead>Created</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {categories.map((category) => (
                 <TableRow key={category.id}>
-                  <TableCell>{category.id}</TableCell>
+                  <TableCell className="font-mono text-xs">{category.id.slice(0, 8)}…</TableCell>
                   <TableCell className="font-medium">{category.name}</TableCell>
-                  <TableCell>{category.description}</TableCell>
-                  <TableCell>{category.createdDate}</TableCell>
+                  <TableCell>{category.description ?? '-'}</TableCell>
+                  <TableCell>{category.createdAt ? format(new Date(category.createdAt), 'yyyy-MM-dd') : '-'}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" onClick={() => openEditDialog(category)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <DeleteButton
@@ -157,6 +172,48 @@ const Categories = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Edit Category Dialog */}
+      <Dialog
+        open={editOpen}
+        onOpenChange={(o) => {
+          setEditOpen(o);
+          if (!o) {
+            setSelectedCategory(null);
+            setEditForm({ name: "", description: "" });
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Category</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Category Name</Label>
+              <Input
+                id="edit-name"
+                value={editForm.name}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={editForm.description}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, description: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button type="submit">Save Changes</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
