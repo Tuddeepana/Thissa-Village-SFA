@@ -18,17 +18,18 @@ import Users from "./pages/Users";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import { STORAGE_KEYS } from "./utils/constants";
 
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const isAuthenticated = localStorage.getItem("isAuthenticated");
+  const isAuthenticated = localStorage.getItem(STORAGE_KEYS.isAuthenticated);
   return isAuthenticated ? <>{children}</> : <Navigate to="/auth" />;
 };
 
 const ModuleRoute = ({ children }: { children: React.ReactNode }) => {
-  const isAuthenticated = localStorage.getItem("isAuthenticated");
-  const selectedModule = localStorage.getItem("selectedModule");
+  const isAuthenticated = localStorage.getItem(STORAGE_KEYS.isAuthenticated);
+  const selectedModule = localStorage.getItem(STORAGE_KEYS.selectedModule);
   
   if (!isAuthenticated) return <Navigate to="/auth" />;
   if (!selectedModule) return <Navigate to="/modules" />;

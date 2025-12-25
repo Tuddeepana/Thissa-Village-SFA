@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Wine } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { authService } from "@/api/services/authService";
+import { STORAGE_KEYS } from "@/utils/constants";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -14,16 +16,24 @@ const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock authentication - in real app, validate credentials
-    if (email && password) {
-      localStorage.setItem("isAuthenticated", "true");
-      toast({
-        title: "Welcome!",
-        description: isLogin ? "Successfully logged in" : "Account created successfully",
-      });
+    try {
+      if (!isLogin) {
+        // implement register via users/register
+        toast({ title: "Info", description: "Sign up not implemented. Use an admin to register." });
+        return;
+      }
+      const res = await authService.login({ email, password });
+      console.log("Login response:", email,password, res);
+      localStorage.setItem(STORAGE_KEYS.isAuthenticated, "true");
+      localStorage.setItem(STORAGE_KEYS.token, res.token);
+      localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(res.user));
+      toast({ title: "Welcome!", description: "Successfully logged in" });
       navigate("/modules");
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || "Invalid credentials";
+      toast({ title: "Login failed", description: msg, variant: "destructive" });
     }
   };
 

@@ -1,4 +1,7 @@
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { STORAGE_KEYS, ROLES } from "@/utils/constants";
+import { User } from "@/types/user.types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wine, ShoppingCart, LayoutDashboard, Package, FileText, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,7 +10,7 @@ const ModuleSelection = () => {
   const navigate = useNavigate();
 
   const handleModuleSelect = (module: string) => {
-    localStorage.setItem("selectedModule", module);
+    localStorage.setItem(STORAGE_KEYS.selectedModule, module);
     if (module === "sfa") {
       navigate("/dashboard");
     } else {
@@ -16,10 +19,18 @@ const ModuleSelection = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated");
-    localStorage.removeItem("selectedModule");
+    localStorage.removeItem(STORAGE_KEYS.isAuthenticated);
+    localStorage.removeItem(STORAGE_KEYS.selectedModule);
+    localStorage.removeItem(STORAGE_KEYS.token);
+    localStorage.removeItem(STORAGE_KEYS.user);
     navigate("/auth");
   };
+
+  const authUser = useMemo<User | null>(() => {
+    const raw = localStorage.getItem(STORAGE_KEYS.user);
+    try { return raw ? (JSON.parse(raw) as User) : null; } catch { return null; }
+  }, []);
+  const isAdmin = authUser?.role === ROLES.ADMIN;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/20 to-background p-4">
@@ -36,6 +47,7 @@ const ModuleSelection = () => {
 
         <div className="grid gap-6 md:grid-cols-2">
           {/* SFA Module Card */}
+          {isAdmin && (
           <Card 
             className="cursor-pointer transition-all hover:shadow-lg hover:border-primary group"
             onClick={() => handleModuleSelect("sfa")}
@@ -73,6 +85,7 @@ const ModuleSelection = () => {
               </Button>
             </CardContent>
           </Card>
+          )}
 
           {/* POS Module Card */}
           <Card 
