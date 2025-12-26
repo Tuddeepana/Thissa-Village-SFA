@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,70 +18,44 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { DeleteButton } from "@/components/common";
+import { useQuery } from "@tanstack/react-query";
+import { productService } from "@/api/services/productService";
+import { categoryService } from "@/api/services/categoryService";
+import type { Product } from "@/types/product.types";
+import type { Category } from "@/types/category.types";
 
-interface Product {
-    id: number;
-    name: string;
-    category: string;
-    liter: string;
-    costPrice: number;
-    sellingPrice: number;
-    stock: number;
-    lowStockAlert: number;
-    bottleSize: string;
-}
+// Result shape returned by productService.list
+type ProductListResult = {
+    items: Product[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+};
 
 const Products = () => {
     const { toast } = useToast();
-    const [products, setProducts] = useState<Product[]>([
-        {
-            id: 1,
-            name: "Château Margaux 2015",
-            category: "Red Wine",
-            liter: "750ml",
-            costPrice: 450,
-            sellingPrice: 650,
-            stock: 24,
-            lowStockAlert: 10,
-            bottleSize: "750ml",
-        },
-        {
-            id: 2,
-            name: "Moët & Chandon Brut",
-            category: "Sparkling Wine",
-            liter: "750ml",
-            costPrice: 35,
-            sellingPrice: 55,
-            stock: 8,
-            lowStockAlert: 15,
-            bottleSize: "750ml",
-        },
-        {
-            id: 3,
-            name: "Cloudy Bay Sauvignon Blanc",
-            category: "White Wine",
-            liter: "750ml",
-            costPrice: 22,
-            sellingPrice: 35,
-            stock: 42,
-            lowStockAlert: 20,
-            bottleSize: "750ml",
-        },
-    ]);
+    const [products, setProducts] = useState<Product[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
+    const categoryNameById = useMemo(() => {
+        const map: Record<string, string> = {};
+        categories.forEach(c => { if (c.id) map[c.id] = c.name; });
+        return map;
+    }, [categories]);
 
     const [open, setOpen] = useState(false);
 
     // Inline edit state for per-row editing of lowStockAlert
-    const [editingId, setEditingId] = useState<number | null>(null);
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [editingLow, setEditingLow] = useState<number | "">("");
     const [editingCostPrice, setEditingCostPrice] = useState<number | "">("");
     const [editingSellingPrice, setEditingSellingPrice] = useState<number | "">("");
-    const [editingBottleSize, setEditingBottleSize] = useState(""); // New state for bottle size
-    const [editingBottleUnit, setEditingBottleUnit] = useState("ml"); // New state for bottle unit
+    const [editingBottleSize, setEditingBottleSize] = useState("");
+    const [editingBottleUnit, setEditingBottleUnit] = useState("ml");
     // Controlled form state for minimal add form
     const [newName, setNewName] = useState("");
     const [newCategory, setNewCategory] = useState("");
@@ -91,23 +65,42 @@ const Products = () => {
     const [newBottleSize, setNewBottleSize] = useState(""); // New state for bottle size
     const [newBottleUnit, setNewBottleUnit] = useState("ml"); // New state for bottle unit
 
-    const handleDelete = (id: number) => {
-        setProducts(products.filter((prod) => prod.id !== id));
-        toast({
-            title: "Deleted",
-            description: "Product removed successfully",
-        });
+    const handleDelete = async (id: string) => {
+        try {
+            await productService.delete(id);
+            toast({ title: "Deleted", description: "Product removed successfully" });
+            refetchProducts();
+        } catch (e: any) {
+            toast({ title: "Error", description: e?.response?.data?.message ?? "Failed to delete product" });
+        }
     };
 
     // Handlers for inline edit
+    const toBottleDisplay = (litresStr: string) => {
+        const litres = Number.parseFloat(litresStr);
+        if (Number.isNaN(litres)) return "-";
+        if (litres >= 1) return `${litres} l`;
+        return `${Math.round(litres * 1000)} ml`;
+    };
+
     const startEditing = (product: Product) => {
         setEditingId(product.id);
-        setEditingLow(product.lowStockAlert);
-        setEditingCostPrice(product.costPrice);
-        setEditingSellingPrice(product.sellingPrice);
-        const [size, unit] = product.bottleSize.split(" ");
-        setEditingBottleSize(size);
-        setEditingBottleUnit(unit);
+        setEditingLow(product.low_stock);
+        setEditingCostPrice(Number.parseFloat(product.cost_price));
+        setEditingSellingPrice(Number.parseFloat(product.selling_price));
+        const litres = Number.parseFloat(product.litres);
+        if (!Number.isNaN(litres)) {
+            if (litres >= 1) {
+                setEditingBottleSize(String(litres));
+                setEditingBottleUnit("l");
+            } else {
+                setEditingBottleSize(String(Math.round(litres * 1000)));
+                setEditingBottleUnit("ml");
+            }
+        } else {
+            setEditingBottleSize("");
+            setEditingBottleUnit("ml");
+        }
     };
 
     const cancelEditing = () => {
@@ -119,19 +112,38 @@ const Products = () => {
         setEditingBottleUnit("ml"); // Reset bottle unit on cancel
     };
 
-    const saveEditing = () => {
+    const toLitresString = (sizeStr: string, unit: string) => {
+        const size = Number.parseFloat(sizeStr);
+        if (Number.isNaN(size)) return "0.00";
+        const litres = unit === "ml" ? size / 1000 : size;
+        return litres.toFixed(2);
+    };
+
+    const saveEditing = async () => {
         if (editingId == null) return;
         const alertLevel = typeof editingLow === "number" ? editingLow : Number.parseInt(String(editingLow || "0"), 10);
-        const costPrice = typeof editingCostPrice === "number" ? editingCostPrice : Number.parseFloat(String(editingCostPrice || "0"));
-        const sellingPrice = typeof editingSellingPrice === "number" ? editingSellingPrice : Number.parseFloat(String(editingSellingPrice || "0"));
-        setProducts(prev => prev.map(p => p.id === editingId ? { ...p, lowStockAlert: alertLevel, costPrice, sellingPrice, bottleSize: `${editingBottleSize} ${editingBottleUnit}` } : p));
-        toast({ title: "Updated", description: "Product details updated" });
-        setEditingId(null);
-        setEditingLow("");
-        setEditingCostPrice("");
-        setEditingSellingPrice("");
-        setEditingBottleSize("");
-        setEditingBottleUnit("ml");
+        const costPriceNum = typeof editingCostPrice === "number" ? editingCostPrice : Number.parseFloat(String(editingCostPrice || "0"));
+        const sellingPriceNum = typeof editingSellingPrice === "number" ? editingSellingPrice : Number.parseFloat(String(editingSellingPrice || "0"));
+        const litresStr = toLitresString(editingBottleSize, editingBottleUnit);
+
+        try {
+            await productService.update(editingId, {
+                low_stock: Number.isNaN(alertLevel) ? 0 : alertLevel,
+                cost_price: Number.isNaN(costPriceNum) ? undefined : costPriceNum.toFixed(2),
+                selling_price: Number.isNaN(sellingPriceNum) ? undefined : sellingPriceNum.toFixed(2),
+                litres: litresStr,
+            });
+            toast({ title: "Updated", description: "Product details updated" });
+            setEditingId(null);
+            setEditingLow("");
+            setEditingCostPrice("");
+            setEditingSellingPrice("");
+            setEditingBottleSize("");
+            setEditingBottleUnit("ml");
+            refetchProducts();
+        } catch (e: any) {
+            toast({ title: "Error", description: e?.response?.data?.message ?? "Failed to update product" });
+        }
     };
 
     const resetForm = () => {
@@ -144,7 +156,44 @@ const Products = () => {
         setNewBottleUnit("ml");
     };
 
-    const handleAddSubmit = (e: React.FormEvent) => {
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+
+    // Fetch products with pagination
+    const { data: productResult, refetch: refetchProducts, isFetching } = useQuery<ProductListResult>({
+        queryKey: ["products", { page: currentPage, limit: itemsPerPage }],
+        queryFn: async () => productService.list({ page: currentPage, limit: itemsPerPage }),
+        staleTime: 10_000,
+        keepPreviousData: true,
+    });
+
+    useEffect(() => {
+        if (productResult?.items) setProducts(productResult.items);
+    }, [productResult]);
+
+    // Derived pagination values with safe typing
+    const pr = productResult as ProductListResult | undefined;
+    const page = pr?.page ?? currentPage;
+    const limit = pr?.limit ?? itemsPerPage;
+    const total = pr?.total ?? (products?.length ?? 0);
+    const totalPages = pr?.totalPages ?? Math.max(1, Math.ceil((total || 1) / (limit || 1)));
+
+    // Fetch categories for select and name mapping
+    const { data: categoryList } = useQuery({
+        queryKey: ["categories-all"],
+        queryFn: async () => {
+            const { categories } = await categoryService.list();
+            return categories;
+        },
+        staleTime: 30_000,
+    });
+
+    useEffect(() => {
+        if (categoryList) setCategories(categoryList);
+    }, [categoryList]);
+
+    const handleAddSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (!newName.trim()) {
@@ -164,33 +213,22 @@ const Products = () => {
         const costPrice = typeof newCostPrice === "number" ? newCostPrice : Number.parseFloat(String(newCostPrice || "0"));
         const sellingPrice = typeof newSellingPrice === "number" ? newSellingPrice : Number.parseFloat(String(newSellingPrice || "0"));
 
-        let categoryLabel = newCategory;
-        if (newCategory === "red") {
-            categoryLabel = "Red Wine";
-        } else if (newCategory === "white") {
-            categoryLabel = "White Wine";
-        } else if (newCategory === "sparkling") {
-            categoryLabel = "Sparkling Wine";
+        try {
+            await productService.create({
+                name: newName.trim(),
+                litres: toLitresString(newBottleSize.trim(), newBottleUnit),
+                cost_price: Number.isNaN(costPrice) ? "0.00" : costPrice.toFixed(2),
+                selling_price: Number.isNaN(sellingPrice) ? "0.00" : sellingPrice.toFixed(2),
+                low_stock: Number.isNaN(alertLevel) ? 0 : alertLevel,
+                categoryId: newCategory,
+            });
+            toast({ title: "Added", description: "Product added successfully" });
+            resetForm();
+            setOpen(false);
+            refetchProducts();
+        } catch (e: any) {
+            toast({ title: "Error", description: e?.response?.data?.message ?? "Failed to add product" });
         }
-
-        const nextId = products.length ? Math.max(...products.map(p => p.id)) + 1 : 1;
-
-        const newProduct: Product = {
-            id: nextId,
-            name: newName.trim(),
-            category: categoryLabel,
-            liter: "750ml", // default
-            costPrice: Number.isNaN(costPrice) ? 0 : costPrice,
-            sellingPrice: Number.isNaN(sellingPrice) ? 0 : sellingPrice,
-            stock: 0,
-            lowStockAlert: Number.isNaN(alertLevel) ? 0 : alertLevel,
-            bottleSize: `${newBottleSize.trim()} ${newBottleUnit}`,
-        };
-
-        setProducts(prev => [...prev, newProduct]);
-        toast({ title: "Added", description: "Product added successfully" });
-        resetForm();
-        setOpen(false);
     };
 
     return (
@@ -219,9 +257,9 @@ const Products = () => {
                                         <SelectValue placeholder="Select category" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="red">Red Wine</SelectItem>
-                                        <SelectItem value="white">White Wine</SelectItem>
-                                        <SelectItem value="sparkling">Sparkling Wine</SelectItem>
+                                        {categories.map((c) => (
+                                            <SelectItem key={c.id} value={c.id!}>{c.name}</SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -307,7 +345,14 @@ const Products = () => {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-base md:text-lg">All Products</CardTitle>
+                    <CardTitle className="text-base md:text-lg">
+                        All Products ({total})
+                        {totalPages > 1 && (
+                            <span className="text-xs md:text-sm font-normal text-muted-foreground ml-2">
+                                - Page {page} of {totalPages}
+                            </span>
+                        )}
+                    </CardTitle>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
                     <Table>
@@ -326,7 +371,7 @@ const Products = () => {
                             {products.map((product) => (
                                 <TableRow key={product.id}>
                                     <TableCell className="font-medium">{product.name}</TableCell>
-                                    <TableCell>{product.category}</TableCell>
+                                    <TableCell>{categoryNameById[product.categoryId] ?? "-"}</TableCell>
                                     <TableCell>
                                         {editingId === product.id ? (
                                             <div className="flex gap-2">
@@ -346,7 +391,7 @@ const Products = () => {
                                                 </Select>
                                             </div>
                                         ) : (
-                                            product.bottleSize
+                                            toBottleDisplay(product.litres)
                                         )}
                                     </TableCell>
                                     <TableCell>
@@ -361,7 +406,7 @@ const Products = () => {
                                                 }}
                                             />
                                         ) : (
-                                            product.costPrice
+                                            product.cost_price
                                         )}
                                     </TableCell>
                                     <TableCell>
@@ -376,7 +421,7 @@ const Products = () => {
                                                 }}
                                             />
                                         ) : (
-                                            product.sellingPrice
+                                            product.selling_price
                                         )}
                                     </TableCell>
                                     <TableCell>
@@ -391,7 +436,7 @@ const Products = () => {
                                                 }}
                                             />
                                         ) : (
-                                            product.lowStockAlert
+                                            product.low_stock
                                         )}
                                     </TableCell>
                                     <TableCell className="text-right">
@@ -416,6 +461,37 @@ const Products = () => {
                             ))}
                         </TableBody>
                     </Table>
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-between gap-3 mt-4">
+                            <div className="text-xs md:text-sm text-muted-foreground">
+                                Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total} products
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                    disabled={isFetching || page === 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                    Previous
+                                </Button>
+                                <span className="text-sm px-2">
+                                    {page} / {totalPages}
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                    disabled={isFetching || page === totalPages}
+                                >
+                                    Next
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </div>
