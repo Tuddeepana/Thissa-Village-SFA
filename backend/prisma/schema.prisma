@@ -64,5 +64,16 @@ model Product {
   @@map("products")
 }
 
+model Invoice {
+  id         String   @id @default(uuid())
+  in_number  String   @unique
+  invoiceDate DateTime
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("invoices")
+}
+
 
 
