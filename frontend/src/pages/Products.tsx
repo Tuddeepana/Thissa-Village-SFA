@@ -76,31 +76,23 @@ const Products = () => {
     };
 
     // Handlers for inline edit
-    const toBottleDisplay = (litresStr: string) => {
-        const litres = Number.parseFloat(litresStr);
-        if (Number.isNaN(litres)) return "-";
-        if (litres >= 1) return `${litres} l`;
-        return `${Math.round(litres * 1000)} ml`;
-    };
+    const toBottleDisplay = (sizeStr?: string, unit?: string) => {
+        if (!sizeStr) return "-";
+        const normalizedUnit = unit === "L" ? "l" : unit === "ML" ? "ml" : "ml";
+        return `${sizeStr} ${normalizedUnit}`;
+        };
 
     const startEditing = (product: Product) => {
         setEditingId(product.id);
         setEditingLow(product.low_stock);
         setEditingCostPrice(Number.parseFloat(product.cost_price));
         setEditingSellingPrice(Number.parseFloat(product.selling_price));
-        const litres = Number.parseFloat(product.litres);
-        if (!Number.isNaN(litres)) {
-            if (litres >= 1) {
-                setEditingBottleSize(String(litres));
-                setEditingBottleUnit("l");
-            } else {
-                setEditingBottleSize(String(Math.round(litres * 1000)));
-                setEditingBottleUnit("ml");
-            }
-        } else {
-            setEditingBottleSize("");
-            setEditingBottleUnit("ml");
-        }
+
+        // Use the raw size string returned by the backend and the bottle_volume enum for unit.
+        // Defaults: empty size -> "", missing unit -> "ml"
+        setEditingBottleSize(product.litres ?? "");
+        const unit = (product.bottle_volume ?? "ML").toString().toLowerCase();
+        setEditingBottleUnit(unit === "l" ? "l" : "ml");
     };
 
     const cancelEditing = () => {
@@ -125,13 +117,15 @@ const Products = () => {
         const costPriceNum = typeof editingCostPrice === "number" ? editingCostPrice : Number.parseFloat(String(editingCostPrice || "0"));
         const sellingPriceNum = typeof editingSellingPrice === "number" ? editingSellingPrice : Number.parseFloat(String(editingSellingPrice || "0"));
         const litresStr = toLitresString(editingBottleSize, editingBottleUnit);
-
+        const unitToEnum = (unit: string) => (String(unit).toLowerCase() === "l" ? "L" : "ML");
+        const bottle_volume = unitToEnum(editingBottleUnit);
         try {
             await productService.update(editingId, {
                 low_stock: Number.isNaN(alertLevel) ? 0 : alertLevel,
                 cost_price: Number.isNaN(costPriceNum) ? undefined : costPriceNum.toFixed(2),
                 selling_price: Number.isNaN(sellingPriceNum) ? undefined : sellingPriceNum.toFixed(2),
                 litres: litresStr,
+                bottle_volume,
             });
             toast({ title: "Updated", description: "Product details updated" });
             setEditingId(null);
@@ -212,14 +206,18 @@ const Products = () => {
         const alertLevel = typeof newLowStockAlert === "number" ? newLowStockAlert : Number.parseInt(String(newLowStockAlert || "0"), 10);
         const costPrice = typeof newCostPrice === "number" ? newCostPrice : Number.parseFloat(String(newCostPrice || "0"));
         const sellingPrice = typeof newSellingPrice === "number" ? newSellingPrice : Number.parseFloat(String(newSellingPrice || "0"));
+        const unitToEnum = (unit: string) => (String(unit).toLowerCase() === "l" ? "L" : "ML");
+        const bottle_volume = unitToEnum(newBottleUnit);
+        const litresStr = String(newBottleSize).trim() || "0";
 
         try {
             await productService.create({
                 name: newName.trim(),
-                litres: toLitresString(newBottleSize.trim(), newBottleUnit),
+                litres: litresStr,
                 cost_price: Number.isNaN(costPrice) ? "0.00" : costPrice.toFixed(2),
                 selling_price: Number.isNaN(sellingPrice) ? "0.00" : sellingPrice.toFixed(2),
                 low_stock: Number.isNaN(alertLevel) ? 0 : alertLevel,
+                bottle_volume,
                 categoryId: newCategory,
             });
             toast({ title: "Added", description: "Product added successfully" });
@@ -391,7 +389,7 @@ const Products = () => {
                                                 </Select>
                                             </div>
                                         ) : (
-                                            toBottleDisplay(product.litres)
+                                            toBottleDisplay(product.litres, product.bottle_volume)
                                         )}
                                     </TableCell>
                                     <TableCell>
