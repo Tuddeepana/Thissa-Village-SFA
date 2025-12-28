@@ -41,10 +41,11 @@ interface ProductItem {
 interface AddInvoiceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAdd: (invoice: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  // optional callback invoked after a successful create so parent can re-fetch
+  onCreated?: () => void;
 }
 
-export function AddInvoiceDialog({ open, onOpenChange, onAdd }: AddInvoiceDialogProps) {
+export function AddInvoiceDialog({ open, onOpenChange, onCreated }: AddInvoiceDialogProps) {
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [date, setDate] = useState<Date>(new Date());
   const [customerName, setCustomerName] = useState("");
@@ -60,7 +61,7 @@ export function AddInvoiceDialog({ open, onOpenChange, onAdd }: AddInvoiceDialog
   const products = useMemo(() => generateProducts(), []);
 
   const selectedProduct = useMemo(() => {
-    return products.find(p => p.id === selectedProductId) as Product | undefined;
+    return products.find(p => p.id === selectedProductId) as unknown as Product | undefined;
   }, [products, selectedProductId]);
 
   // fetched products from backend
@@ -182,35 +183,15 @@ export function AddInvoiceDialog({ open, onOpenChange, onAdd }: AddInvoiceDialog
     const payload = {
       in_number: invoiceNumber,
       invoiceDate: date.toISOString(),
+      subtotal: subtotal,
       items: items.map(i => ({ productId: i.productId, quantityMoved: i.quantity })),
     };
 
     try {
       await api.post('/invoices', payload);
 
-      // keep local UI behaviour: add to list
-      const invoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'> = {
-        invoiceNumber,
-        date,
-        customerName: customerName || "Walk-in Customer",
-        customerPhone: customerPhone || undefined,
-        items: items.map(item => ({
-          productId: item.productId,
-          productName: item.productName,
-          category: item.category,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          total: item.total,
-        })),
-        subtotal,
-        tax,
-        discount,
-        total,
-        paymentMethod,
-        status,
-      };
-
-      onAdd(invoiceData);
+      // Notify parent to re-fetch the invoices. Parent is responsible for updating UI.
+      onCreated?.();
       resetForm();
       onOpenChange(false);
     } catch (err: any) {

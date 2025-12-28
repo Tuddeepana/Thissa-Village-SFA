@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,8 +13,8 @@ import { Plus, FileDown, FileSpreadsheet, AlertTriangle } from "lucide-react";
 import { AddInvoiceDialog } from "@/components/invoices/AddInvoiceDialog";
 import { InvoiceFiltersComponent } from "@/components/invoices/InvoiceFilters";
 import { InvoiceTable } from "@/components/invoices/InvoiceTable";
-import { mockInvoices } from "@/lib/invoiceData";
 import { Invoice, InvoiceFilters, LowStockItem } from "@/types/invoice";
+import api from '@/api/client';
 import {
   generateMonthlyRevenuePDF,
   generateMonthlyRevenueExcel,
@@ -26,11 +26,73 @@ import {
 import { toast } from "sonner";
 
 const Invoices = () => {
-  const [invoices, setInvoices] = useState<Invoice[]>(mockInvoices);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [filters, setFilters] = useState<InvoiceFilters>({});
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+
+  // fetch invoices from backend with pagination (and optional invoiceNumber search)
+  const fetchInvoices = useCallback(async (page: number = currentPage, limit: number = itemsPerPage) => {
+    try {
+      const search = filters.invoiceNumber ? `&search=${encodeURIComponent(filters.invoiceNumber)}` : '';
+      const res = await api.get(`/invoices/with-products?page=${page}&limit=${limit}${search}`);
+      const payload = res.data;
+      const mapped: Invoice[] = (payload.data || []).map((inv: any) => {
+          const items = (inv.products || []).map((p: any) => {
+            const unit = Number(p.selling_price ?? p.cost_price ?? 0);
+            const qty = Number(p.quantity_moved ?? 0);
+            return {
+              productId: p.productId,
+              productName: p.name ?? '',
+              category: p.category ?? p.categoryName ?? 'Uncategorized',
+              quantity: qty,
+              unitPrice: unit,
+              total: unit * qty,
+            };
+          });
+
+        return {
+          id: inv.id,
+          invoiceNumber: inv.in_number,
+          date: new Date(inv.invoiceDate),
+          customerName: 'Walk-in Customer',
+          customerPhone: undefined,
+          items,
+          subtotal: Number(inv.subtotal ?? 0),
+          tax: 0,
+          discount: 0,
+          total: Number(inv.subtotal ?? 0),
+          paymentMethod: 'cash',
+          status: 'pending',
+          createdAt: new Date(inv.createdAt),
+          updatedAt: new Date(inv.updatedAt),
+        };
+      });
+
+      setInvoices(mapped);
+      const total = Number(payload.total ?? mapped.length);
+      const pageLimit = Number(payload.limit ?? limit);
+      setServerTotalPages(Math.max(1, Math.ceil(total / pageLimit)));
+    } catch (err) {
+      // fallback to mock data if available
+      try {
+        const { mockInvoices } = await import('@/lib/invoiceData');
+        setInvoices(mockInvoices);
+        setServerTotalPages(1);
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, [currentPage, itemsPerPage, filters.invoiceNumber]);
+
+  // initial load
+  useEffect(() => {
+    (async () => {
+      await fetchInvoices(1, itemsPerPage);
+    })();
+  }, []);
 
   // Extract unique categories from invoices
   const categories = useMemo(() => {
@@ -41,55 +103,21 @@ const Invoices = () => {
     return Array.from(categorySet).sort();
   }, [invoices]);
 
-  // Filter invoices based on active filters
+  // Server paginates; apply only category filter client-side on current page
   const filteredInvoices = useMemo(() => {
-    return invoices.filter(invoice => {
-      // Invoice Number filter
-      if (filters.invoiceNumber && !invoice.invoiceNumber.toLowerCase().includes(filters.invoiceNumber.toLowerCase())) {
-        return false;
-      }
-
-      // Date Range filter
-      if (filters.dateFrom && invoice.date < filters.dateFrom) {
-        return false;
-      }
-      if (filters.dateTo && invoice.date > filters.dateTo) {
-        return false;
-      }
-
-      // Month filter
-      if (filters.month !== undefined && invoice.date.getMonth() !== filters.month) {
-        return false;
-      }
-
-      // Year filter
-      if (filters.year !== undefined && invoice.date.getFullYear() !== filters.year) {
-        return false;
-      }
-
-      // Category filter
-      if (filters.category) {
-        const hasCategory = invoice.items.some(item => item.category === filters.category);
-        if (!hasCategory) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [invoices, filters]);
+    if (!filters.category) return invoices;
+    return invoices.filter(inv => inv.items.some(item => item.category === filters.category));
+  }, [invoices, filters.category]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
-  const paginatedInvoices = filteredInvoices.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const paginatedInvoices = filteredInvoices; // already server-paginated
 
   // Reset to page 1 when filters change
-  useMemo(() => {
+  // when invoiceNumber search changes, reset page and re-fetch
+  useEffect(() => {
     setCurrentPage(1);
-  }, [filters]);
+    (async () => { await fetchInvoices(1, itemsPerPage); })();
+  }, [filters.invoiceNumber]);
 
   const handleAddInvoice = (invoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>) => {
     // Create a new invoice with full data
@@ -355,8 +383,11 @@ const Invoices = () => {
           <InvoiceTable
             invoices={paginatedInvoices}
             currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
+            totalPages={serverTotalPages}
+            onPageChange={(p) => {
+              setCurrentPage(p);
+              (async () => { await fetchInvoices(p, itemsPerPage); })();
+            }}
           />
         </CardContent>
       </Card>
@@ -365,7 +396,7 @@ const Invoices = () => {
       <AddInvoiceDialog
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
-        onAdd={handleAddInvoice}
+        onCreated={() => fetchInvoices(currentPage, itemsPerPage)}
       />
     </div>
   );
