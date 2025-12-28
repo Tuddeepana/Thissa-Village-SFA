@@ -1,5 +1,5 @@
 import prisma from '../lib/prisma';
-import type { InvoiceCreateInput, InvoiceDTO, InvoiceUpdateInput, PaginatedResult, InvoiceCreateWithItemsInput } from '../types/invoice.types';
+import type { InvoiceCreateInput, InvoiceDTO, InvoiceUpdateInput, PaginatedResult, InvoiceCreateWithItemsInput, InvoiceWithProductsDTO } from '../types/invoice.types';
 import type { InventoryDTO } from '../types/inventory.types';
 import { inventoryService } from './inventory.service';
 
@@ -72,6 +72,50 @@ class InvoiceService {
     ]);
 
     return { data: items as InvoiceDTO[], page, limit, total };
+  }
+
+  async listInvoicesWithProducts(query: { page?: number; limit?: number; search?: string }): Promise<PaginatedResult<InvoiceWithProductsDTO>> {
+    const page = query.page && query.page > 0 ? query.page : 1;
+    const limit = query.limit && query.limit > 0 ? query.limit : 10;
+    const where: any = {};
+
+    if (query.search) {
+      where.OR = [{ in_number: { contains: query.search, mode: 'insensitive' } }];
+    }
+
+    const [total, items] = await Promise.all([
+      (prisma as any).invoice.count({ where }),
+      (prisma as any).invoice.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        // include product and the product's category so we can surface category name to the frontend
+        include: { inventoryRecords: { include: { product: { include: { category: true } } } } },
+      }),
+    ]);
+
+    const data = (items as any[]).map((inv) => ({
+      id: inv.id,
+      in_number: inv.in_number,
+      invoiceDate: inv.invoiceDate instanceof Date ? inv.invoiceDate.toISOString() : String(inv.invoiceDate),
+      createdAt: inv.createdAt instanceof Date ? inv.createdAt.toISOString() : String(inv.createdAt),
+      updatedAt: inv.updatedAt instanceof Date ? inv.updatedAt.toISOString() : String(inv.updatedAt),
+      subtotal: inv.subtotal !== undefined ? String(inv.subtotal) : '0',
+      itemCount: (inv.inventoryRecords || []).length,
+      products: (inv.inventoryRecords || []).map((rec: any) => ({
+        productId: rec.productId,
+        name: rec.product?.name ?? null,
+        categoryName: rec.product?.category?.name ?? null,
+        litres: rec.product?.litres !== undefined ? String(rec.product.litres) : null,
+        bottle_volume: rec.product?.bottle_volume ?? null,
+        cost_price: rec.product?.cost_price !== undefined ? String(rec.product.cost_price) : null,
+        selling_price: rec.product?.selling_price !== undefined ? String(rec.product.selling_price) : null,
+        quantity_moved: rec.quantity_moved,
+      })),
+    })) as InvoiceWithProductsDTO[];
+
+    return { data, page, limit, total };
   }
 
   async updateInvoice(id: string, input: InvoiceUpdateInput): Promise<InvoiceDTO> {

@@ -32,6 +32,29 @@ export type PaginatedResult<T> = {
   total: number;
 };
 
+// Product details as included on an invoice
+export type InvoiceProductDetail = {
+  productId: string;
+  name?: string | null;
+  categoryName?: string | null;
+  litres?: string | null; // Decimal as string
+  bottle_volume?: string | null;
+  cost_price?: string | null;
+  selling_price?: string | null;
+  quantity_moved: number;
+};
+
+export type InvoiceWithProductsDTO = {
+  id: string;
+  in_number: string;
+  invoiceDate: string; // ISO
+  createdAt: string;
+  updatedAt: string;
+  subtotal: string;
+  itemCount: number;
+  products: InvoiceProductDetail[];
+};
+
 // Inventory DTO
 export type InventoryDTO = {
   id: string;

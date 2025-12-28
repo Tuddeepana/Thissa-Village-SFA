@@ -11,6 +11,9 @@ const router = Router();
 // List (with pagination & search) - authenticated
 router.get('/', authenticate, validate(invoiceQuerySchema), controller.list);
 
+// List invoices with included product details (paginated)
+router.get('/with-products', authenticate, validate(invoiceQuerySchema), controller.listWithProducts);
+
 // Get
 router.get('/:id', authenticate, controller.getById);
 

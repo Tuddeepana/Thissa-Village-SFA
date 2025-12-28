@@ -11,6 +11,14 @@ export const list = async (req: Request, res: Response) => {
   res.json({ success: true, data: result.data, page: result.page, limit: result.limit, total: result.total });
 };
 
+export const listWithProducts = async (req: Request, res: Response) => {
+  const parsed = invoiceQuerySchema.safeParse(req.query);
+  if (!parsed.success) throw new AppError('Invalid query params', 400);
+
+  const result = await invoiceService.listInvoicesWithProducts(parsed.data);
+  res.json({ success: true, data: result.data, page: result.page, limit: result.limit, total: result.total });
+};
+
 export const getById = async (req: Request, res: Response) => {
   const { id } = req.params;
   const invoice = await invoiceService.getInvoiceById(id);
