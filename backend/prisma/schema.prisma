@@ -77,6 +77,7 @@ model Invoice {
   id         String   @id @default(uuid())
   in_number  String   @unique
   invoiceDate DateTime
+  subtotal   Decimal  @db.Decimal(10,2) @default(0)
   
   // Inventory movements
   inventoryRecords Inventory[]

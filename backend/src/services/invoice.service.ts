@@ -16,10 +16,14 @@ class InvoiceService {
 
   async createInvoiceWithItems(input: InvoiceCreateWithItemsInput): Promise<{ invoice: InvoiceDTO; inventory: InventoryDTO[] }> {
     const result = await (prisma as any).$transaction(async (tx: any) => {
+      // Use subtotal provided by the frontend (assumed to be numeric or numeric-string)
+      const providedSubtotal = input.subtotal !== undefined ? Number(input.subtotal) : 0;
+
       const createdInvoice = await tx.invoice.create({
         data: {
           in_number: input.in_number,
           invoiceDate: new Date(input.invoiceDate),
+          subtotal: providedSubtotal.toFixed(2),
         },
       });
 
@@ -74,6 +78,7 @@ class InvoiceService {
     const data: any = {};
     if (input.in_number !== undefined) data.in_number = input.in_number;
     if (input.invoiceDate !== undefined) data.invoiceDate = new Date(input.invoiceDate as any);
+    if (input.subtotal !== undefined) data.subtotal = (typeof input.subtotal === 'number' ? input.subtotal : Number(input.subtotal)).toFixed(2);
 
     const invoice = await (prisma as any).invoice.update({ where: { id }, data });
     return invoice as InvoiceDTO;

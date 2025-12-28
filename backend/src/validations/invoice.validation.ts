@@ -21,6 +21,8 @@ export const invoiceQuerySchema = z.object({
 export const createInvoiceWithItemsSchema = z.object({
   in_number: z.string().min(1),
   invoiceDate: z.preprocess((val) => (typeof val === 'string' ? new Date(val) : val), z.date()),
+  // frontend must provide subtotal (sum of item unit price * qty)
+  subtotal: z.coerce.number().nonnegative(),
   items: z
     .array(
       z.object({
