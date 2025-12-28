@@ -155,7 +155,7 @@ const Products = () => {
     const itemsPerPage = 10;
 
     // Fetch products with pagination
-    const { data: productResult, refetch: refetchProducts, isFetching } = useQuery<ProductListResult>({
+    const { data: productResult, refetch: refetchProducts, isFetching } = useQuery<ProductListResult,Error, ProductListResult>({
         queryKey: ["products", { page: currentPage, limit: itemsPerPage }],
         queryFn: async () => productService.list({ page: currentPage, limit: itemsPerPage }),
         staleTime: 10_000,

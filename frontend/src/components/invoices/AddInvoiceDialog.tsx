@@ -310,6 +310,19 @@ export function AddInvoiceDialog({ open, onOpenChange, onAdd }: AddInvoiceDialog
             </div>
           </div>
         </ScrollArea>
+        {/* Summary */}
+        <div className="px-4 pt-4">
+          <div className="flex justify-end">
+            <div className="w-full max-w-sm">
+              
+             
+              <div className="border-t mt-2 pt-2 flex justify-between">
+                <div className="text-sm">Total</div>
+                <div className="font-bold">Rs. {subtotal.toFixed(2)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
         <DialogFooter>
           <Button
             onClick={handleSubmit}
