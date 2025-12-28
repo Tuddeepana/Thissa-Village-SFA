@@ -4,7 +4,7 @@ import { authenticate } from '../middleware/auth.middleware';
 import { authorize } from '../middleware/rbac.middleware';
 import { Role } from '@prisma/client';
 import { validate } from '../middleware/validate.middleware';
-import { createInvoiceSchema, updateInvoiceSchema, invoiceQuerySchema } from '../validations/invoice.validation';
+import { createInvoiceWithItemsSchema, updateInvoiceSchema, invoiceQuerySchema } from '../validations/invoice.validation';
 
 const router = Router();
 
@@ -15,7 +15,7 @@ router.get('/', authenticate, validate(invoiceQuerySchema), controller.list);
 router.get('/:id', authenticate, controller.getById);
 
 // Create - admin only
-router.post('/', authenticate, authorize(Role.ADMIN), validate(createInvoiceSchema), controller.create);
+router.post('/', authenticate, authorize(Role.ADMIN), validate(createInvoiceWithItemsSchema), controller.create);
 
 // Update - admin only
 router.put('/:id', authenticate, authorize(Role.ADMIN), validate(updateInvoiceSchema), controller.update);

@@ -1,5 +1,7 @@
 import prisma from '../lib/prisma';
-import type { InvoiceCreateInput, InvoiceDTO, InvoiceUpdateInput, PaginatedResult } from '../types/invoice.types';
+import type { InvoiceCreateInput, InvoiceDTO, InvoiceUpdateInput, PaginatedResult, InvoiceCreateWithItemsInput } from '../types/invoice.types';
+import type { InventoryDTO } from '../types/inventory.types';
+import { inventoryService } from './inventory.service';
 
 class InvoiceService {
   async createInvoice(input: InvoiceCreateInput): Promise<InvoiceDTO> {
@@ -10,6 +12,35 @@ class InvoiceService {
       },
     });
     return invoice as InvoiceDTO;
+  }
+
+  async createInvoiceWithItems(input: InvoiceCreateWithItemsInput): Promise<{ invoice: InvoiceDTO; inventory: InventoryDTO[] }> {
+    const result = await (prisma as any).$transaction(async (tx: any) => {
+      const createdInvoice = await tx.invoice.create({
+        data: {
+          in_number: input.in_number,
+          invoiceDate: new Date(input.invoiceDate),
+        },
+      });
+
+      const inventoryRecords: InventoryDTO[] = [];
+
+      for (const item of input.items) {
+        const rec = await inventoryService.createMovement(
+          {
+            productId: item.productId,
+            invoiceId: createdInvoice.id,
+            quantity_moved: item.quantityMoved,
+          },
+          tx
+        );
+        inventoryRecords.push(rec);
+      }
+
+      return { invoice: createdInvoice as InvoiceDTO, inventory: inventoryRecords };
+    });
+
+    return result;
   }
 
   async getInvoiceById(id: string): Promise<InvoiceDTO | null> {

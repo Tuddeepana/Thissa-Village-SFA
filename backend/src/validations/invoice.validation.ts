@@ -17,3 +17,16 @@ export const invoiceQuerySchema = z.object({
   limit: z.coerce.number().positive().optional(),
   search: z.string().optional(),
 });
+
+export const createInvoiceWithItemsSchema = z.object({
+  in_number: z.string().min(1),
+  invoiceDate: z.preprocess((val) => (typeof val === 'string' ? new Date(val) : val), z.date()),
+  items: z
+    .array(
+      z.object({
+        productId: z.string().uuid(),
+        quantityMoved: z.coerce.number().int(),
+      })
+    )
+    .min(1),
+});

@@ -28,3 +28,24 @@ export type PaginatedResult<T> = {
   limit: number;
   total: number;
 };
+
+// Inventory DTO
+export type InventoryDTO = {
+  id: string;
+  productId: string;
+  invoiceId: string;
+  quantity_moved: number;
+  available_quantity: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// Create invoice with items
+export type InvoiceItemInput = {
+  productId: string;
+  quantityMoved: number;
+};
+
+export type InvoiceCreateWithItemsInput = InvoiceCreateInput & {
+  items: InvoiceItemInput[];
+};

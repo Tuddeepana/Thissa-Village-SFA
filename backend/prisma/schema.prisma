@@ -64,6 +64,9 @@ model Product {
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
 
+  // Inventory movements
+  inventoryRecords Inventory[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -74,11 +77,31 @@ model Invoice {
   id         String   @id @default(uuid())
   in_number  String   @unique
   invoiceDate DateTime
+  
+  // Inventory movements
+  inventoryRecords Inventory[]
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   @@map("invoices")
+}
+
+model Inventory {
+  id                String  @id @default(uuid())
+  productId         String
+  invoiceId         String
+  quantity_moved    Int
+  available_quantity Int
+
+  // Relations
+  product Product @relation(fields: [productId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("inventory")
 }
 
 

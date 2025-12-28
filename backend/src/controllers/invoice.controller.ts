@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { AppError } from '../errors/AppError';
 import { invoiceService } from '../services/invoice.service';
-import { createInvoiceSchema, updateInvoiceSchema, invoiceQuerySchema } from '../validations/invoice.validation';
+import { createInvoiceSchema, updateInvoiceSchema, invoiceQuerySchema, createInvoiceWithItemsSchema } from '../validations/invoice.validation';
 
 export const list = async (req: Request, res: Response) => {
   const parsed = invoiceQuerySchema.safeParse(req.query);
@@ -19,9 +19,10 @@ export const getById = async (req: Request, res: Response) => {
 };
 
 export const create = async (req: Request, res: Response) => {
-  const parsed = createInvoiceSchema.safeParse(req.body);
+  // Support creating invoice with items (inventory movements)
+  const parsed = createInvoiceWithItemsSchema.safeParse(req.body);
   if (!parsed.success) throw new AppError('Validation failed', 400);
-  const created = await invoiceService.createInvoice(parsed.data as any);
+  const created = await invoiceService.createInvoiceWithItems(parsed.data as any);
   res.status(201).json({ success: true, data: created });
 };
 
