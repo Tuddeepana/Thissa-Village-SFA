@@ -116,7 +116,7 @@ const Products = () => {
         const alertLevel = typeof editingLow === "number" ? editingLow : Number.parseInt(String(editingLow || "0"), 10);
         const costPriceNum = typeof editingCostPrice === "number" ? editingCostPrice : Number.parseFloat(String(editingCostPrice || "0"));
         const sellingPriceNum = typeof editingSellingPrice === "number" ? editingSellingPrice : Number.parseFloat(String(editingSellingPrice || "0"));
-        const litresStr = toLitresString(editingBottleSize, editingBottleUnit);
+        const litresStr = String(editingBottleSize).trim() || "0";
         const unitToEnum = (unit: string) => (String(unit).toLowerCase() === "l" ? "L" : "ML");
         const bottle_volume = unitToEnum(editingBottleUnit);
         try {
