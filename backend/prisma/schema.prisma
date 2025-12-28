@@ -17,6 +17,11 @@ enum Role {
   ADMIN
 }
 
+enum BottleVolume {
+  L
+  ML
+}
+
 
 model User {
   id        String   @id @default(uuid())
@@ -54,14 +59,50 @@ model Product {
   cost_price    Decimal  @db.Decimal(10,2)
   selling_price Decimal  @db.Decimal(10,2)
   low_stock     Int
+  bottle_volume BottleVolume @default(ML)
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
+
+  // Inventory movements
+  inventoryRecords Inventory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("products")
+}
+
+model Invoice {
+  id         String   @id @default(uuid())
+  in_number  String   @unique
+  invoiceDate DateTime
+  subtotal   Decimal  @db.Decimal(10,2) @default(0)
+  
+  // Inventory movements
+  inventoryRecords Inventory[]
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("invoices")
+}
+
+model Inventory {
+  id                String  @id @default(uuid())
+  productId         String
+  invoiceId         String
+  quantity_moved    Int
+  available_quantity Int
+
+  // Relations
+  product Product @relation(fields: [productId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("inventory")
 }
 
 

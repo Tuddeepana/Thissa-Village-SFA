@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BottleVolume } from '@prisma/client';
 
 // Coerce string/number inputs into numbers
 const decimalNumber = z.coerce.number();
@@ -9,6 +10,7 @@ export const createProductSchema = z.object({
   litres: decimalNumber.min(0, 'Litres must be >= 0'),
   cost_price: decimalNumber.min(0, 'Cost price must be >= 0'),
   selling_price: decimalNumber.min(0, 'Selling price must be >= 0'),
+  bottle_volume: z.nativeEnum(BottleVolume).optional(),
   low_stock: z.number().int().nonnegative('Low stock must be >= 0'),
   categoryId: z.string().uuid('Invalid category id'),
 });
@@ -19,6 +21,7 @@ export const updateProductSchema = z.object({
   litres: decimalNumber.min(0, 'Litres must be >= 0').optional(),
   cost_price: decimalNumber.min(0, 'Cost price must be >= 0').optional(),
   selling_price: decimalNumber.min(0, 'Selling price must be >= 0').optional(),
+  bottle_volume: z.nativeEnum(BottleVolume).optional(),
   low_stock: z.number().int().nonnegative('Low stock must be >= 0').optional(),
   categoryId: z.string().uuid('Invalid category id').optional(),
 });

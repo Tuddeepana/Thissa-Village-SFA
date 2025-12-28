@@ -8,8 +8,10 @@ export type Product = {
   selling_price: string;
   low_stock: number;
   categoryId: string;
+  categoryName?: string;
   createdAt?: string;
   updatedAt?: string;
+  bottle_volume?: 'L' | 'ML' | string;
 };
 
 export type CreateProductPayload = {
@@ -20,6 +22,7 @@ export type CreateProductPayload = {
   selling_price: string; // send as string
   low_stock: number;
   categoryId: string;
+  bottle_volume?: 'L' | 'ML' | string;
 };
 
 export type UpdateProductPayload = Partial<{
@@ -30,6 +33,7 @@ export type UpdateProductPayload = Partial<{
   selling_price: string;
   low_stock: number;
   categoryId: string;
+  bottle_volume?: 'L' | 'ML' | string;
 }>;
 
 export type ProductListQuery = {

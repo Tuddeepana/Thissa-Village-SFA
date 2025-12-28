@@ -135,24 +135,12 @@ export function InvoiceTable({
                   <p className="text-sm font-medium text-muted-foreground">Date</p>
                   <p className="text-base">{format(selectedInvoice.date, "PPP")}</p>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Customer</p>
-                  <p className="text-base">{selectedInvoice.customerName}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Phone</p>
-                  <p className="text-base">{selectedInvoice.customerPhone || "N/A"}</p>
-                </div>
+                
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Payment Method</p>
                   <p className="text-base capitalize">{selectedInvoice.paymentMethod}</p>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Status</p>
-                  <Badge className={getStatusColor(selectedInvoice.status)}>
-                    {selectedInvoice.status}
-                  </Badge>
-                </div>
+                
               </div>
 
               <div>
@@ -184,20 +172,6 @@ export function InvoiceTable({
               </div>
 
               <div className="space-y-2 border-t pt-4">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span>Rs. {selectedInvoice.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Tax (15%)</span>
-                  <span>Rs. {selectedInvoice.tax.toFixed(2)}</span>
-                </div>
-                {selectedInvoice.discount > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Discount</span>
-                    <span>- Rs. {selectedInvoice.discount.toFixed(2)}</span>
-                  </div>
-                )}
                 <div className="flex justify-between text-lg font-bold border-t pt-2">
                   <span>Total</span>
                   <span>Rs. {selectedInvoice.total.toFixed(2)}</span>

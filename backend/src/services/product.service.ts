@@ -13,6 +13,7 @@ export const createProduct = async (payload: ProductCreateInput): Promise<Produc
       name: payload.name,
       description: payload.description ?? null,
       litres: payload.litres,
+      bottle_volume: payload.bottle_volume ?? undefined,
       cost_price: payload.cost_price,
       selling_price: payload.selling_price,
       low_stock: payload.low_stock,
@@ -23,7 +24,9 @@ export const createProduct = async (payload: ProductCreateInput): Promise<Produc
 };
 
 export const getProductById = async (id: string): Promise<ProductDTO | null> => {
-  return (prisma as any).product.findUnique({ where: { id } });
+  const p = await (prisma as any).product.findUnique({ where: { id }, include: { category: { select: { name: true } } } });
+  if (!p) return null;
+  return { ...p, categoryName: p.category?.name ?? undefined, category: undefined } as ProductDTO;
 };
 
 export const listProducts = async (query: PaginationQuery): Promise<PaginatedResult<ProductDTO>> => {
@@ -44,11 +47,20 @@ export const listProducts = async (query: PaginationQuery): Promise<PaginatedRes
       skip,
       take: limit,
       orderBy: { createdAt: 'desc' },
+      include: { category: { select: { name: true } } },
     }),
     (prisma as any).product.count({ where }),
   ]);
 
-  return { data, page, limit, total };
+  // Map to include categoryName in DTO
+  const mapped = (data || []).map((p: any) => ({
+    ...p,
+    categoryName: p.category?.name ?? undefined,
+    // remove nested category to avoid sending relation object
+    category: undefined,
+  }));
+
+  return { data: mapped, page, limit, total };
 };
 
 export const updateProduct = async (id: string, payload: ProductUpdateInput): Promise<ProductDTO> => {
@@ -58,6 +70,7 @@ export const updateProduct = async (id: string, payload: ProductUpdateInput): Pr
       name: payload.name ?? undefined,
       description: payload.description ?? undefined,
       litres: payload.litres ?? undefined,
+      bottle_volume: payload.bottle_volume ?? undefined,
       cost_price: payload.cost_price ?? undefined,
       selling_price: payload.selling_price ?? undefined,
       low_stock: payload.low_stock ?? undefined,
