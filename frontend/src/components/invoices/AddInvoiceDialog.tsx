@@ -25,6 +25,9 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Invoice } from "@/types/invoice";
 import { generateProducts } from "@/lib/productData";
+import { productService } from '@/api/services/productService';
+import api from '@/api/client';
+import type { Product } from '@/types/product.types';
 
 interface ProductItem {
   productId: string;
@@ -57,8 +60,44 @@ export function AddInvoiceDialog({ open, onOpenChange, onAdd }: AddInvoiceDialog
   const products = useMemo(() => generateProducts(), []);
 
   const selectedProduct = useMemo(() => {
-    return products.find(p => p.id === selectedProductId);
+    return products.find(p => p.id === selectedProductId) as Product | undefined;
   }, [products, selectedProductId]);
+
+  // fetched products from backend
+  const [fetchedProducts, setFetchedProducts] = useState<Product[] | null>(null);
+
+  // unit price state (number)
+  const [unitPrice, setUnitPrice] = useState<number>(0);
+
+  // load products from API on mount
+  useMemo(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await productService.list({ page: 1, limit: 100 });
+        if (!mounted) return;
+        setFetchedProducts(res.items ?? res.items ?? []);
+      } catch (err) {
+        // fallback to generateProducts
+        setFetchedProducts(generateProducts() as unknown as Product[]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // choose source products: prefer fetchedProducts
+  const productOptions = fetchedProducts && fetchedProducts.length > 0 ? fetchedProducts : (products as unknown as Product[]);
+
+  // update unit price when selection changes
+  const effectiveSelectedProduct = productOptions.find(p => p.id === selectedProductId);
+  useMemo(() => {
+    if (effectiveSelectedProduct) {
+      const cp = Number.parseFloat(String(effectiveSelectedProduct.cost_price ?? effectiveSelectedProduct.selling_price ?? 0));
+      setUnitPrice(Number.isNaN(cp) ? 0 : cp);
+    } else {
+      setUnitPrice(0);
+    }
+  }, [selectedProductId, fetchedProducts]);
 
   const subtotal = useMemo(() => {
     return items.reduce((sum, item) => sum + item.total, 0);
@@ -73,8 +112,10 @@ export function AddInvoiceDialog({ open, onOpenChange, onAdd }: AddInvoiceDialog
   }, [subtotal, tax, discount]);
 
   const handleAddItem = () => {
-    if (selectedProduct && quantity > 0) {
-      const existingItemIndex = items.findIndex(item => item.productId === selectedProduct.id);
+    const prod = effectiveSelectedProduct;
+    if (prod && quantity > 0) {
+      const existingItemIndex = items.findIndex(item => item.productId === prod.id);
+      const price = unitPrice;
 
       if (existingItemIndex >= 0) {
         // Update existing item
@@ -85,12 +126,12 @@ export function AddInvoiceDialog({ open, onOpenChange, onAdd }: AddInvoiceDialog
       } else {
         // Add new item
         const newItem: ProductItem = {
-          productId: selectedProduct.id,
-          productName: selectedProduct.name,
-          category: selectedProduct.category,
+          productId: prod.id,
+          productName: prod.name,
+          category: prod.categoryName || "Uncategorized",
           quantity: quantity,
-          unitPrice: selectedProduct.price,
-          total: quantity * selectedProduct.price,
+          unitPrice: price,
+          total: quantity * price,
         };
         setItems([...items, newItem]);
       }
@@ -135,8 +176,19 @@ export function AddInvoiceDialog({ open, onOpenChange, onAdd }: AddInvoiceDialog
     setStatus('pending');
   };
 
-  const handleSubmit = () => {
-    if (invoiceNumber.trim() && items.length > 0) {
+  const handleSubmit = async () => {
+    if (!(invoiceNumber.trim() && items.length > 0)) return;
+
+    const payload = {
+      in_number: invoiceNumber,
+      invoiceDate: date.toISOString(),
+      items: items.map(i => ({ productId: i.productId, quantityMoved: i.quantity })),
+    };
+
+    try {
+      await api.post('/invoices', payload);
+
+      // keep local UI behaviour: add to list
       const invoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'> = {
         invoiceNumber,
         date,
@@ -161,6 +213,9 @@ export function AddInvoiceDialog({ open, onOpenChange, onAdd }: AddInvoiceDialog
       onAdd(invoiceData);
       resetForm();
       onOpenChange(false);
+    } catch (err: any) {
+      console.error('Create invoice failed', err);
+      alert(err?.response?.data?.message ?? 'Failed to create invoice');
     }
   };
 
@@ -230,20 +285,24 @@ export function AddInvoiceDialog({ open, onOpenChange, onAdd }: AddInvoiceDialog
                     <SelectValue placeholder="Choose a product" />
                   </SelectTrigger>
                   <SelectContent>
-                    {products.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.name}
-                      </SelectItem>
-                    ))}
+                    {productOptions.map((product) => {
+                      const unit = (product.bottle_volume ?? 'ML') === 'L' ? ' l' : ' ml';
+                      const label = `${product.name} - ${product.litres}${unit}`;
+                      return (
+                        <SelectItem key={product.id} value={product.id}>
+                          {label}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
-              {selectedProduct && (
+              {effectiveSelectedProduct && (
                 <div className="grid grid-cols-3 gap-4 items-center">
                   <div className="grid gap-2">
                     <Label>Unit Price</Label>
                     <Input
-                      value={selectedProduct.price}
+                      value={String(unitPrice)}
                       readOnly
                     />
                   </div>

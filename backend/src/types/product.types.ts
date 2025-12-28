@@ -10,6 +10,7 @@ export interface ProductDTO {
   bottle_volume: BottleVolume;
   low_stock: number;
   categoryId: string;
+  categoryName?: string;
   createdAt: Date;
   updatedAt: Date;
 }

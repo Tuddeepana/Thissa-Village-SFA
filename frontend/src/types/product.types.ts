@@ -8,6 +8,7 @@ export type Product = {
   selling_price: string;
   low_stock: number;
   categoryId: string;
+  categoryName?: string;
   createdAt?: string;
   updatedAt?: string;
   bottle_volume?: 'L' | 'ML' | string;
