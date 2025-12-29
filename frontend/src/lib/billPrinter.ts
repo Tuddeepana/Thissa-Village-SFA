@@ -1,7 +1,7 @@
 import { Bill } from '@/types/pos';
 import { format } from 'date-fns';
 
-export const printBill = (bill: Bill, storeName: string = "VinoPOS Pro") => {
+export const printBill = (bill: Bill, storeName: string = "Thissa Village") => {
   // Create a hidden iframe for printing
   const printFrame = document.createElement('iframe');
   printFrame.style.position = 'absolute';
@@ -140,9 +140,7 @@ export const printBill = (bill: Bill, storeName: string = "VinoPOS Pro") => {
       <div class="info-line">
         <strong>Date:</strong> ${format(bill.createdAt, 'dd/MM/yyyy HH:mm:ss')}
       </div>
-      ${bill.customerName ? `<div class="info-line"><strong>Customer:</strong> ${bill.customerName}</div>` : ''}
-      ${bill.customerPhone ? `<div class="info-line"><strong>Phone:</strong> ${bill.customerPhone}</div>` : ''}
-      
+      ${bill.customerName ? `<div class="info-line"><strong>Cashier:</strong> ${bill.customerName}</div>` : ''} 
       <table class="items-table">
         <thead>
           <tr>
@@ -220,7 +218,7 @@ export const printBill = (bill: Bill, storeName: string = "VinoPOS Pro") => {
         <div>Thank you for your business!</div>
         <div>Please come again</div>
         <div style="margin-top: 10px;">---</div>
-        <div>Powered by VinoPOS Pro</div>
+        <div>Powered by Wrenix Pvt Ltd</div>
       </div>
       
       <script>

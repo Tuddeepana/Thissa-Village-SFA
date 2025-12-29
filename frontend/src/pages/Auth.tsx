@@ -46,7 +46,7 @@ const Auth = () => {
               <Wine className="w-8 h-8 text-primary-foreground" />
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold text-primary">VinoPro</CardTitle>
+          <CardTitle className="text-3xl font-bold text-primary">Thissa Village</CardTitle>
           <CardDescription className="text-base">
             {isLogin ? "Welcome back to your wine management system" : "Create your account"}
           </CardDescription>
@@ -79,15 +79,7 @@ const Auth = () => {
               {isLogin ? "Sign In" : "Create Account"}
             </Button>
           </form>
-          <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-muted-foreground hover:text-primary transition-colors"
-            >
-              {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
-            </button>
-          </div>
+
         </CardContent>
       </Card>
     </div>
