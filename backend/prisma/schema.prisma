@@ -9,7 +9,6 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-
 }
 
 enum Role {
@@ -21,7 +20,6 @@ enum BottleVolume {
   L
   ML
 }
-
 
 model User {
   id        String   @id @default(uuid())
@@ -38,26 +36,26 @@ model User {
 }
 
 model Category {
-  id        String   @id @default(uuid())
-  name      String   @unique
+  id          String    @id @default(uuid())
+  name        String    @unique
   description String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
 
   // Relations
-  products  Product[]
+  products Product[]
 
   @@map("categories")
 }
 
 model Product {
-  id            String   @id @default(uuid())
+  id            String       @id @default(uuid())
   name          String
   description   String?
-  litres        Decimal  @db.Decimal(10,2)
-  cost_price    Decimal  @db.Decimal(10,2)
-  selling_price Decimal  @db.Decimal(10,2)
+  litres        Decimal      @db.Decimal(10, 2)
+  cost_price    Decimal      @db.Decimal(10, 2)
+  selling_price Decimal      @db.Decimal(10, 2)
   low_stock     Int
   bottle_volume BottleVolume @default(ML)
 
@@ -74,30 +72,32 @@ model Product {
 }
 
 model Invoice {
-  id         String   @id @default(uuid())
-  in_number  String   @unique
+  id          String   @id @default(uuid())
+  in_number   String   @unique
   invoiceDate DateTime
-  subtotal   Decimal  @db.Decimal(10,2) @default(0)
-  
+  subtotal    Decimal  @default(0) @db.Decimal(10, 2)
+
   // Inventory movements
   inventoryRecords Inventory[]
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("invoices")
 }
 
 model Inventory {
-  id                String  @id @default(uuid())
-  productId         String
-  invoiceId         String
-  quantity_moved    Int
+  id                 String  @id @default(uuid())
+  productId          String
+  invoiceId          String?
+  billId             String?
+  quantity_moved     Int
   available_quantity Int
 
   // Relations
-  product Product @relation(fields: [productId], references: [id])
-  invoice Invoice @relation(fields: [invoiceId], references: [id])
+  product Product  @relation(fields: [productId], references: [id])
+  invoice Invoice? @relation(fields: [invoiceId], references: [id])
+  bill    Bill?    @relation(fields: [billId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -105,5 +105,25 @@ model Inventory {
   @@map("inventory")
 }
 
+model Bill {
+  id             String   @id @default(uuid())
+  bill_number    String   @unique
+  date           DateTime
+  payment_method String
+  customer_name  String?
+  total          Decimal  @db.Decimal(10, 2)
+  cashier_name   String
+  item_count     Int
+  credit_note    String?
+  cash_given     Decimal  @db.Decimal(10, 2)
+  balance_given  Decimal  @db.Decimal(10, 2)
+  tax            Decimal? @db.Decimal(10, 2)
 
+  // Relations
+  inventoryRecords Inventory[]
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("bills")
+}

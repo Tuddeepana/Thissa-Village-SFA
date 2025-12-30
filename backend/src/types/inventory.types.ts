@@ -1,7 +1,8 @@
 export type InventoryDTO = {
   id: string;
   productId: string;
-  invoiceId: string;
+  invoiceId?: string;
+  billId?: string;
   quantity_moved: number;
   available_quantity: number;
   createdAt: string;
@@ -10,7 +11,8 @@ export type InventoryDTO = {
 
 export type InventoryCreateInput = {
   productId: string;
-  invoiceId: string;
+  invoiceId?: string;
+  billId?: string;
   quantity_moved: number; // positive for incoming stock; negative for outgoing
 };
 
@@ -19,6 +21,7 @@ export type InventoryListQuery = {
   limit?: number;
   productId?: string;
   invoiceId?: string;
+  billId?: string;
 };
 
 export type PaginatedResult<T> = {
