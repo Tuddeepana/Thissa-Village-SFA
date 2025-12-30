@@ -54,6 +54,7 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
       category: p.category ? { id: p.category.id, name: p.category.name } : null,
       availableQuantity: available,
       minStock: p.low_stock ?? 0,
+      sellingPrice: p.selling_price ? Number(p.selling_price) : undefined,
       status,
       lastUpdatedAt: inv ? inv.updatedAt?.toISOString?.() ?? inv.updatedAt : null,
     } as MyStockTableRow;

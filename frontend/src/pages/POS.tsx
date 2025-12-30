@@ -3,17 +3,62 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ProductSearch } from "@/components/pos/ProductSearch";
 import { BillCart } from "@/components/pos/BillCart";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
-import { mockProducts } from "@/lib/productData";
+import api from "@/api/client";
 import { Product, BillItem, Bill, StockWarning } from "@/types/pos";
 import { printBillNewWindow } from "@/lib/billPrinter";
 import { toast } from "sonner";
+import type { MyStockResponse, MyStockTableRow } from '@/types/mystock';
+import { Button } from "@/components/ui/button";
+
+const PAGE_SIZE = 50;
 
 const POS = () => {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const [products, setProducts] = useState<Product[]>([]);
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [taxRate, setTaxRate] = useState(15); // 15% default tax
   const [discountRate, setDiscountRate] = useState(0);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+
+  // Fetch products from /api/mystock and map to POS Product shape
+  useEffect(() => {
+    let cancelled = false;
+    const fetchProducts = async () => {
+      setLoadingProducts(true);
+      try {
+        const res = await api.get<MyStockResponse>('/mystock', { params: { page, pageSize: PAGE_SIZE } });
+        if (cancelled) return;
+        const rows: MyStockTableRow[] = res.data.tableResponse?.data ?? [];
+        const mapped: Product[] = rows.map((r) => ({
+          id: r.productId,
+          name: r.productName,
+          category: r.category?.name ?? '',
+          // Use sellingPrice returned by mystock if present (fallback to 0)
+          price: r.sellingPrice ?? 0,
+          cost: r.sellingPrice ?? 0,
+          stock: r.availableQuantity,
+          minStock: r.minStock ?? 0,
+          barcode: undefined,
+          image: undefined,
+          description: undefined,
+          createdAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
+          updatedAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
+        }));
+        setProducts(mapped);
+        const pagination = res.data.tableResponse?.pagination;
+        setTotalPages(pagination?.totalPages ?? 1);
+      } catch (err) {
+        console.error('Failed to load products for POS', err);
+        toast.error('Failed to load products');
+      } finally {
+        if (!cancelled) setLoadingProducts(false);
+      }
+    };
+    fetchProducts();
+    return () => { cancelled = true; };
+  }, [page]);
 
   // Calculate totals
   const subtotal = useMemo(() => {
@@ -35,7 +80,7 @@ const POS = () => {
   // Check for stock warnings
   const stockWarnings = useMemo(() => {
     const warnings: StockWarning[] = [];
-    billItems.forEach((item) => {
+    for (const item of billItems) {
       if (item.product.stock <= item.product.minStock) {
         warnings.push({
           product: item.product,
@@ -44,7 +89,7 @@ const POS = () => {
           requestedQuantity: item.quantity,
         });
       }
-    });
+    }
     return warnings;
   }, [billItems]);
 
@@ -57,7 +102,7 @@ const POS = () => {
           .join(", "),
       });
     }
-  }, [stockWarnings.length]);
+  }, [stockWarnings]);
 
   const handleAddProduct = (product: Product) => {
     if (product.stock === 0) {
@@ -218,7 +263,15 @@ const POS = () => {
         <div className="lg:col-span-2">
           <Card>
             <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm text-muted-foreground">Showing page {page} of {totalPages}</div>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Prev</Button>
+                  <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
+                </div>
+              </div>
               <ProductSearch products={products} onAddProduct={handleAddProduct} />
+              {loadingProducts && <p className="text-xs text-muted-foreground mt-2">Loading products...</p>}
             </CardContent>
           </Card>
         </div>
