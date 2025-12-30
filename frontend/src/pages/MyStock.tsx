@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,102 +20,110 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Download, Search, Package, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
-import { generateProducts } from "@/lib/productData";
+import api from "@/api/client";
+import { categoryService } from '@/api/services/categoryService';
+import type { Category } from '@/types/category.types';
+import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
 import { format } from "date-fns";
-
-interface StockItem {
-  id: string;
-  productName: string;
-  category: string;
-  availableQuantity: number;
-  minStock: number;
-  lastUpdated: Date;
-}
 
 const MyStock = () => {
   const [searchProduct, setSearchProduct] = useState("");
-  const [searchItem, setSearchItem] = useState("");
-  const [filterToday, setFilterToday] = useState<string>("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const ALL_CATEGORY_VALUE = 'ALL_CATEGORIES';
+  const ALL_STOCK_VALUE = 'ALL_STOCK';
+  const [stockFilter, setStockFilter] = useState<string>(ALL_STOCK_VALUE);
+   const [currentPage, setCurrentPage] = useState(1);
+   const itemsPerPage = 20;
 
-  // Get products and transform to stock items
-  const stockItems: StockItem[] = useMemo(() => {
-    const products = generateProducts();
-    return products.map((product) => ({
-      id: product.id,
-      productName: product.name,
-      category: product.category,
-      availableQuantity: product.stock,
-      minStock: product.minStock,
-      lastUpdated: product.updatedAt,
-    }));
+  // Server data
+  const [rows, setRows] = useState<MyStockTableRow[]>([]);
+  const [cards, setCards] = useState<MyStockResponse['cardResponse'] | null>(null);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Fetch data from server when filters/pagination change
+  useEffect(() => {
+    let cancelled = false;
+    const fetchData = async () => {
+      // fetch
+      try {
+        const res = await api.get<MyStockResponse>(
+          '/mystock',
+          {
+            params: {
+              page: currentPage,
+              pageSize: itemsPerPage,
+              productName: searchProduct || undefined,
+              categoryId: categoryId || undefined,
+              status: stockFilter === ALL_STOCK_VALUE ? undefined : stockFilter,
+            },
+          }
+        );
+        if (cancelled) return;
+        const data = res.data;
+        setCards(data.cardResponse ?? null);
+        const serverRows: MyStockTableRow[] = data.tableResponse?.data ?? [];
+        // convert lastUpdatedAt to Date for UI formatting
+        setRows(serverRows.map((r) => ({ ...r, lastUpdatedAt: r.lastUpdatedAt } as MyStockTableRow)));
+        setTotalPages(data.tableResponse.pagination.totalPages || 1);
+      } catch (err) {
+        console.error('Failed to fetch mystock', err);
+      } finally {
+        // done
+      }
+    };
+    fetchData();
+    return () => { cancelled = true; };
+  }, [currentPage, itemsPerPage, searchProduct, categoryId, stockFilter]);
+
+  // Fetch categories for dropdown
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { categories } = await categoryService.list({ page: 1, limit: 100 });
+        if (!mounted) return;
+        setCategories(categories || []);
+      } catch (err) {
+        console.error('Failed to load categories', err);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
-  // Filter stock items
-  const filteredItems = useMemo(() => {
-    return stockItems.filter((item) => {
-      // Filter by product name
-      if (
-        searchProduct &&
-        !item.productName.toLowerCase().includes(searchProduct.toLowerCase())
-      ) {
-        return false;
-      }
-
-      // Filter by item name (same as product name in this context)
-      if (
-        searchItem &&
-        !item.productName.toLowerCase().includes(searchItem.toLowerCase())
-      ) {
-        return false;
-      }
-
-      // Filter by today's stock
-      if (filterToday === "today") {
-        const today = new Date();
-        const itemDate = new Date(item.lastUpdated);
-        if (
-          itemDate.getDate() !== today.getDate() ||
-          itemDate.getMonth() !== today.getMonth() ||
-          itemDate.getFullYear() !== today.getFullYear()
-        ) {
-          return false;
-        }
-      }
-
+  // Apply client-side item name filter on server rows
+  const filteredItems = useMemo<MyStockTableRow[]>(() => {
+    return rows.filter((item) => {
+      if (searchProduct && !item.productName.toLowerCase().includes(searchProduct.toLowerCase())) return false;
+      // category and status filtering are handled server-side
       return true;
     });
-  }, [stockItems, searchProduct, searchItem, filterToday]);
+  }, [rows, searchProduct]);
 
-  // Reset to page 1 when filters change
-  useMemo(() => {
+  // Reset to page 1 when server-side filters change
+  useEffect(() => {
     setCurrentPage(1);
-  }, [searchProduct, searchItem, filterToday]);
+  }, [searchProduct, itemsPerPage, categoryId, stockFilter]);
 
-  // Pagination
-  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
-  const paginatedItems = useMemo(() => {
+  // Pagination (use server pagination values where possible)
+  const paginatedItems = useMemo<(MyStockTableRow & { lastUpdated: Date })[]>(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredItems.slice(startIndex, startIndex + itemsPerPage);
+    const pageSlice = filteredItems.slice(startIndex, startIndex + itemsPerPage);
+    return pageSlice.map((r) => ({
+      ...r,
+      lastUpdated: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
+    } as MyStockTableRow & { lastUpdated: Date }));
   }, [filteredItems, currentPage, itemsPerPage]);
 
-  // Calculate statistics
+  // Use server-provided card stats when available, otherwise compute client-side fallback
   const stats = useMemo(() => {
+    if (cards) return { totalItems: cards.totalItems, totalQuantity: cards.totalQuantity, lowStockItems: cards.lowStockItems, outOfStock: cards.outOfStockItems };
     const totalItems = filteredItems.length;
-    const totalQuantity = filteredItems.reduce(
-      (sum, item) => sum + item.availableQuantity,
-      0
-    );
-    const lowStockItems = filteredItems.filter(
-      (item) => item.availableQuantity <= item.minStock
-    ).length;
-    const outOfStock = filteredItems.filter(
-      (item) => item.availableQuantity === 0
-    ).length;
-
+    const totalQuantity = filteredItems.reduce((sum, item) => sum + item.availableQuantity, 0);
+    const lowStockItems = filteredItems.filter((item) => item.availableQuantity <= item.minStock).length;
+    const outOfStock = filteredItems.filter((item) => item.availableQuantity === 0).length;
     return { totalItems, totalQuantity, lowStockItems, outOfStock };
-  }, [filteredItems]);
+  }, [cards, filteredItems]);
 
   // Download CSV function
   const downloadCSV = () => {
@@ -130,17 +138,13 @@ const MyStock = () => {
     ];
 
     const csvData = filteredItems.map((item) => [
-      item.id,
+      item.productId,
       item.productName,
-      item.category,
+      item.category?.name ?? '',
       item.availableQuantity.toString(),
-      item.minStock.toString(),
-      item.availableQuantity === 0
-        ? "Out of Stock"
-        : item.availableQuantity <= item.minStock
-        ? "Low Stock"
-        : "In Stock",
-      format(item.lastUpdated, "yyyy-MM-dd HH:mm:ss"),
+      item.minStock?.toString() ?? '',
+      item.availableQuantity === 0 ? "Out of Stock" : item.availableQuantity <= item.minStock ? "Low Stock" : "In Stock",
+      format(item.lastUpdatedAt ? new Date(item.lastUpdatedAt) : new Date(), "yyyy-MM-dd HH:mm:ss"),
     ]);
 
     const csvContent = [
@@ -161,7 +165,8 @@ const MyStock = () => {
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    // modern remove
+    link.remove();
   };
 
   const getStockStatus = (quantity: number, minStock: number) => {
@@ -175,8 +180,8 @@ const MyStock = () => {
 
   const clearFilters = () => {
     setSearchProduct("");
-    setSearchItem("");
-    setFilterToday("all");
+    setCategoryId(undefined);
+    setStockFilter(ALL_STOCK_VALUE);
     setCurrentPage(1);
   };
 
@@ -265,24 +270,29 @@ const MyStock = () => {
               />
             </div>
             <div className="space-y-2 col-span-2 md:col-span-1">
-              <Label htmlFor="searchItem" className="text-xs md:text-sm">Item Name</Label>
-              <Input
-                id="searchItem"
-                placeholder="Search item..."
-                value={searchItem}
-                onChange={(e) => setSearchItem(e.target.value)}
-                className="h-9 md:h-10"
-              />
+              <Label htmlFor="categorySelect" className="text-xs md:text-sm">Category</Label>
+              <Select value={categoryId ?? ALL_CATEGORY_VALUE} onValueChange={(val) => setCategoryId(val === ALL_CATEGORY_VALUE ? undefined : val)}>
+                <SelectTrigger id="categorySelect" className="h-9 md:h-10">
+                  <SelectValue placeholder="All categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_CATEGORY_VALUE}>All categories</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label className="text-xs md:text-sm">Stock Filter</Label>
-              <Select value={filterToday} onValueChange={setFilterToday}>
+              <Select value={stockFilter} onValueChange={(v) => setStockFilter(v)}>
                 <SelectTrigger className="h-9 md:h-10">
                   <SelectValue placeholder="Select filter" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Stock</SelectItem>
-                  <SelectItem value="today">Today's Stock</SelectItem>
+                  <SelectItem value={ALL_STOCK_VALUE}>All Stock</SelectItem>
+                  <SelectItem value={'LowStock'}>Low Stock</SelectItem>
+                  <SelectItem value={'OutOfStock'}>Out Of Stock</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -319,7 +329,6 @@ const MyStock = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Item ID</TableHead>
                   <TableHead>Product Name</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead className="text-center">Available Qty</TableHead>
@@ -343,14 +352,11 @@ const MyStock = () => {
                   </TableRow>
                 ) : (
                   paginatedItems.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-mono text-sm">
-                        {item.id}
-                      </TableCell>
+                    <TableRow key={item.productId}>
                       <TableCell className="font-medium">
                         {item.productName}
                       </TableCell>
-                      <TableCell>{item.category}</TableCell>
+                      <TableCell>{item.category?.name ?? ''}</TableCell>
                       <TableCell className="text-center">
                         <span
                           className={`font-semibold ${
@@ -373,7 +379,7 @@ const MyStock = () => {
                       <TableCell className="text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {format(item.lastUpdated, "MMM dd, yyyy")}
+                          {format(item.lastUpdatedAt ? new Date(item.lastUpdatedAt) : new Date(), "MMM dd, yyyy")}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -394,30 +400,20 @@ const MyStock = () => {
             ) : (
               paginatedItems.map((item) => (
                 <div
-                  key={item.id}
+                  key={item.productId}
                   className="border rounded-lg p-3 space-y-2 bg-card"
                 >
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="font-medium text-sm">{item.productName}</h3>
-                      <p className="text-xs text-muted-foreground">{item.category}</p>
+                      <p className="text-xs text-muted-foreground">{item.category?.name ?? ''}</p>
                     </div>
                     {getStockStatus(item.availableQuantity, item.minStock)}
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div>
                       <p className="text-muted-foreground">Available</p>
-                      <p
-                        className={`font-semibold ${
-                          item.availableQuantity === 0
-                            ? "text-red-600"
-                            : item.availableQuantity <= item.minStock
-                            ? "text-yellow-600"
-                            : "text-green-600"
-                        }`}
-                      >
-                        {item.availableQuantity}
-                      </p>
+                      <p className={`font-semibold ${item.availableQuantity === 0 ? 'text-red-600' : item.availableQuantity <= item.minStock ? 'text-yellow-600' : 'text-green-600'}`}>{item.availableQuantity}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Min Stock</p>
@@ -425,12 +421,10 @@ const MyStock = () => {
                     </div>
                     <div>
                       <p className="text-muted-foreground">Updated</p>
-                      <p className="font-semibold">{format(item.lastUpdated, "MMM dd")}</p>
+                      <p className="font-semibold">{format(item.lastUpdatedAt ? new Date(item.lastUpdatedAt) : new Date(), "MMM dd")}</p>
                     </div>
                   </div>
-                  <div className="text-xs text-muted-foreground font-mono">
-                    ID: {item.id}
-                  </div>
+                  {/* ID intentionally hidden from UI table/card view */}
                 </div>
               ))
             )}
@@ -440,97 +434,39 @@ const MyStock = () => {
           {totalPages > 1 && (
             <div className="flex flex-col md:flex-row items-center justify-between gap-3 mt-4">
               <div className="text-xs md:text-sm text-muted-foreground text-center md:text-left">
-                Showing {((currentPage - 1) * itemsPerPage) + 1} to{" "}
-                {Math.min(currentPage * itemsPerPage, filteredItems.length)} of{" "}
-                {filteredItems.length} items
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredItems.length)} of {filteredItems.length} items
               </div>
 
               {/* Mobile Pagination */}
               <div className="flex md:hidden items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="h-8"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm px-2">
-                  {currentPage} / {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className="h-8"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="h-8"><ChevronLeft className="h-4 w-4" /></Button>
+                <span className="text-sm px-2">{currentPage} / {totalPages}</span>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} className="h-8"><ChevronRight className="h-4 w-4" /></Button>
               </div>
 
               {/* Desktop Pagination */}
               <div className="hidden md:flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                >
-                  First
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>First</Button>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} disabled={currentPage === 1}><ChevronLeft className="h-4 w-4" /> Previous</Button>
+
                 <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-                    return (
-                      <Button
-                        key={pageNum}
-                        variant={currentPage === pageNum ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setCurrentPage(pageNum)}
-                        className="w-8 h-8 p-0"
-                      >
-                        {pageNum}
-                      </Button>
-                    );
-                  })}
+                  {(() => {
+                    const maxButtons = Math.min(5, totalPages);
+                    const pages: number[] = [];
+                    let start = 1;
+                    if (totalPages <= 5) start = 1;
+                    else if (currentPage <= 3) start = 1;
+                    else if (currentPage >= totalPages - 2) start = totalPages - 4;
+                    else start = currentPage - 2;
+                    for (let i = 0; i < maxButtons; i++) pages.push(start + i);
+                    return pages.map((pageNum) => (
+                      <Button key={pageNum} variant={currentPage === pageNum ? 'default' : 'outline'} size="sm" onClick={() => setCurrentPage(pageNum)} className="w-8 h-8 p-0">{pageNum}</Button>
+                    ));
+                  })()}
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage === totalPages}
-                >
-                  Last
-                </Button>
+
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}>Next <ChevronRight className="h-4 w-4" /></Button>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>Last</Button>
               </div>
             </div>
           )}
