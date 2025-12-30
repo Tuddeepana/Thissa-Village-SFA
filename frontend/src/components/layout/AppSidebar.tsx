@@ -32,7 +32,7 @@ const sfaItems = [
   { title: "Invoices", url: "/invoices", icon: FileText },
   { title: "Bills", url: "/bills", icon: Receipt },
   { title: "Users", url: "/users", icon: Users },
-  { title: "Low Stock", url: "/low-stock", icon: AlertCircle },
+  // { title: "Low Stock", url: "/low-stock", icon: AlertCircle }, Not needed
 ];
 
 const posItems = [
