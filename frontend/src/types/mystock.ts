@@ -10,7 +10,7 @@ export type MyStockTableRow = {
   productName: string;
   category: { id: string; name: string } | null;
   availableQuantity: number;
-  minStock: number; // low_stock from product
+  minStock: number;
   status: 'InStock' | 'LowStock' | 'OutOfStock';
   lastUpdatedAt: string | null;
 };
@@ -28,12 +28,4 @@ export type MyStockTableResponse = {
 export type MyStockResponse = {
   cardResponse: MyStockCardResponse;
   tableResponse: MyStockTableResponse;
-};
-
-export type MyStockQuery = {
-  page?: number;
-  pageSize?: number;
-  productName?: string;
-  categoryId?: string;
-  status?: 'InStock' | 'LowStock' | 'OutOfStock' | string;
 };
