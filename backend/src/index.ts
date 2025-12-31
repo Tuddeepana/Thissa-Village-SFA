@@ -7,9 +7,10 @@ import userRoutes from './routes/user.routes';
 import categoryRoutes from './routes/category.routes';
 import productRoutes from './routes/product.routes';
 import invoiceRoutes from './routes/invoice.routes';
-import billRoutes from './routes/bill.routes';
 import inventoryRoutes from './routes/inventory.routes';
+import billRoutes from './routes/bill.routes';
 import mystockRoutes from './routes/mystock.routes';
+import dashboardRoutes from './routes/dashboard.routes';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 
 // Load environment variables
@@ -20,20 +21,35 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:8080',
-  credentials: true,
-}));
+// Configure CORS: allow any origin in development for easier local testing,
+// otherwise use CORS_ORIGIN env var (supports comma-separated list).
+const corsOriginEnv = process.env.CORS_ORIGIN;
+const corsOptions: any = { credentials: true };
+if (process.env.NODE_ENV !== 'production') {
+    // allow requests from any origin in development (useful for Vite/CRA dev servers)
+    corsOptions.origin = true;
+} else if (corsOriginEnv) {
+    // allow a single origin or comma-separated list in production via env var
+    const origins = new Set(corsOriginEnv.split(',').map((s) => s.trim()));
+    corsOptions.origin = (origin: any, callback: any) => {
+        if (!origin) return callback(null, true); // allow non-browser requests
+        if (origins.has(origin)) return callback(null, true);
+        return callback(new Error('CORS not allowed for origin: ' + origin));
+    };
+} else {
+    corsOptions.origin = 'http://localhost:8080';
+}
+
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Request logging middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-  next();
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    next();
 });
 
-// API Routes
 app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);
@@ -41,60 +57,61 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/bills', billRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/mystock', mystockRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {
-  res.json({
-    status: 'ok',
-    message: 'VinoPOS Backend API is running',
-    timestamp: new Date().toISOString(),
-  });
+    res.json({
+        status: 'ok',
+        message: 'VinoPOS Backend API is running',
+        timestamp: new Date().toISOString(),
+    });
 });
 
 // Hello World
 app.get('/', (req: Request, res: Response) => {
-  res.json({
-    message: 'Welcome to VinoPOS Backend API',
-    version: '1.0.0',
-    endpoints: {
-      health: '/health',
-      api: '/api',
-    },
-  });
+    res.json({
+        message: 'Welcome to VinoPOS Backend API',
+        version: '1.0.0',
+        endpoints: {
+            health: '/health',
+            api: '/api',
+        },
+    });
 });
 
 // API base route
 app.get('/api', (req: Request, res: Response) => {
-  res.json({
-    message: 'VinoPOS API v1',
-    endpoints: {
-      users: '/api/users',
-      categories: '/api/categories',
-    },
-  });
+    res.json({
+        message: 'VinoPOS API v1',
+        endpoints: {
+            users: '/api/users',
+            categories: '/api/categories',
+        },
+    });
 });
 
 // Test database connection
 app.get('/api/test-db', async (req: Request, res: Response) => {
-  try {
-    const usersCount = await prisma.user.count();
-    
+    try {
+        const usersCount = await prisma.user.count();
 
-    res.json({
-      status: 'success',
-      message: 'Database connection successful',
-      data: {
-        users: usersCount,
-      },
-    });
-  } catch (error) {
-    console.error('Database connection error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Database connection failed',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
+
+        res.json({
+            status: 'success',
+            message: 'Database connection successful',
+            data: {
+                users: usersCount,
+            },
+        });
+    } catch (error) {
+        console.error('Database connection error:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Database connection failed',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
+    }
 });
 
 
@@ -107,35 +124,31 @@ app.use(errorHandler);
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-  console.log('\n🛑 Shutting down gracefully...');
-  await prisma.$disconnect();
-  process.exit(0);
+    console.log('\n🛑 Shutting down gracefully...');
+    await prisma.$disconnect();
+    process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  console.log('\n🛑 Shutting down gracefully...');
-  await prisma.$disconnect();
-  process.exit(0);
+    console.log('\n🛑 Shutting down gracefully...');
+    await prisma.$disconnect();
+    process.exit(0);
 });
 
 // Start server (only in development, not on Vercel)
 if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log('🚀 VinoPOS Backend Server Started!');
-    console.log(`📡 Server running on: http://localhost:${PORT}`);
-    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`📊 Database: ${process.env.DATABASE_URL?.split('@')[1]?.split('?')[0] || 'Not configured'}`);
-    console.log('\n📍 Available endpoints:');
-    console.log(`   GET  /              - Welcome message`);
-    console.log(`   GET  /health        - Health check`);
-    console.log(`   GET  /api           - API info`);
-    console.log(`   GET  /api/test-db   - Test database connection`);
-    console.log(`   GET  /api/categories - Get all categories`);
-    console.log(`   GET  /api/products  - Get all products`);
-    console.log('\n✨ Ready to accept requests!\n');
-  });
+    app.listen(PORT, () => {
+
+        console.log('\n📍 Available endpoints:');
+        console.log(`   GET  /              - Welcome message`);
+        console.log(`   GET  /health        - Health check`);
+        console.log(`   GET  /api           - API info`);
+        console.log(`   GET  /api/test-db   - Test database connection`);
+        console.log(`   GET  /api/categories - Get all categories`);
+        console.log(`   GET  /api/products  - Get all products`);
+        console.log('\n✨ Ready to accept requests!\n');
+    });
 }
 
-// Export for Vercel
-export default app;
-export { app, prisma };
+// Export for Vercel / tests
+export { app };
