@@ -21,32 +21,16 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-// Configure CORS: allow any origin in development for easier local testing,
-// otherwise use CORS_ORIGIN env var (supports comma-separated list).
-const corsOriginEnv = process.env.CORS_ORIGIN;
-const corsOptions: any = { credentials: true };
-if (process.env.NODE_ENV !== 'production') {
-    // allow requests from any origin in development (useful for Vite/CRA dev servers)
-    corsOptions.origin = true;
-} else if (corsOriginEnv) {
-    // allow a single origin or comma-separated list in production via env var
-    const origins = new Set(corsOriginEnv.split(',').map((s) => s.trim()));
-    corsOptions.origin = (origin: any, callback: any) => {
-        if (!origin) return callback(null, true); // allow non-browser requests
-        if (origins.has(origin)) return callback(null, true);
-        return callback(new Error('CORS not allowed for origin: ' + origin));
-    };
-} else {
-    corsOptions.origin = 'http://localhost:8080';
-}
-
-app.use(cors(corsOptions));
+app.use(cors({
+    origin: process.env.CORS_ORIGIN || 'http://localhost:8080',
+    credentials: true,
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Request logging middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
     next();
 });
 
@@ -58,6 +42,7 @@ app.use('/api/bills', billRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/mystock', mystockRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {
@@ -138,7 +123,10 @@ process.on('SIGTERM', async () => {
 // Start server (only in development, not on Vercel)
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {
-
+        console.log('🚀 VinoPOS Backend Server Started!');
+        console.log(`📡 Server running on: http://localhost:${PORT}`);
+        console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`📊 Database: ${process.env.DATABASE_URL?.split('@')[1]?.split('?')[0] || 'Not configured'}`);
         console.log('\n📍 Available endpoints:');
         console.log(`   GET  /              - Welcome message`);
         console.log(`   GET  /health        - Health check`);
@@ -150,5 +138,6 @@ if (process.env.NODE_ENV !== 'production') {
     });
 }
 
-// Export for Vercel / tests
-export { app };
+// Export for Vercel
+export default app;
+export { app, prisma };
