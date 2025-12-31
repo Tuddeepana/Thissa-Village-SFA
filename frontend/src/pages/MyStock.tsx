@@ -130,6 +130,7 @@ const MyStock = () => {
     const headers = [
       "Item ID",
       "Product Name",
+      "Bottle Size",
       "Category",
       "Available Quantity",
       "Min Stock",
@@ -140,6 +141,7 @@ const MyStock = () => {
     const csvData = filteredItems.map((item) => [
       item.productId,
       item.productName,
+      item.bottle_size ?? '',
       item.category?.name ?? '',
       item.availableQuantity.toString(),
       item.minStock?.toString() ?? '',
@@ -330,6 +332,7 @@ const MyStock = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Product Name</TableHead>
+                  <TableHead>Bottle Size</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead className="text-center">Available Qty</TableHead>
                   <TableHead className="text-center">Min Stock</TableHead>
@@ -356,6 +359,7 @@ const MyStock = () => {
                       <TableCell className="font-medium">
                         {item.productName}
                       </TableCell>
+                      <TableCell>{item.bottle_size ?? ''}</TableCell>
                       <TableCell>{item.category?.name ?? ''}</TableCell>
                       <TableCell className="text-center">
                         <span
@@ -407,6 +411,9 @@ const MyStock = () => {
                     <div>
                       <h3 className="font-medium text-sm">{item.productName}</h3>
                       <p className="text-xs text-muted-foreground">{item.category?.name ?? ''}</p>
+                      {item.bottle_size && (
+                        <p className="text-xs text-muted-foreground">{item.bottle_size}</p>
+                      )}
                     </div>
                     {getStockStatus(item.availableQuantity, item.minStock)}
                   </div>
