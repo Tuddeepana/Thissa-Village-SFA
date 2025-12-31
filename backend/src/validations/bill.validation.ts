@@ -23,8 +23,34 @@ export const createBillWithItemsSchema = createBillSchema.extend({
   items: z.array(billItemSchema).min(1),
 });
 
-export const billQuerySchema = z.object({
-  page: z.coerce.number().int().positive().optional(),
-  limit: z.coerce.number().int().positive().optional(),
-  search: z.string().optional(),
-});
+export const billQuerySchema = z
+  .object({
+    billNo: z.string().optional(),
+    // Dates accepted as YYYY-MM-DD or full ISO; leave parsing to service but ensure they're strings here
+    dateFrom: z.string().optional(),
+    dateTo: z.string().optional(),
+    // Coerce common boolean representations from query string to boolean
+    today: z.preprocess((val) => {
+      if (val === 'true' || val === true) return true;
+      if (val === 'false' || val === false) return false;
+      return undefined;
+    }, z.boolean().optional()),
+    paymentMethod: z.string().optional(),
+    page: z.coerce.number().int().positive().optional(),
+    pageSize: z.coerce.number().int().positive().optional(),
+    search: z.string().optional(),
+  })
+  // Don't allow mixing `today` with explicit dateFrom/dateTo to avoid ambiguity
+  .refine((d) => !(d.today && (d.dateFrom || d.dateTo)), {
+    message: 'today cannot be used with dateFrom or dateTo',
+    path: ['today'],
+  })
+  // If both dates provided ensure from <= to
+  .refine((d) => {
+    if (d.dateFrom && d.dateTo) {
+      const from = new Date(d.dateFrom);
+      const to = new Date(d.dateTo);
+      return !isNaN(from.getTime()) && !isNaN(to.getTime()) && from.getTime() <= to.getTime();
+    }
+    return true;
+  }, { message: 'dateFrom cannot be after dateTo', path: ['dateFrom', 'dateTo'] });

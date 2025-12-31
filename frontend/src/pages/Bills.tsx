@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,176 +45,184 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { Bill, BillItem } from "@/types/pos";
-
-// Mock bills data - in real app, this would come from API
-const generateMockBills = (): Bill[] => {
-  const paymentMethods: Array<'cash' | 'card' | 'credit' | 'other'> = ['cash', 'card', 'credit', 'other'];
-  const bills: Bill[] = [];
-
-  // Generate bills for the last 30 days
-  for (let i = 0; i < 50; i++) {
-    const daysAgo = Math.floor(Math.random() * 30);
-    const date = new Date();
-    date.setDate(date.getDate() - daysAgo);
-    date.setHours(Math.floor(Math.random() * 12) + 8, Math.floor(Math.random() * 60));
-
-    const itemCount = Math.floor(Math.random() * 5) + 1;
-    const items: BillItem[] = [];
-    let subtotal = 0;
-
-    for (let j = 0; j < itemCount; j++) {
-      const price = Math.floor(Math.random() * 500) + 100;
-      const quantity = Math.floor(Math.random() * 3) + 1;
-      const itemSubtotal = price * quantity;
-      subtotal += itemSubtotal;
-
-      items.push({
-        product: {
-          id: `prod-${j}`,
-          name: `Product ${j + 1}`,
-          category: 'General',
-          price: price,
-          cost: price * 0.7,
-          stock: 100,
-          minStock: 10,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        quantity: quantity,
-        subtotal: itemSubtotal,
-      });
-    }
-
-    const taxRate = 10;
-    const tax = subtotal * (taxRate / 100);
-    const discountRate = Math.random() > 0.7 ? Math.floor(Math.random() * 10) + 5 : 0;
-    const discount = subtotal * (discountRate / 100);
-    const total = subtotal + tax - discount;
-    const paymentMethod = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
-
-    bills.push({
-      id: `BILL-${Date.now() - i * 100000}`,
-      items,
-      subtotal,
-      tax,
-      taxRate,
-      discount,
-      discountRate,
-      total,
-      customerName: Math.random() > 0.5 ? `Customer ${i + 1}` : undefined,
-      customerPhone: Math.random() > 0.6 ? `+94 77 ${Math.floor(Math.random() * 9000000) + 1000000}` : undefined,
-      paymentMethod,
-      amountPaid: paymentMethod === 'credit' ? 0 : total + (paymentMethod === 'cash' ? Math.floor(Math.random() * 500) : 0),
-      change: paymentMethod === 'credit' ? 0 : Math.floor(Math.random() * 500),
-      creditDescription: paymentMethod === 'credit' ? `Credit sale - Due in 30 days` : undefined,
-      createdAt: date,
-    });
-  }
-
-  return bills.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-};
+import api from '@/api/client';
 
 const Bills = () => {
-  const [bills] = useState<Bill[]>(generateMockBills());
+  // Server-driven state
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [serverCard, setServerCard] = useState<any | null>(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [filterToday, setFilterToday] = useState(false);
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
+  const [selectedBill, setSelectedBill] = useState<any | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isLoadingBill, setIsLoadingBill] = useState(false);
   const itemsPerPage = 15;
 
-  // Filter bills
-  const filteredBills = useMemo(() => {
-    return bills.filter((bill) => {
-      // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        if (
-          !bill.id.toLowerCase().includes(query) &&
-          !bill.customerName?.toLowerCase().includes(query) &&
-          !bill.customerPhone?.includes(query)
-        ) {
-          return false;
-        }
-      }
-
-      // Today filter
-      if (filterToday) {
-        const today = new Date();
-        const billDate = new Date(bill.createdAt);
-        if (
-          billDate.getDate() !== today.getDate() ||
-          billDate.getMonth() !== today.getMonth() ||
-          billDate.getFullYear() !== today.getFullYear()
-        ) {
-          return false;
-        }
-      }
-
-      // Date from filter
-      if (dateFrom) {
-        const fromDate = new Date(dateFrom);
-        fromDate.setHours(0, 0, 0, 0);
-        if (new Date(bill.createdAt) < fromDate) {
-          return false;
-        }
-      }
-
-      // Date to filter
-      if (dateTo) {
-        const toDate = new Date(dateTo);
-        toDate.setHours(23, 59, 59, 999);
-        if (new Date(bill.createdAt) > toDate) {
-          return false;
-        }
-      }
-
-      // Payment method filter
-      if (paymentMethodFilter !== "all" && bill.paymentMethod !== paymentMethodFilter) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [bills, searchQuery, filterToday, dateFrom, dateTo, paymentMethodFilter]);
-
   // Reset page when filters change
-  useMemo(() => {
+  useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, filterToday, dateFrom, dateTo, paymentMethodFilter]);
 
-  // Pagination
-  const totalPages = Math.ceil(filteredBills.length / itemsPerPage);
-  const paginatedBills = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredBills.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredBills, currentPage]);
+  // Pagination values from server
+  const totalPages = Math.max(1, Math.ceil((totalRecords || 0) / itemsPerPage));
+  const paginatedBills = bills; // server already returns paginated page
 
-  // Statistics
+  // Statistics - prefer server card summary when available
   const stats = useMemo(() => {
-    const totalRevenue = filteredBills.reduce((sum, bill) => sum + bill.total, 0);
-    const totalBills = filteredBills.length;
-    const cashBills = filteredBills.filter((b) => b.paymentMethod === "cash").length;
-    const cardBills = filteredBills.filter((b) => b.paymentMethod === "card").length;
-    const creditBills = filteredBills.filter((b) => b.paymentMethod === "credit").length;
+    const totalRevenue = serverCard ? Number(serverCard.totalRevenue || 0) : bills.reduce((sum, b) => sum + b.total, 0);
+    const totalBills = serverCard ? serverCard.totalBills || totalRecords : totalRecords || bills.length;
+    const cashBills = bills.filter((b) => b.paymentMethod === 'cash').length;
+    const cardBills = bills.filter((b) => b.paymentMethod === 'card').length;
+    const creditBills = bills.filter((b) => b.paymentMethod === 'credit').length;
     return { totalRevenue, totalBills, cashBills, cardBills, creditBills };
-  }, [filteredBills]);
+  }, [serverCard, bills, totalRecords]);
 
+  // Clear all filters
   const clearFilters = () => {
     setDateFrom("");
     setDateTo("");
     setFilterToday(false);
-    setPaymentMethodFilter("all");
+    setPaymentMethodFilter('all');
     setSearchQuery("");
     setCurrentPage(1);
   };
 
-  const handleViewBill = (bill: Bill) => {
-    setSelectedBill(bill);
+  // Fetch bills from server (debounced for search)
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    const timeout = setTimeout(async () => {
+      setIsLoading(true);
+      try {
+        const params: any = {
+          page: currentPage,
+          pageSize: itemsPerPage,
+        };
+        if (searchQuery) params.search = searchQuery;
+        if (paymentMethodFilter && paymentMethodFilter !== 'all') params.paymentMethod = paymentMethodFilter.toUpperCase();
+        if (filterToday) params.today = true;
+        if (dateFrom) params.dateFrom = dateFrom;
+        if (dateTo) params.dateTo = dateTo;
+
+        const resp = await api.get('/bills', { params, signal: controller.signal });
+        const respData = resp.data;
+        const list = respData?.billsResponse?.data ?? respData?.data ?? [];
+        const pagination = respData?.billsResponse?.pagination ?? {};
+        const card = respData?.card ?? null;
+
+        // Map backend DTOs to frontend Bill shape (shallow - items will be fetched when viewing)
+        const mapped: Bill[] = (list as any[]).map((b: any) => ({
+          id: b.id,
+          items: new Array(b.item_count || 0).fill({} as any),
+          subtotal: Number(b.total || 0) - Number(b.tax || 0),
+          tax: b.tax !== undefined && b.tax !== null ? Number(b.tax) : 0,
+          taxRate: 0,
+          discount: 0,
+          discountRate: 0,
+          total: Number(b.total || 0),
+          customerName: b.customer_name ?? undefined,
+          customerPhone: undefined,
+          paymentMethod: (String(b.payment_method || 'other').toLowerCase() as any),
+          amountPaid: b.cash_given !== undefined && b.cash_given !== null ? Number(b.cash_given) : Number(b.total || 0),
+          change: b.balance_given !== undefined && b.balance_given !== null ? Number(b.balance_given) : 0,
+          creditDescription: b.credit_note ?? undefined,
+          createdAt: b.date ? new Date(b.date) : new Date(b.createdAt),
+        }));
+
+        if (!cancelled) {
+          setBills(mapped);
+          setTotalRecords(pagination.totalRecords ?? respData?.total ?? 0);
+          setServerCard(card);
+        }
+      } catch (err) {
+        if (!cancelled) console.error('Failed to fetch bills', err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [searchQuery, filterToday, dateFrom, dateTo, paymentMethodFilter, currentPage]);
+
+  // Fetch bill details from backend and map to local shape used by this page
+  const handleViewBill = async (bill: Bill) => {
+    setIsLoadingBill(true);
+    setSelectedBill(null);
     setIsViewDialogOpen(true);
+
+    try {
+      const resp = await api.get(`/bills/${encodeURIComponent(bill.id)}`);
+      const data = resp.data?.data ?? resp.data;
+
+      // If backend returns the detailed shape (dateTime, PaymentMethod, customer, creditNote, Items, Subtotal, Tax, Total)
+      const detailed = data;
+
+      if (detailed && detailed.Items) {
+        // Map to the frontend Bill shape used in the modal
+        const mappedItems = (detailed.Items || []).map((it: any) => {
+          const qty = Math.abs(Number(it.quantity_moved || 0));
+          const price = it.selling_price !== undefined && it.selling_price !== null ? Number(it.selling_price) : 0;
+          return {
+            product: {
+              id: it.productId || it.productId || 'unknown',
+              name: it.name || it.productName || 'Unknown Product',
+              category: it.categoryName || it.category || 'General',
+              price: price,
+              cost: it.cost_price !== undefined && it.cost_price !== null ? Number(it.cost_price) : price * 0.7,
+              stock: 0,
+              minStock: 0,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            quantity: qty,
+            subtotal: +(price * qty),
+          };
+        });
+
+        const subtotalNum = Number(detailed.Subtotal ?? mappedItems.reduce((s: number, it: any) => s + it.subtotal, 0));
+        const taxNum = Number(detailed.Tax ?? 0);
+        const totalNum = Number(detailed.Total ?? (subtotalNum + taxNum));
+
+        const mappedBill = {
+          id: detailed.id || bill.id,
+          items: mappedItems,
+          subtotal: subtotalNum,
+          tax: taxNum,
+          taxRate: mappedItems.length ? Math.round((taxNum / (subtotalNum || 1)) * 100) : 0,
+          discount: 0,
+          discountRate: 0,
+          total: totalNum,
+          customerName: detailed.customer ?? undefined,
+          customerPhone: undefined,
+          paymentMethod: (String(detailed.PaymentMethod || bill.paymentMethod || '').toLowerCase()),
+          amountPaid: detailed.PaymentMethod && String(detailed.PaymentMethod).toLowerCase() === 'credit' ? 0 : totalNum,
+          change: 0,
+          creditDescription: detailed.creditNote ?? undefined,
+          createdAt: detailed.dateTime ? new Date(detailed.dateTime) : bill.createdAt,
+        };
+
+        setSelectedBill(mappedBill);
+      } else {
+        // Fallback - use the existing mock bill data
+        setSelectedBill(bill);
+      }
+    } catch (err) {
+      console.error('Failed to fetch bill details', err);
+      // Fallback to mock bill
+      setSelectedBill(bill);
+    } finally {
+      setIsLoadingBill(false);
+    }
   };
 
   const getPaymentMethodBadge = (method: string) => {
@@ -405,7 +413,7 @@ const Bills = () => {
         <CardHeader className="p-4 md:p-6">
           <CardTitle className="text-base md:text-lg flex items-center gap-2">
             <Receipt className="h-4 w-4 md:h-5 md:w-5" />
-            Bills ({filteredBills.length})
+            Bills ({totalRecords || 0})
             {totalPages > 1 && (
               <span className="text-xs md:text-sm font-normal text-muted-foreground">
                 - Page {currentPage} of {totalPages}
@@ -533,9 +541,7 @@ const Bills = () => {
           {totalPages > 1 && (
             <div className="flex flex-col md:flex-row items-center justify-between gap-3 mt-4">
               <div className="text-xs md:text-sm text-muted-foreground text-center md:text-left">
-                Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                {Math.min(currentPage * itemsPerPage, filteredBills.length)} of{" "}
-                {filteredBills.length} bills
+                Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalRecords || 0)} of {totalRecords || 0} bills
               </div>
 
               {/* Mobile Pagination */}
@@ -643,8 +649,12 @@ const Bills = () => {
             </DialogDescription>
           </DialogHeader>
 
-          {selectedBill && (
-            <div className="space-y-4">
+          {isLoadingBill ? (
+            <div className="py-8 flex items-center justify-center">
+              <div>Loading bill...</div>
+            </div>
+          ) : selectedBill ? (
+             <div className="space-y-4">
               {/* Bill Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
@@ -716,7 +726,7 @@ const Bills = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedBill.items.map((item, index) => (
+                      {selectedBill.items.map((item: any, index: number) => (
                         <TableRow key={index}>
                           <TableCell>{item.product.name}</TableCell>
                           <TableCell className="text-center">{item.quantity}</TableCell>
@@ -770,12 +780,14 @@ const Bills = () => {
                 )}
               </div>
             </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">No bill selected</div>
           )}
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-};
+         </DialogContent>
+       </Dialog>
+     </div>
+   );
+ };
 
-export default Bills;
+ export default Bills;
 
