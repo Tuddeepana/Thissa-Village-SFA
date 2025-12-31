@@ -6,6 +6,7 @@ const router = Router();
 
 // GET /api/dashboard/summary
 router.get('/summary', authenticate, controller.getSummary);
+// GET /api/dashboard/product-category
+router.get('/product-category', authenticate, controller.getProductCategory);
 
 export default router;
-

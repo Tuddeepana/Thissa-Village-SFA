@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, TrendingUp, Package, AlertCircle } from "lucide-react";
 import {
@@ -15,98 +16,142 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import api from '@/api/client';
 
-// Sample data
-const weeklyData = [
-  { day: "Mon", income: 4200 },
-  { day: "Tue", income: 3800 },
-  { day: "Wed", income: 5100 },
-  { day: "Thu", income: 4600 },
-  { day: "Fri", income: 6200 },
-  { day: "Sat", income: 7800 },
-  { day: "Sun", income: 5900 },
+// color palette for pie slices
+const COLOR_VARS = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+  'hsl(var(--chart-6))',
 ];
 
-const monthlyData = [
-  { month: "Jan", revenue: 45000 },
-  { month: "Feb", revenue: 52000 },
-  { month: "Mar", revenue: 48000 },
-  { month: "Apr", revenue: 61000 },
-  { month: "May", revenue: 55000 },
-  { month: "Jun", revenue: 67000 },
-];
-
-const categoryData = [
-  { name: "Red Wine", value: 45, color: "hsl(var(--chart-1))" },
-  { name: "White Wine", value: 30, color: "hsl(var(--chart-2))" },
-  { name: "Sparkling", value: 15, color: "hsl(var(--chart-3))" },
-  { name: "Rose", value: 10, color: "hsl(var(--chart-4))" },
-];
+const DAY_ORDER = ['monday', 'tuesday', 'wensday', 'thursday', 'friday', 'saturday', 'sunday'];
+const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const MONTH_KEYS = ['jan','feb','march','april','may','june','july','aug','sep','oct','nov','dec'];
+const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 const Dashboard = () => {
+  const [weeklyData, setWeeklyData] = useState<Array<{ day: string; income: number }>>([]);
+  const [monthlyData, setMonthlyData] = useState<Array<{ month: string; revenue: number }>>([]);
+  const [categoryData, setCategoryData] = useState<Array<{ name: string; value: number; color: string }>>([]);
+
+  const [weeklyIncome, setWeeklyIncome] = useState<string>('0');
+  const [monthlyIncome, setMonthlyIncome] = useState<string>('0');
+  const [totalProducts, setTotalProducts] = useState<number>(0);
+  const [lowStockCount, setLowStockCount] = useState<number>(0);
+
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const resp = await api.get('/dashboard/summary');
+        const payload = resp.data?.response ?? resp.data;
+
+        if (cancelled) return;
+
+        // Stats
+        setWeeklyIncome(payload.weeklyIncome ?? '0');
+        setMonthlyIncome(payload.monthlyIncome ?? '0');
+        setTotalProducts(Number(payload.TotalProduct ?? 0));
+        setLowStockCount((payload.lowStockItems ?? []).length ?? 0);
+
+        // Weekly chart mapping
+        const wResp = payload.weeklyIncomeResponse ?? {};
+        const wData = DAY_ORDER.map((key, idx) => ({
+          day: DAY_LABELS[idx],
+          income: Number((wResp[key] ?? '0')),
+        }));
+        setWeeklyData(wData);
+
+        // Monthly mapping
+        const mResp = payload.monthlyIncomeResponse ?? {};
+        const mData = MONTH_KEYS.map((k, idx) => ({ month: MONTH_LABELS[idx], revenue: Number(mResp[k] ?? '0') }));
+        setMonthlyData(mData);
+
+        // Category distribution
+        const cat = payload.categoryDistribution ?? [];
+        const mappedCats = (cat as any[]).map((c, i) => ({ name: c.categoryName ?? c.name, value: Number(c.percentage ?? c.value ?? 0), color: COLOR_VARS[i % COLOR_VARS.length] }));
+        setCategoryData(mappedCats);
+      } catch (err: any) {
+        console.error('Failed to load dashboard summary', err);
+        setError(err?.response?.data?.message ?? err.message ?? 'Failed to load data');
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    fetchData();
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-sm md:text-base text-muted-foreground">Overview of your wine store performance</p>
+        <p className="text-sm md:text-base text-muted-foreground">Overview of your store performance</p>
       </div>
+
+      {error && (
+        <div className="text-sm text-destructive">Error loading dashboard: {error}</div>
+      )}
 
       {/* Stat Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Weekly Income
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Weekly Income</CardTitle>
             <DollarSign className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">$37,600</div>
+            <div className="text-2xl font-bold text-foreground">Rs.{Number(weeklyIncome || '0').toFixed(2)}</div>
             <p className="text-xs text-success flex items-center gap-1 mt-1">
               <TrendingUp className="h-3 w-3" />
-              +12.5% from last week
+              {/* Placeholder percent; could be derived from previous week */}
+              +{weeklyData.length ? Math.round(((weeklyData.reduce((s, d) => s + d.income, 0) / (weeklyData.length || 1)) / 100) * 100) : 0}% from last week
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Monthly Revenue
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Revenue</CardTitle>
             <TrendingUp className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">$67,000</div>
+            <div className="text-2xl font-bold text-foreground">Rs.{Number(monthlyIncome || '0').toFixed(2)}</div>
             <p className="text-xs text-success flex items-center gap-1 mt-1">
               <TrendingUp className="h-3 w-3" />
-              +8.2% from last month
+              +{monthlyData.length ? Math.round(((monthlyData.reduce((s, d) => s + d.revenue, 0) / (monthlyData.length || 1)) / 100) * 100) : 0}% from last month
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Products
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Products</CardTitle>
             <Package className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">324</div>
-            <p className="text-xs text-muted-foreground mt-1">Across 12 categories</p>
+            <div className="text-2xl font-bold text-foreground">{totalProducts}</div>
+            <p className="text-xs text-muted-foreground mt-1">Across categories</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Low Stock Items
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Low Stock Items</CardTitle>
             <AlertCircle className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-warning">23</div>
+            <div className="text-2xl font-bold text-warning">{lowStockCount}</div>
             <p className="text-xs text-muted-foreground mt-1">Require attention</p>
           </CardContent>
         </Card>
