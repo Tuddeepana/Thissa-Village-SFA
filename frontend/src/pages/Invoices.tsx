@@ -112,6 +112,33 @@ const Invoices = () => {
       csvParts.push(...summaryRows.map(row => row.map(cell => `"${cell}"`).join(',')));
       csvParts.push(grandRow.map(cell => `"${cell}"`).join(','));
 
+      // Product + Bottle Size Summary (total quantity of each product-bottle combination)
+      const productBottleHeaders = ['Product', 'Bottle Size', 'Total Quantity', 'Total Selling Price', 'Total Cost Price', 'Profit'];
+      const byProductBottle = new Map<string, { product: string; bottle: string; qty: number; selling: number; cost: number }>();
+      for (const r of rows) {
+        const key = `${r.product}||${r.bottleVolume}`;
+        const cur = byProductBottle.get(key) ?? { product: r.product, bottle: r.bottleVolume, qty: 0, selling: 0, cost: 0 };
+        cur.qty += r.quantity;
+        cur.selling += r.quantity * r.sellingPrice;
+        cur.cost += r.quantity * r.costPrice;
+        byProductBottle.set(key, cur);
+      }
+      const productBottleRows = Array.from(byProductBottle.values())
+        .sort((a, b) => a.product.localeCompare(b.product) || a.bottle.localeCompare(b.bottle))
+        .map(({ product, bottle, qty, selling, cost }) => [
+          product,
+          bottle,
+          String(qty),
+          selling.toFixed(2),
+          cost.toFixed(2),
+          (selling - cost).toFixed(2),
+        ]);
+
+      csvParts.push('');
+      csvParts.push('Product + Bottle Size Summary');
+      csvParts.push(productBottleHeaders.join(','));
+      csvParts.push(...productBottleRows.map(row => row.map(cell => `"${cell}"`).join(',')));
+
       const csvContent = csvParts.join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
