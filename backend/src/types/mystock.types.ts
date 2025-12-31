@@ -38,4 +38,6 @@ export type MyStockQuery = {
   productName?: string;
   categoryId?: string;
   status?: 'InStock' | 'LowStock' | 'OutOfStock' | string;
+  // When true, return all filtered rows in tableResponse.data (no slicing/pagination)
+  noPagination?: boolean;
 };

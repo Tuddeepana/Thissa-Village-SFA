@@ -66,8 +66,9 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
 
   // Pagination
   const totalRecords = filteredRows.length;
-  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
-  const pageRows = filteredRows.slice(skip, skip + pageSize);
+  const useNoPagination = !!query.noPagination;
+  const totalPages = useNoPagination ? 1 : Math.max(1, Math.ceil(totalRecords / pageSize));
+  const pageRows = useNoPagination ? filteredRows : filteredRows.slice(skip, skip + pageSize);
 
   // Compute card metrics from allRows (not just paginated)
   let totalItems = allRows.length;
@@ -85,8 +86,8 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
     tableResponse: {
       data: pageRows,
       pagination: {
-        currentPage: page,
-        pageSize,
+        currentPage: useNoPagination ? 1 : page,
+        pageSize: useNoPagination ? totalRecords : pageSize,
         totalPages,
         totalRecords,
       },

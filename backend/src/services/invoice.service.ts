@@ -74,7 +74,7 @@ class InvoiceService {
     return { data: items as InvoiceDTO[], page, limit, total };
   }
 
-  async listInvoicesWithProducts(query: { page?: number; limit?: number; search?: string; category?: string; month?: number; year?: number; dateFrom?: Date | string; dateTo?: Date | string }): Promise<PaginatedResult<InvoiceWithProductsDTO>> {
+  async listInvoicesWithProducts(query: { page?: number; limit?: number; search?: string; category?: string; month?: number; year?: number; dateFrom?: Date | string; dateTo?: Date | string; noPagination?: boolean }): Promise<PaginatedResult<InvoiceWithProductsDTO>> {
     const page = query.page && query.page > 0 ? query.page : 1;
     const limit = query.limit && query.limit > 0 ? query.limit : 10;
     const where: any = {};
@@ -132,12 +132,13 @@ class InvoiceService {
       where.AND = andClauses;
     }
 
+    const useNoPagination = !!query.noPagination;
     const [total, items] = await Promise.all([
       (prisma as any).invoice.count({ where }),
       (prisma as any).invoice.findMany({
         where,
-        skip: (page - 1) * limit,
-        take: limit,
+        skip: useNoPagination ? undefined : (page - 1) * limit,
+        take: useNoPagination ? undefined : limit,
         orderBy: { createdAt: 'desc' },
         // include product and the product's category so we can surface category name to the frontend
         include: { inventoryRecords: { include: { product: { include: { category: true } } } } },
@@ -164,7 +165,7 @@ class InvoiceService {
       })),
     })) as InvoiceWithProductsDTO[];
 
-    return { data, page, limit, total };
+    return { data, page: useNoPagination ? 1 : page, limit: useNoPagination ? total : limit, total };
   }
 
   async updateInvoice(id: string, input: InvoiceUpdateInput): Promise<InvoiceDTO> {

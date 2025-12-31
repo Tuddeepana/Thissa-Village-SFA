@@ -9,6 +9,7 @@ export const getMyStockController = async (req: Request, res: Response) => {
     productName: typeof req.query.productName === 'string' ? req.query.productName : undefined,
     categoryId: typeof req.query.categoryId === 'string' ? req.query.categoryId : undefined,
     status: typeof req.query.status === 'string' ? req.query.status : undefined,
+    noPagination: typeof req.query.noPagination === 'string' ? req.query.noPagination === 'true' : undefined,
   };
 
   const data = await getMyStock(q);

@@ -28,6 +28,7 @@ export type InvoiceListQuery = {
   year?: number; // e.g., 2025
   dateFrom?: string | Date;
   dateTo?: string | Date;
+  noPagination?: boolean;
 };
 
 export type PaginatedResult<T> = {

@@ -126,8 +126,25 @@ const MyStock = () => {
   }, [cards, filteredItems]);
 
   // Download CSV function
-  const downloadCSV = () => {
-    const headers = [
+  const downloadCSV = async () => {
+    // Refetch all filtered rows from server (no pagination) for accurate CSV export
+    try {
+      const res = await api.get<MyStockResponse>(
+        '/mystock',
+        {
+          params: {
+            page: 1,
+            pageSize: itemsPerPage, // ignored when noPagination=true
+            productName: searchProduct || undefined,
+            categoryId: categoryId || undefined,
+            status: stockFilter === ALL_STOCK_VALUE ? undefined : stockFilter,
+            noPagination: true,
+          },
+        }
+      );
+      const exportRows: MyStockTableRow[] = res.data.tableResponse?.data ?? [];
+
+      const headers = [
       "Item ID",
       "Product Name",
       "Bottle Size",
@@ -136,9 +153,9 @@ const MyStock = () => {
       "Min Stock",
       "Status",
       "Last Updated",
-    ];
+      ];
 
-    const csvData = filteredItems.map((item) => [
+    const csvData = exportRows.map((item) => [
       item.productId,
       item.productName,
       item.bottle_size ?? '',
@@ -169,6 +186,9 @@ const MyStock = () => {
     link.click();
     // modern remove
     link.remove();
+    } catch (err) {
+      console.error('Failed to export CSV', err);
+    }
   };
 
   const getStockStatus = (quantity: number, minStock: number) => {

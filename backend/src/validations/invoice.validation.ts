@@ -26,6 +26,7 @@ export const invoiceQuerySchema = z.object({
   dateTo: z
     .preprocess((val) => (typeof val === 'string' ? new Date(val) : val), z.date())
     .optional(),
+  noPagination: z.coerce.boolean().optional(),
 });
 
 export const createInvoiceWithItemsSchema = z.object({
