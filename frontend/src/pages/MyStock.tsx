@@ -126,20 +126,39 @@ const MyStock = () => {
   }, [cards, filteredItems]);
 
   // Download CSV function
-  const downloadCSV = () => {
-    const headers = [
+  const downloadCSV = async () => {
+    // Refetch all filtered rows from server (no pagination) for accurate CSV export
+    try {
+      const res = await api.get<MyStockResponse>(
+        '/mystock',
+        {
+          params: {
+            page: 1,
+            pageSize: itemsPerPage, // ignored when noPagination=true
+            productName: searchProduct || undefined,
+            categoryId: categoryId || undefined,
+            status: stockFilter === ALL_STOCK_VALUE ? undefined : stockFilter,
+            noPagination: true,
+          },
+        }
+      );
+      const exportRows: MyStockTableRow[] = res.data.tableResponse?.data ?? [];
+
+      const headers = [
       "Item ID",
       "Product Name",
+      "Bottle Size",
       "Category",
       "Available Quantity",
       "Min Stock",
       "Status",
       "Last Updated",
-    ];
+      ];
 
-    const csvData = filteredItems.map((item) => [
+    const csvData = exportRows.map((item) => [
       item.productId,
       item.productName,
+      item.bottle_size ?? '',
       item.category?.name ?? '',
       item.availableQuantity.toString(),
       item.minStock?.toString() ?? '',
@@ -167,6 +186,9 @@ const MyStock = () => {
     link.click();
     // modern remove
     link.remove();
+    } catch (err) {
+      console.error('Failed to export CSV', err);
+    }
   };
 
   const getStockStatus = (quantity: number, minStock: number) => {
@@ -330,6 +352,7 @@ const MyStock = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Product Name</TableHead>
+                  <TableHead>Bottle Size</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead className="text-center">Available Qty</TableHead>
                   <TableHead className="text-center">Min Stock</TableHead>
@@ -356,6 +379,7 @@ const MyStock = () => {
                       <TableCell className="font-medium">
                         {item.productName}
                       </TableCell>
+                      <TableCell>{item.bottle_size ?? ''}</TableCell>
                       <TableCell>{item.category?.name ?? ''}</TableCell>
                       <TableCell className="text-center">
                         <span
@@ -407,6 +431,9 @@ const MyStock = () => {
                     <div>
                       <h3 className="font-medium text-sm">{item.productName}</h3>
                       <p className="text-xs text-muted-foreground">{item.category?.name ?? ''}</p>
+                      {item.bottle_size && (
+                        <p className="text-xs text-muted-foreground">{item.bottle_size}</p>
+                      )}
                     </div>
                     {getStockStatus(item.availableQuantity, item.minStock)}
                   </div>
