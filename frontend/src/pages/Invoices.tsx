@@ -36,8 +36,18 @@ const Invoices = () => {
   // fetch invoices from backend with pagination (and optional invoiceNumber search)
   const fetchInvoices = useCallback(async (page: number = currentPage, limit: number = itemsPerPage) => {
     try {
-      const search = filters.invoiceNumber ? `&search=${encodeURIComponent(filters.invoiceNumber)}` : '';
-      const res = await api.get(`/invoices/with-products?page=${page}&limit=${limit}${search}`);
+      const params: string[] = [];
+      params.push(`page=${page}`);
+      params.push(`limit=${limit}`);
+      if (filters.invoiceNumber) params.push(`search=${encodeURIComponent(filters.invoiceNumber)}`);
+      if (filters.category) params.push(`category=${encodeURIComponent(filters.category)}`);
+      if (typeof filters.month === 'number') params.push(`month=${filters.month}`);
+      if (typeof filters.year === 'number') params.push(`year=${filters.year}`);
+      if (filters.dateFrom) params.push(`dateFrom=${encodeURIComponent(filters.dateFrom.toISOString())}`);
+      if (filters.dateTo) params.push(`dateTo=${encodeURIComponent(filters.dateTo.toISOString())}`);
+
+      const qs = params.join('&');
+      const res = await api.get(`/invoices/with-products?${qs}`);
       const payload = res.data;
       const mapped: Invoice[] = (payload.data || []).map((inv: any) => {
           const items = (inv.products || []).map((p: any) => {
@@ -85,7 +95,7 @@ const Invoices = () => {
         // ignore
       }
     }
-  }, [currentPage, itemsPerPage, filters.invoiceNumber]);
+  }, [currentPage, itemsPerPage, filters.invoiceNumber, filters.category, filters.month, filters.year, filters.dateFrom, filters.dateTo]);
 
   // initial load
   useEffect(() => {
@@ -105,9 +115,9 @@ const Invoices = () => {
 
   // Server paginates; apply only category filter client-side on current page
   const filteredInvoices = useMemo(() => {
-    if (!filters.category) return invoices;
-    return invoices.filter(inv => inv.items.some(item => item.category === filters.category));
-  }, [invoices, filters.category]);
+    // Server handles filtering; keep client view as-is
+    return invoices;
+  }, [invoices]);
 
   // Pagination
   const paginatedInvoices = filteredInvoices; // already server-paginated
@@ -117,7 +127,7 @@ const Invoices = () => {
   useEffect(() => {
     setCurrentPage(1);
     (async () => { await fetchInvoices(1, itemsPerPage); })();
-  }, [filters.invoiceNumber]);
+  }, [filters.invoiceNumber, filters.category, filters.month, filters.year, filters.dateFrom, filters.dateTo]);
 
   const handleAddInvoice = (invoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>) => {
     // Create a new invoice with full data
@@ -176,39 +186,9 @@ const Invoices = () => {
   };
 
   const handleGenerateLowStockReport = (format: 'pdf' | 'excel') => {
-    // Mock low stock data for demonstration
-    const lowStockItems: LowStockItem[] = [
-      {
-        productId: "prod-001",
-        productName: "Coca Cola",
-        category: "Beverages",
-        currentStock: 5,
-        minStock: 20,
-        reorderQuantity: 50,
-      },
-      {
-        productId: "prod-002",
-        productName: "Bread",
-        category: "Bakery",
-        currentStock: 8,
-        minStock: 15,
-        reorderQuantity: 30,
-      },
-      {
-        productId: "prod-003",
-        productName: "Milk",
-        category: "Dairy",
-        currentStock: 3,
-        minStock: 25,
-        reorderQuantity: 40,
-      },
-    ];
+    
 
-    if (format === 'pdf') {
-      generateLowStockPDF(lowStockItems);
-    } else {
-      generateLowStockExcel(lowStockItems);
-    }
+    
     
     toast.success(`Low stock report generated as ${format.toUpperCase()}`);
   };

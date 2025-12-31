@@ -74,13 +74,62 @@ class InvoiceService {
     return { data: items as InvoiceDTO[], page, limit, total };
   }
 
-  async listInvoicesWithProducts(query: { page?: number; limit?: number; search?: string }): Promise<PaginatedResult<InvoiceWithProductsDTO>> {
+  async listInvoicesWithProducts(query: { page?: number; limit?: number; search?: string; category?: string; month?: number; year?: number; dateFrom?: Date | string; dateTo?: Date | string }): Promise<PaginatedResult<InvoiceWithProductsDTO>> {
     const page = query.page && query.page > 0 ? query.page : 1;
     const limit = query.limit && query.limit > 0 ? query.limit : 10;
     const where: any = {};
 
+    const andClauses: any[] = [];
+
     if (query.search) {
-      where.OR = [{ in_number: { contains: query.search, mode: 'insensitive' } }];
+      andClauses.push({ in_number: { contains: query.search, mode: 'insensitive' } });
+    }
+
+    // Date filters: month/year or explicit date range
+    let startDate: Date | undefined;
+    let endDate: Date | undefined;
+
+    if (query.month !== undefined && query.year !== undefined) {
+      // Month filtering requires year; derive start/end of month
+      startDate = new Date(query.year, query.month, 1);
+      endDate = new Date(query.year, query.month + 1, 0, 23, 59, 59, 999);
+    } else if (query.year !== undefined && query.month === undefined) {
+      // Year-only filter
+      startDate = new Date(query.year, 0, 1);
+      endDate = new Date(query.year, 11, 31, 23, 59, 59, 999);
+    }
+
+    if (query.dateFrom) {
+      const df = typeof query.dateFrom === 'string' ? new Date(query.dateFrom) : query.dateFrom;
+      startDate = df;
+    }
+    if (query.dateTo) {
+      const dt = typeof query.dateTo === 'string' ? new Date(query.dateTo) : query.dateTo;
+      endDate = dt;
+    }
+
+    if (startDate || endDate) {
+      const dateClause: any = {};
+      if (startDate) dateClause.gte = startDate;
+      if (endDate) dateClause.lte = endDate;
+      andClauses.push({ invoiceDate: dateClause });
+    }
+
+    // Category filter: invoices that have at least one inventory record whose product's category matches
+    if (query.category) {
+      andClauses.push({
+        inventoryRecords: {
+          some: {
+            product: {
+              category: { name: { equals: query.category, mode: 'insensitive' } },
+            },
+          },
+        },
+      });
+    }
+
+    if (andClauses.length > 0) {
+      where.AND = andClauses;
     }
 
     const [total, items] = await Promise.all([
