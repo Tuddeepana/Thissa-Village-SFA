@@ -39,9 +39,15 @@ export type BillCreateWithItemsInput = BillCreateInput & {
 };
 
 export type BillListQuery = {
+  billNo?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  today?: boolean;
+  paymentMethod?: string;
+  search?: string;
   page?: number;
+  pageSize?: number;
   limit?: number;
-  search?: string; // by bill_number
 };
 
 export type PaginatedResult<T> = {
@@ -49,4 +55,13 @@ export type PaginatedResult<T> = {
   page: number;
   limit: number;
   total: number;
+};
+
+export type CardSummary = {
+  totalBills: number;
+  totalRevenue: string; // decimal as string
+  cash: string;
+  card: string;
+  credit: string;
+  other?: Record<string, string>;
 };
