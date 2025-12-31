@@ -12,7 +12,6 @@ export type MyStockTableRow = {
   availableQuantity: number;
   minStock: number;
   sellingPrice: number | undefined;
-  bottle_size?: string | null;
   status: 'InStock' | 'LowStock' | 'OutOfStock';
   lastUpdatedAt: string | null;
 };

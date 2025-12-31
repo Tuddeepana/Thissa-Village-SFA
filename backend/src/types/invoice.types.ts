@@ -23,12 +23,6 @@ export type InvoiceListQuery = {
   page?: number;
   limit?: number;
   search?: string;
-  category?: string;
-  month?: number; // 0-11
-  year?: number; // e.g., 2025
-  dateFrom?: string | Date;
-  dateTo?: string | Date;
-  noPagination?: boolean;
 };
 
 export type PaginatedResult<T> = {

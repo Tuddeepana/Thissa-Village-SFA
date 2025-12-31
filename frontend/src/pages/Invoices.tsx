@@ -1,15 +1,29 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, FileDown, AlertTriangle } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus, FileDown, FileSpreadsheet, AlertTriangle } from "lucide-react";
 import { AddInvoiceDialog } from "@/components/invoices/AddInvoiceDialog";
 import { InvoiceFiltersComponent } from "@/components/invoices/InvoiceFilters";
 import { InvoiceTable } from "@/components/invoices/InvoiceTable";
-import { Invoice, InvoiceFilters } from "@/types/invoice";
+import { Invoice, InvoiceFilters, LowStockItem } from "@/types/invoice";
 import api from '@/api/client';
-import { format } from "date-fns";
+import {
+  generateMonthlyRevenuePDF,
+  generateMonthlyRevenueExcel,
+  generateAnnualRevenuePDF,
+  generateAnnualRevenueExcel,
+  generateLowStockPDF,
+  generateLowStockExcel,
+} from "@/lib/reportGenerator";
 import { toast } from "sonner";
-import LocalLoader from "@/components/common/LocalLoader";
 
 const Invoices = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -19,158 +33,11 @@ const Invoices = () => {
   const itemsPerPage = 10;
   const [serverTotalPages, setServerTotalPages] = useState(1);
 
-  // Download CSV for invoices: fetch all filtered rows (no pagination) and build two-section CSV
-  const downloadInvoicesCSV = useCallback(async () => {
-    try {
-      const params: string[] = [];
-      params.push(`page=1`);
-      params.push(`limit=${itemsPerPage}`); // ignored when noPagination=true
-      if (filters.invoiceNumber) params.push(`search=${encodeURIComponent(filters.invoiceNumber)}`);
-      if (filters.category) params.push(`category=${encodeURIComponent(filters.category)}`);
-      if (typeof filters.month === 'number') params.push(`month=${filters.month}`);
-      if (typeof filters.year === 'number') params.push(`year=${filters.year}`);
-      if (filters.dateFrom) params.push(`dateFrom=${encodeURIComponent(filters.dateFrom.toISOString())}`);
-      if (filters.dateTo) params.push(`dateTo=${encodeURIComponent(filters.dateTo.toISOString())}`);
-      params.push(`noPagination=true`);
-
-      const qs = params.join('&');
-  const res = await api.get(`/invoices/with-products?${qs}`, { meta: { showLoader: 'local', loaderKey: 'invoices' } });
-      const all = res.data?.data ?? [];
-
-      // Flatten product rows with required columns
-      type Row = { date: string; category: string; product: string; quantity: number; sellingPrice: number; costPrice: number; bottleVolume: string; litersPerUnit: number };
-      const rows: Row[] = [];
-
-      for (const inv of all) {
-        const invDate = inv.invoiceDate ? new Date(inv.invoiceDate) : new Date();
-        for (const p of (inv.products || [])) {
-          const qty = Number(p.quantity_moved ?? 0);
-          const sp = Number(p.selling_price ?? 0);
-          const cp = Number(p.cost_price ?? 0);
-          const litresRaw = p.litres !== undefined && p.litres !== null ? Number(p.litres) : 0;
-          const unit = String(p.bottle_volume ?? '').toUpperCase();
-          const bottleVolume = `${litresRaw} ${unit.toLowerCase()}`;
-          const litersPerUnit = unit === 'ML' ? litresRaw / 1000 : litresRaw;
-          rows.push({
-            date: format(invDate, 'yyyy-MM-dd'),
-            category: p.categoryName ?? 'Uncategorized',
-            product: p.name ?? '',
-            quantity: qty,
-            sellingPrice: sp,
-            costPrice: cp,
-            bottleVolume,
-            litersPerUnit,
-          });
-        }
-      }
-
-      const detailsHeaders = [
-        'Date',
-        'Category',
-        'Product Name',
-        'Quantity',
-        'Selling Price',
-        'Cost Price',
-        'Bottle Volume',
-      ];
-
-      const detailsData = rows.map(r => [
-        r.date,
-        r.category,
-        r.product,
-        String(r.quantity),
-        r.sellingPrice.toFixed(2),
-        r.costPrice.toFixed(2),
-        r.bottleVolume,
-      ]);
-
-      // Build category summary
-      type Agg = { volumeL: number; selling: number; cost: number };
-      const byCat = new Map<string, Agg>();
-      for (const r of rows) {
-        const a = byCat.get(r.category) ?? { volumeL: 0, selling: 0, cost: 0 };
-        a.volumeL += r.quantity * r.litersPerUnit;
-        a.selling += r.quantity * r.sellingPrice;
-        a.cost += r.quantity * r.costPrice;
-        byCat.set(r.category, a);
-      }
-
-      const summaryHeaders = ['Category', 'Total Volume (L)', 'Total Selling Price', 'Total Cost Price', 'Profit'];
-      const summaryRows: string[][] = [];
-      let totalVol = 0, totalSell = 0, totalCost = 0;
-      for (const [cat, a] of Array.from(byCat.entries()).sort((a,b)=>a[0].localeCompare(b[0]))) {
-        totalVol += a.volumeL; totalSell += a.selling; totalCost += a.cost;
-        summaryRows.push([cat, a.volumeL.toFixed(2), a.selling.toFixed(2), a.cost.toFixed(2), (a.selling - a.cost).toFixed(2)]);
-      }
-      const grandRow = ['TOTAL', totalVol.toFixed(2), totalSell.toFixed(2), totalCost.toFixed(2), (totalSell - totalCost).toFixed(2)];
-
-      const csvParts: string[] = [];
-      csvParts.push(detailsHeaders.join(','));
-      csvParts.push(...detailsData.map(row => row.map(cell => `"${cell}"`).join(',')));
-      csvParts.push('');
-      csvParts.push('Category Summary');
-      csvParts.push(summaryHeaders.join(','));
-      csvParts.push(...summaryRows.map(row => row.map(cell => `"${cell}"`).join(',')));
-      csvParts.push(grandRow.map(cell => `"${cell}"`).join(','));
-
-      // Product + Bottle Size Summary (total quantity of each product-bottle combination)
-      const productBottleHeaders = ['Product', 'Bottle Size', 'Total Quantity', 'Total Selling Price', 'Total Cost Price', 'Profit'];
-      const byProductBottle = new Map<string, { product: string; bottle: string; qty: number; selling: number; cost: number }>();
-      for (const r of rows) {
-        const key = `${r.product}||${r.bottleVolume}`;
-        const cur = byProductBottle.get(key) ?? { product: r.product, bottle: r.bottleVolume, qty: 0, selling: 0, cost: 0 };
-        cur.qty += r.quantity;
-        cur.selling += r.quantity * r.sellingPrice;
-        cur.cost += r.quantity * r.costPrice;
-        byProductBottle.set(key, cur);
-      }
-      const productBottleRows = Array.from(byProductBottle.values())
-        .sort((a, b) => a.product.localeCompare(b.product) || a.bottle.localeCompare(b.bottle))
-        .map(({ product, bottle, qty, selling, cost }) => [
-          product,
-          bottle,
-          String(qty),
-          selling.toFixed(2),
-          cost.toFixed(2),
-          (selling - cost).toFixed(2),
-        ]);
-
-      csvParts.push('');
-      csvParts.push('Product + Bottle Size Summary');
-      csvParts.push(productBottleHeaders.join(','));
-      csvParts.push(...productBottleRows.map(row => row.map(cell => `"${cell}"`).join(',')));
-
-      const csvContent = csvParts.join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `invoices-${format(new Date(), 'yyyy-MM-dd')}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (err) {
-      console.error('Failed to export invoices CSV', err);
-      toast.error('Failed to export CSV');
-    }
-  }, [filters, itemsPerPage]);
-
   // fetch invoices from backend with pagination (and optional invoiceNumber search)
   const fetchInvoices = useCallback(async (page: number = currentPage, limit: number = itemsPerPage) => {
     try {
-      const params: string[] = [];
-      params.push(`page=${page}`);
-      params.push(`limit=${limit}`);
-      if (filters.invoiceNumber) params.push(`search=${encodeURIComponent(filters.invoiceNumber)}`);
-      if (filters.category) params.push(`category=${encodeURIComponent(filters.category)}`);
-      if (typeof filters.month === 'number') params.push(`month=${filters.month}`);
-      if (typeof filters.year === 'number') params.push(`year=${filters.year}`);
-      if (filters.dateFrom) params.push(`dateFrom=${encodeURIComponent(filters.dateFrom.toISOString())}`);
-      if (filters.dateTo) params.push(`dateTo=${encodeURIComponent(filters.dateTo.toISOString())}`);
-
-      const qs = params.join('&');
-  const res = await api.get(`/invoices/with-products?${qs}`, { meta: { showLoader: 'local', loaderKey: 'invoices' } });
+      const search = filters.invoiceNumber ? `&search=${encodeURIComponent(filters.invoiceNumber)}` : '';
+      const res = await api.get(`/invoices/with-products?page=${page}&limit=${limit}${search}`);
       const payload = res.data;
       const mapped: Invoice[] = (payload.data || []).map((inv: any) => {
           const items = (inv.products || []).map((p: any) => {
@@ -218,7 +85,7 @@ const Invoices = () => {
         // ignore
       }
     }
-  }, [currentPage, itemsPerPage, filters.invoiceNumber, filters.category, filters.month, filters.year, filters.dateFrom, filters.dateTo]);
+  }, [currentPage, itemsPerPage, filters.invoiceNumber]);
 
   // initial load
   useEffect(() => {
@@ -227,7 +94,7 @@ const Invoices = () => {
     })();
   }, []);
 
-  // Extract unique categories from invoices (for filter dropdown)
+  // Extract unique categories from invoices
   const categories = useMemo(() => {
     const categorySet = new Set<string>();
     invoices.forEach(invoice => {
@@ -236,16 +103,117 @@ const Invoices = () => {
     return Array.from(categorySet).sort();
   }, [invoices]);
 
-  // Server paginates; display as-is
-  const filteredInvoices = useMemo(() => invoices, [invoices]);
+  // Server paginates; apply only category filter client-side on current page
+  const filteredInvoices = useMemo(() => {
+    if (!filters.category) return invoices;
+    return invoices.filter(inv => inv.items.some(item => item.category === filters.category));
+  }, [invoices, filters.category]);
 
-  // Reset to page 1 when filters change and re-fetch
+  // Pagination
+  const paginatedInvoices = filteredInvoices; // already server-paginated
+
+  // Reset to page 1 when filters change
+  // when invoiceNumber search changes, reset page and re-fetch
   useEffect(() => {
     setCurrentPage(1);
     (async () => { await fetchInvoices(1, itemsPerPage); })();
-  }, [filters.invoiceNumber, filters.category, filters.month, filters.year, filters.dateFrom, filters.dateTo]);
+  }, [filters.invoiceNumber]);
 
-  // Statistics (basic)
+  const handleAddInvoice = (invoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>) => {
+    // Create a new invoice with full data
+    const newInvoice: Invoice = {
+      id: `inv-${Math.random().toString(36).slice(2, 11)}`,
+      ...invoiceData,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    setInvoices([newInvoice, ...invoices]);
+    toast.success("Invoice added successfully!");
+  };
+
+  const handleGenerateMonthlyReport = (format: 'pdf' | 'excel') => {
+    const month = filters.month ?? new Date().getMonth();
+    const year = filters.year ?? new Date().getFullYear();
+    
+    const monthlyInvoices = invoices.filter(
+      inv => inv.date.getMonth() === month && inv.date.getFullYear() === year
+    );
+
+    if (monthlyInvoices.length === 0) {
+      toast.error("No invoices found for the selected month");
+      return;
+    }
+
+    if (format === 'pdf') {
+      generateMonthlyRevenuePDF(monthlyInvoices, month, year);
+    } else {
+      generateMonthlyRevenueExcel(monthlyInvoices, month, year);
+    }
+    
+    toast.success(`Monthly report generated as ${format.toUpperCase()}`);
+  };
+
+  const handleGenerateAnnualReport = (format: 'pdf' | 'excel') => {
+    const year = filters.year ?? new Date().getFullYear();
+    
+    const yearlyInvoices = invoices.filter(
+      inv => inv.date.getFullYear() === year
+    );
+
+    if (yearlyInvoices.length === 0) {
+      toast.error("No invoices found for the selected year");
+      return;
+    }
+
+    if (format === 'pdf') {
+      generateAnnualRevenuePDF(yearlyInvoices, year);
+    } else {
+      generateAnnualRevenueExcel(yearlyInvoices, year);
+    }
+    
+    toast.success(`Annual report generated as ${format.toUpperCase()}`);
+  };
+
+  const handleGenerateLowStockReport = (format: 'pdf' | 'excel') => {
+    // Mock low stock data for demonstration
+    const lowStockItems: LowStockItem[] = [
+      {
+        productId: "prod-001",
+        productName: "Coca Cola",
+        category: "Beverages",
+        currentStock: 5,
+        minStock: 20,
+        reorderQuantity: 50,
+      },
+      {
+        productId: "prod-002",
+        productName: "Bread",
+        category: "Bakery",
+        currentStock: 8,
+        minStock: 15,
+        reorderQuantity: 30,
+      },
+      {
+        productId: "prod-003",
+        productName: "Milk",
+        category: "Dairy",
+        currentStock: 3,
+        minStock: 25,
+        reorderQuantity: 40,
+      },
+    ];
+
+    if (format === 'pdf') {
+      generateLowStockPDF(lowStockItems);
+    } else {
+      generateLowStockExcel(lowStockItems);
+    }
+    
+    toast.success(`Low stock report generated as ${format.toUpperCase()}`);
+  };
+
+  // Statistics
   const stats = useMemo(() => {
     const total = filteredInvoices.reduce((sum, inv) => sum + inv.total, 0);
     const profit = filteredInvoices.reduce((sum, inv) => sum + (inv.total - inv.tax), 0);
@@ -256,16 +224,22 @@ const Invoices = () => {
     };
   }, [filteredInvoices]);
 
-  // Dates with no invoices (helper)
+  // Check dates with no invoices
   const getDatesWithNoInvoices = () => {
-    if (!filters.month || !filters.year) return [] as number[];
+    if (!filters.month || !filters.year) return [];
+    
     const daysInMonth = new Date(filters.year, filters.month + 1, 0).getDate();
-    const datesWithInvoices = new Set(filteredInvoices.map(inv => inv.date.getDate()));
-    const missing: number[] = [];
+    const datesWithInvoices = new Set(
+      filteredInvoices.map(inv => inv.date.getDate())
+    );
+    
+    const missingDates = [];
     for (let day = 1; day <= daysInMonth; day++) {
-      if (!datesWithInvoices.has(day)) missing.push(day);
+      if (!datesWithInvoices.has(day)) {
+        missingDates.push(day);
+      }
     }
-    return missing;
+    return missingDates;
   };
 
   const missingDates = getDatesWithNoInvoices();
@@ -282,10 +256,49 @@ const Invoices = () => {
             <Plus className="mr-2 h-4 w-4" />
             Add Invoice
           </Button>
-          <Button variant="outline" onClick={downloadInvoicesCSV}>
-            <FileDown className="mr-2 h-4 w-4" />
-            Download CSV
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <FileDown className="mr-2 h-4 w-4" />
+                Reports
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Monthly Revenue Report</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => handleGenerateMonthlyReport('pdf')}>
+                <FileDown className="mr-2 h-4 w-4" />
+                Download as PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleGenerateMonthlyReport('excel')}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Download as Excel
+              </DropdownMenuItem>
+              
+              <DropdownMenuSeparator />
+              
+              <DropdownMenuLabel>Annual Revenue Report</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => handleGenerateAnnualReport('pdf')}>
+                <FileDown className="mr-2 h-4 w-4" />
+                Download as PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleGenerateAnnualReport('excel')}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Download as Excel
+              </DropdownMenuItem>
+              
+              <DropdownMenuSeparator />
+              
+              <DropdownMenuLabel>Low Stock Report</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => handleGenerateLowStockReport('pdf')}>
+                <FileDown className="mr-2 h-4 w-4" />
+                Download as PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleGenerateLowStockReport('excel')}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Download as Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -367,9 +380,8 @@ const Invoices = () => {
           <CardTitle>Invoices</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <LocalLoader loaderKey="invoices">
           <InvoiceTable
-            invoices={filteredInvoices}
+            invoices={paginatedInvoices}
             currentPage={currentPage}
             totalPages={serverTotalPages}
             onPageChange={(p) => {
@@ -377,7 +389,6 @@ const Invoices = () => {
               (async () => { await fetchInvoices(p, itemsPerPage); })();
             }}
           />
-          </LocalLoader>
         </CardContent>
       </Card>
 
