@@ -20,8 +20,11 @@ class InventoryService {
 
     const rec = await client.inventory.create({
       data: {
-        productId: input.productId,
-        invoiceId: input.invoiceId,
+        // Connect required product relation
+        product: { connect: { id: input.productId } },
+        // Connect optional invoice or bill relations
+        ...(input.invoiceId ? { invoice: { connect: { id: input.invoiceId } } } : {}),
+        ...(input.billId ? { bill: { connect: { id: input.billId } } } : {}),
         quantity_moved: input.quantity_moved,
         available_quantity: newAvailable,
       },
@@ -40,6 +43,7 @@ class InventoryService {
     const where: any = {};
     if (query.productId) where.productId = query.productId;
     if (query.invoiceId) where.invoiceId = query.invoiceId;
+    if (query.billId) where.billId = query.billId;
 
     const [total, items] = await Promise.all([
       (prisma as any).inventory.count({ where }),
