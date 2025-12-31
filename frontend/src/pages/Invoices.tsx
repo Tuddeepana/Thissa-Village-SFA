@@ -9,6 +9,7 @@ import { Invoice, InvoiceFilters } from "@/types/invoice";
 import api from '@/api/client';
 import { format } from "date-fns";
 import { toast } from "sonner";
+import LocalLoader from "@/components/common/LocalLoader";
 
 const Invoices = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -33,7 +34,7 @@ const Invoices = () => {
       params.push(`noPagination=true`);
 
       const qs = params.join('&');
-      const res = await api.get(`/invoices/with-products?${qs}`);
+  const res = await api.get(`/invoices/with-products?${qs}`, { meta: { showLoader: 'local', loaderKey: 'invoices' } });
       const all = res.data?.data ?? [];
 
       // Flatten product rows with required columns
@@ -169,7 +170,7 @@ const Invoices = () => {
       if (filters.dateTo) params.push(`dateTo=${encodeURIComponent(filters.dateTo.toISOString())}`);
 
       const qs = params.join('&');
-      const res = await api.get(`/invoices/with-products?${qs}`);
+  const res = await api.get(`/invoices/with-products?${qs}`, { meta: { showLoader: 'local', loaderKey: 'invoices' } });
       const payload = res.data;
       const mapped: Invoice[] = (payload.data || []).map((inv: any) => {
           const items = (inv.products || []).map((p: any) => {
@@ -366,6 +367,7 @@ const Invoices = () => {
           <CardTitle>Invoices</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <LocalLoader loaderKey="invoices">
           <InvoiceTable
             invoices={filteredInvoices}
             currentPage={currentPage}
@@ -375,6 +377,7 @@ const Invoices = () => {
               (async () => { await fetchInvoices(p, itemsPerPage); })();
             }}
           />
+          </LocalLoader>
         </CardContent>
       </Card>
 
