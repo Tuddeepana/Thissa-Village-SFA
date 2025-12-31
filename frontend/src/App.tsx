@@ -19,6 +19,8 @@ import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import { STORAGE_KEYS } from "./utils/constants";
+import { LoadingProvider } from "@/state/loadingProvider";
+import GlobalLoaderOverlay from "@/components/common/GlobalLoaderOverlay";
 
 const queryClient = new QueryClient();
 
@@ -42,7 +44,9 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <LoadingProvider>
+        <GlobalLoaderOverlay />
+        <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
           <Route
@@ -76,7 +80,8 @@ const App = () => (
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </BrowserRouter>
+        </BrowserRouter>
+      </LoadingProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

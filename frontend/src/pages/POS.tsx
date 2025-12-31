@@ -182,71 +182,107 @@ const POS = () => {
     customerPhone?: string,
     creditDescription?: string
   ) => {
-    // Generate bill ID
-    const billId = `BILL-${Date.now()}`;
     const now = new Date();
+    const change = paymentMethod === 'credit' ? 0 : amountPaid - total;
+    const billNumber = `B-${Date.now()}`; // simple unique bill number
+    const cashierName = (() => {
+      try {
+        const raw = localStorage.getItem('authUser');
+        if (!raw) return 'Cashier';
+        const user = JSON.parse(raw);
+        return user?.name ?? 'Cashier';
+      } catch {
+        return 'Cashier';
+      }
+    })();
 
-    const bill: Bill = {
-      id: billId,
-      items: billItems,
-      subtotal,
-      tax,
-      taxRate,
-      discount,
-      discountRate,
-      total,
-      customerName,
-      customerPhone,
-      paymentMethod,
-      amountPaid,
-      change: paymentMethod === 'credit' ? 0 : amountPaid - total,
-      creditDescription,
-      createdAt: now,
+    // Build payload for backend as per API contract
+    const payload = {
+      bill_number: billNumber,
+      date: now.toISOString(),
+      payment_method: paymentMethod.toUpperCase(),
+      customer_name: customerName ?? null,
+      total: Number(total.toFixed(2)),
+      cashier_name: cashierName,
+      item_count: billItems.length,
+      credit_note: creditDescription ?? null,
+      cash_given: Number(amountPaid.toFixed(2)),
+      balance_given: Number(change.toFixed(2)),
+      tax: Number(tax.toFixed(2)),
+      items: billItems.map((bi) => ({
+        productId: bi.product.id,
+        quantityMoved: bi.quantity,
+      })),
     };
 
-    // Update stock levels (auto-reduce stock)
-    const updatedProducts = products.map((product) => {
-      const billItem = billItems.find((item) => item.product.id === product.id);
-      if (billItem) {
-        const newStock = product.stock - billItem.quantity;
-        return {
-          ...product,
-          stock: newStock,
-          updatedAt: now,
-        };
-      }
-      return product;
-    });
-
-    setProducts(updatedProducts);
-
-    // Print bill
-    printBillNewWindow(bill);
-
-    // Clear bill
-    setBillItems([]);
-    setDiscountRate(0);
-    setIsPaymentDialogOpen(false);
-
-    // Show success message
-    toast.success("Bill completed successfully!", {
-      description: `Bill #${billId} - Total: Rs. ${total.toFixed(2)}`,
-    });
-
-    // Show low stock warnings after completing bill
-    setTimeout(() => {
-      const lowStockProducts = updatedProducts.filter(
-        (p) => p.stock > 0 && p.stock <= p.minStock
-      );
-      if (lowStockProducts.length > 0) {
-        toast.warning(`${lowStockProducts.length} product(s) are now low in stock!`, {
-          description: lowStockProducts
-            .slice(0, 3)
-            .map((p) => `${p.name}: ${p.stock} units`)
-            .join(", "),
+    // Call backend to persist bill and create inventory movements
+    api
+      .post('/bills', payload)
+      .then((res) => {
+        // Update stock levels locally (reflect subtraction)
+        const updatedProducts = products.map((product) => {
+          const billItem = billItems.find((item) => item.product.id === product.id);
+          if (billItem) {
+            const newStock = product.stock - billItem.quantity;
+            return {
+              ...product,
+              stock: newStock,
+              updatedAt: now,
+            };
+          }
+          return product;
         });
-      }
-    }, 1000);
+        setProducts(updatedProducts);
+
+        // Prepare printable bill object
+        const bill: Bill = {
+          id: billNumber,
+          items: billItems,
+          subtotal,
+          tax,
+          taxRate,
+          discount,
+          discountRate,
+          total,
+          customerName,
+          customerPhone,
+          paymentMethod,
+          amountPaid,
+          change,
+          creditDescription,
+          createdAt: now,
+        };
+        printBillNewWindow(bill);
+
+        // Clear bill & close dialog
+        setBillItems([]);
+        setDiscountRate(0);
+        setIsPaymentDialogOpen(false);
+
+        toast.success('Bill completed successfully!', {
+          description: `Bill #${billNumber} - Total: Rs. ${total.toFixed(2)}`,
+        });
+
+        // Show low stock warnings after completing bill
+        setTimeout(() => {
+          const lowStockProducts = updatedProducts.filter(
+            (p) => p.stock > 0 && p.stock <= p.minStock
+          );
+          if (lowStockProducts.length > 0) {
+            toast.warning(`${lowStockProducts.length} product(s) are now low in stock!`, {
+              description: lowStockProducts
+                .slice(0, 3)
+                .map((p) => `${p.name}: ${p.stock} units`)
+                .join(', '),
+            });
+          }
+        }, 1000);
+      })
+      .catch((err) => {
+        console.error('Failed to complete bill', err);
+        const msg = err?.response?.data?.message ?? 'Failed to complete bill';
+        toast.error(msg);
+      });
   };
 
   return (
