@@ -47,7 +47,7 @@ async function testConnection() {
         take: 5,
       });
       products.forEach((prod) => {
-        console.log(`   - ${prod.name} (${prod.category.name}) - Rs. ${prod.price} - Stock: ${prod.stock}`);
+        // console.log(`   - ${prod.name} (${prod.category.name}) - Rs. ${prod.price} - Stock: ${prod.stock}`);
       });
       console.log('');
     }
