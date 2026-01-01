@@ -39,6 +39,15 @@ export function InvoiceTable({
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
 
+  // Check if invoice is editable (within 5 hours of creation)
+  const isEditable = (invoice: Invoice): boolean => {
+    const createdAt = new Date(invoice.createdAt);
+    const now = new Date();
+    const fiveHoursInMs = 5 * 60 * 60 * 1000; // 5 hours in milliseconds
+    const timeDiff = now.getTime() - createdAt.getTime();
+    return timeDiff < fiveHoursInMs;
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "paid":
@@ -87,24 +96,28 @@ export function InvoiceTable({
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Edit invoice"
-                      title="Edit"
-                      onClick={() => onEdit?.(invoice)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Delete invoice"
-                      title="Delete"
-                      onClick={() => setInvoiceToDelete(invoice)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {isEditable(invoice) && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Edit invoice"
+                          title="Edit"
+                          onClick={() => onEdit?.(invoice)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Delete invoice"
+                          title="Delete"
+                          onClick={() => setInvoiceToDelete(invoice)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
