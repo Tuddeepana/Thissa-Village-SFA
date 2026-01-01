@@ -179,8 +179,17 @@ class InvoiceService {
   }
 
   async deleteInvoice(id: string): Promise<InvoiceDTO> {
-    const invoice = await (prisma as any).invoice.delete({ where: { id } });
-    return invoice as InvoiceDTO;
+    // Delete within transaction: first delete inventory records, then invoice
+    const result = await (prisma as any).$transaction(async (tx: any) => {
+      // Delete all inventory records associated with this invoice
+      await tx.inventory.deleteMany({ where: { invoiceId: id } });
+
+      // Delete the invoice
+      const invoice = await tx.invoice.delete({ where: { id } });
+      return invoice;
+    });
+
+    return result as InvoiceDTO;
   }
 }
 

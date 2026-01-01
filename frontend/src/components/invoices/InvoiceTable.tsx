@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, Edit, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Invoice } from "@/types/invoice";
 import { useState } from "react";
@@ -24,6 +24,8 @@ interface InvoiceTableProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  onEdit?: (invoice: Invoice) => void;
+  onDelete?: (invoice: Invoice) => void;
 }
 
 export function InvoiceTable({
@@ -31,8 +33,20 @@ export function InvoiceTable({
   currentPage,
   totalPages,
   onPageChange,
+  onEdit,
+  onDelete,
 }: InvoiceTableProps) {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
+
+  // Check if invoice is editable (within 5 hours of creation)
+  const isEditable = (invoice: Invoice): boolean => {
+    const createdAt = new Date(invoice.createdAt);
+    const now = new Date();
+    const fiveHoursInMs = 5 * 60 * 60 * 1000; // 5 hours in milliseconds
+    const timeDiff = now.getTime() - createdAt.getTime();
+    return timeDiff < fiveHoursInMs;
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -82,6 +96,28 @@ export function InvoiceTable({
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
+                    {isEditable(invoice) && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Edit invoice"
+                          title="Edit"
+                          onClick={() => onEdit?.(invoice)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Delete invoice"
+                          title="Delete"
+                          onClick={() => setInvoiceToDelete(invoice)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -152,7 +188,7 @@ export function InvoiceTable({
                         <TableHead>Product</TableHead>
                         <TableHead>Category</TableHead>
                         <TableHead>Qty</TableHead>
-                        <TableHead>Price</TableHead>
+                        <TableHead>Cost Price</TableHead>
                         <TableHead>Total</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -162,8 +198,8 @@ export function InvoiceTable({
                           <TableCell>{item.productName}</TableCell>
                           <TableCell>{item.category}</TableCell>
                           <TableCell>{item.quantity}</TableCell>
-                          <TableCell>Rs. {item.unitPrice.toFixed(2)}</TableCell>
-                          <TableCell>Rs. {item.total.toFixed(2)}</TableCell>
+                          <TableCell>Rs. {(item.costPrice ?? item.unitPrice).toFixed(2)}</TableCell>
+                          <TableCell>Rs. {(item.quantity * (item.costPrice ?? item.unitPrice)).toFixed(2)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -179,6 +215,24 @@ export function InvoiceTable({
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!invoiceToDelete} onOpenChange={() => setInvoiceToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Invoice</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            Are you sure you want to delete invoice {invoiceToDelete?.invoiceNumber}? This action cannot be undone.
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setInvoiceToDelete(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => { if (invoiceToDelete) { onDelete?.(invoiceToDelete); } setInvoiceToDelete(null); }}>
+              Delete
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>

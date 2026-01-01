@@ -21,6 +21,7 @@ export interface InvoiceItem {
   category: string;
   quantity: number;
   unitPrice: number;
+  costPrice?: number;
   total: number;
 }
 

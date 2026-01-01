@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { CalendarIcon, Plus, Trash2 } from "lucide-react";
+import { CalendarIcon, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Invoice } from "@/types/invoice";
@@ -43,9 +43,13 @@ interface AddInvoiceDialogProps {
   onOpenChange: (open: boolean) => void;
   // optional callback invoked after a successful create so parent can re-fetch
   onCreated?: () => void;
+  // optional callback invoked after a successful update
+  onUpdated?: () => void;
+  // optional invoice to edit; if provided the dialog will act in edit mode
+  invoiceToEdit?: Invoice | null;
 }
 
-export function AddInvoiceDialog({ open, onOpenChange, onCreated }: AddInvoiceDialogProps) {
+export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, invoiceToEdit }: AddInvoiceDialogProps) {
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [date, setDate] = useState<Date>(new Date());
   const [customerName, setCustomerName] = useState("");
@@ -85,6 +89,26 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated }: AddInvoiceDi
     })();
     return () => { mounted = false; };
   }, []);
+
+  // populate form when invoiceToEdit changes
+  useEffect(() => {
+    if (invoiceToEdit) {
+      setInvoiceNumber(invoiceToEdit.invoiceNumber ?? "");
+      setDate(invoiceToEdit.date ?? new Date());
+      setCustomerName(invoiceToEdit.customerName ?? "");
+      setCustomerPhone(invoiceToEdit.customerPhone ?? "");
+      // map items
+      const mappedItems: ProductItem[] = (invoiceToEdit.items || []).map(i => ({
+        productId: i.productId ?? String(Math.random()),
+        productName: i.productName ?? "",
+        category: i.category ?? "Uncategorized",
+        quantity: i.quantity ?? 0,
+        unitPrice: i.unitPrice ?? 0,
+        total: i.total ?? (i.unitPrice ?? 0) * (i.quantity ?? 0),
+      }));
+      setItems(mappedItems);
+    }
+  }, [invoiceToEdit]);
 
   // choose source products: prefer fetchedProducts
   const productOptions = fetchedProducts && fetchedProducts.length > 0 ? fetchedProducts : (products as unknown as Product[]);
@@ -188,15 +212,29 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated }: AddInvoiceDi
     };
 
     try {
-      await api.post('/invoices', payload);
+      if (invoiceToEdit && (invoiceToEdit.id || invoiceToEdit.invoiceNumber)) {
+        // Try to use id if available, otherwise fall back to invoice number
+        const id = invoiceToEdit.id;
+        if (id) {
+          await api.put(`/invoices/${id}`, payload);
+        } else {
+          // fallback endpoint - not ideal, but attempt by invoice number
+          await api.put(`/invoices`, { ...payload, in_number: invoiceToEdit.invoiceNumber });
+        }
+        onUpdated?.();
+      } else {
+        await api.post('/invoices', payload);
+        onCreated?.();
+      }
 
-      // Notify parent to re-fetch the invoices. Parent is responsible for updating UI.
-      onCreated?.();
       resetForm();
       onOpenChange(false);
-    } catch (err: any) {
-      console.error('Create invoice failed', err);
-      alert(err?.response?.data?.message ?? 'Failed to create invoice');
+    } catch (err: unknown) {
+      console.error('Save invoice failed', err);
+      // Show a friendly message; try to extract message if it's an axios error
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const message = (err as any)?.response?.data?.message ?? 'Failed to save invoice';
+      alert(message);
     }
   };
 
@@ -209,9 +247,9 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated }: AddInvoiceDi
     }}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>Add New Invoice</DialogTitle>
+          <DialogTitle>{invoiceToEdit ? 'Edit Invoice' : 'Add New Invoice'}</DialogTitle>
           <DialogDescription>
-            Create a new invoice with customer and product details.
+            {invoiceToEdit ? 'Edit existing invoice and save changes.' : 'Create a new invoice with customer and product details.'}
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[60vh] pr-4">
@@ -368,7 +406,7 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated }: AddInvoiceDi
             onClick={handleSubmit}
             disabled={!isValid}
           >
-            Save Invoice
+            {invoiceToEdit ? 'Update Invoice' : 'Save Invoice'}
           </Button>
         </DialogFooter>
       </DialogContent>
