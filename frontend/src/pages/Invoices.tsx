@@ -9,15 +9,62 @@ import { Invoice, InvoiceFilters } from "@/types/invoice";
 import api from '@/api/client';
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { authService } from "@/api/services/authService";
 import LocalLoader from "@/components/common/LocalLoader";
 
 const Invoices = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [filters, setFilters] = useState<InvoiceFilters>({});
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [serverTotalPages, setServerTotalPages] = useState(1);
+
+  // Password confirmation state
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [pendingDeleteInvoice, setPendingDeleteInvoice] = useState<Invoice | null>(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+
+  // Open password confirmation after the initial "Are you sure" prompt
+  const requestDeleteInvoice = (invoice: Invoice) => {
+    setPendingDeleteInvoice(invoice);
+    setDeletePassword("");
+    setIsDeleteConfirmOpen(true);
+  };
+
+  // Confirm deletion by verifying the logged-in user's password, then delete
+  const confirmDeleteWithPassword = async () => {
+    if (!pendingDeleteInvoice) return;
+    setIsConfirmingDelete(true);
+    try {
+      const me = await authService.me();
+      const email = me?.email;
+      if (!email) throw new Error('Missing user email');
+      await authService.login({ email, password: deletePassword });
+
+      // password verified, perform deletion
+      const invoice = pendingDeleteInvoice;
+      if (invoice.id) {
+        await api.delete(`/invoices/${invoice.id}`);
+      } else {
+        await api.delete(`/invoices`, { data: { in_number: invoice.invoiceNumber } });
+      }
+      toast.success('Invoice deleted');
+      setIsDeleteConfirmOpen(false);
+      setPendingDeleteInvoice(null);
+      setDeletePassword("");
+      await fetchInvoices(currentPage, itemsPerPage);
+    } catch (err) {
+      console.error('Delete confirmation failed', err);
+      toast.error('Invalid password or delete failed');
+    } finally {
+      setIsConfirmingDelete(false);
+    }
+  };
 
   // Download CSV for invoices: fetch all filtered rows (no pagination) and build two-section CSV
   const downloadInvoicesCSV = useCallback(async () => {
@@ -172,19 +219,22 @@ const Invoices = () => {
       const qs = params.join('&');
   const res = await api.get(`/invoices/with-products?${qs}`, { meta: { showLoader: 'local', loaderKey: 'invoices' } });
       const payload = res.data;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mapped: Invoice[] = (payload.data || []).map((inv: any) => {
-          const items = (inv.products || []).map((p: any) => {
-            const unit = Number(p.selling_price ?? p.cost_price ?? 0);
-            const qty = Number(p.quantity_moved ?? 0);
-            return {
-              productId: p.productId,
-              productName: p.name ?? '',
-              category: p.category ?? p.categoryName ?? 'Uncategorized',
-              quantity: qty,
-              unitPrice: unit,
-              total: unit * qty,
-            };
-          });
+        const items = (inv.products || []).map((p: any) => {
+          const unit = Number(p.selling_price ?? p.cost_price ?? 0);
+          const cost = p.cost_price !== undefined && p.cost_price !== null ? Number(p.cost_price) : undefined;
+          const qty = Number(p.quantity_moved ?? 0);
+          return {
+            productId: p.productId,
+            productName: p.name ?? '',
+            category: p.category ?? p.categoryName ?? 'Uncategorized',
+            quantity: qty,
+            unitPrice: unit,
+            costPrice: cost,
+            total: unit * qty,
+          };
+        });
 
         return {
           id: inv.id,
@@ -373,10 +423,15 @@ const Invoices = () => {
             currentPage={currentPage}
             totalPages={serverTotalPages}
             onPageChange={(p) => {
-              setCurrentPage(p);
-              (async () => { await fetchInvoices(p, itemsPerPage); })();
+               setCurrentPage(p);
+               (async () => { await fetchInvoices(p, itemsPerPage); })();
+             }}
+            onEdit={(inv) => {
+              setEditingInvoice(inv);
+              setIsAddDialogOpen(true);
             }}
-          />
+            onDelete={requestDeleteInvoice}
+            />
           </LocalLoader>
         </CardContent>
       </Card>
@@ -384,9 +439,33 @@ const Invoices = () => {
       {/* Add Invoice Dialog */}
       <AddInvoiceDialog
         open={isAddDialogOpen}
-        onOpenChange={setIsAddDialogOpen}
+        onOpenChange={(open) => {
+          setIsAddDialogOpen(open);
+          if (!open) setEditingInvoice(null);
+        }}
+        invoiceToEdit={editingInvoice}
         onCreated={() => fetchInvoices(currentPage, itemsPerPage)}
+        onUpdated={() => fetchInvoices(currentPage, itemsPerPage)}
       />
+
+      {/* Delete confirmation modal */}
+      <Dialog open={isDeleteConfirmOpen} onOpenChange={(open) => { setIsDeleteConfirmOpen(open); if (!open) { setPendingDeleteInvoice(null); setDeletePassword(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p>Enter your password to delete invoice {pendingDeleteInvoice?.invoiceNumber}.</p>
+            <Input type="password" placeholder="Password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)}>Cancel</Button>
+            <Button variant="destructive" disabled={!deletePassword || isConfirmingDelete} onClick={confirmDeleteWithPassword}>
+              {isConfirmingDelete ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
