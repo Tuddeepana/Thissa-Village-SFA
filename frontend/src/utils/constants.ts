@@ -10,5 +10,10 @@ export const ROLES = {
   CASHIER: 'CASHIER',
 } as const;
 
-export type RoleValue = typeof ROLES[keyof typeof ROLES];
+export const INVOICE_STATUSES = {
+  PENDING: 'PENDING',
+  PAID: 'PAID',
+} as const;
 
+
+export type RoleValue = typeof ROLES[keyof typeof ROLES];

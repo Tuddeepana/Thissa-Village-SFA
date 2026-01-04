@@ -18,12 +18,16 @@ class InvoiceService {
     const result = await (prisma as any).$transaction(async (tx: any) => {
       // Use subtotal provided by the frontend (assumed to be numeric or numeric-string)
       const providedSubtotal = input.subtotal !== undefined ? Number(input.subtotal) : 0;
+      const providedDiscount = input.discount !== undefined ? Number(input.discount) : 0;
+      const providedStatus = input.paid_status ?? 'PENDING';
 
       const createdInvoice = await tx.invoice.create({
         data: {
           in_number: input.in_number,
           invoiceDate: new Date(input.invoiceDate),
           subtotal: providedSubtotal.toFixed(2),
+          discount: providedDiscount.toFixed(2),
+          paid_status: providedStatus,
         },
       });
 
@@ -152,6 +156,8 @@ class InvoiceService {
       createdAt: inv.createdAt instanceof Date ? inv.createdAt.toISOString() : String(inv.createdAt),
       updatedAt: inv.updatedAt instanceof Date ? inv.updatedAt.toISOString() : String(inv.updatedAt),
       subtotal: inv.subtotal !== undefined ? String(inv.subtotal) : '0',
+      discount: inv.discount !== undefined ? String(inv.discount) : '0',
+      paid_status: inv.paid_status ?? 'PENDING',
       itemCount: (inv.inventoryRecords || []).length,
       products: (inv.inventoryRecords || []).map((rec: any) => ({
         productId: rec.productId,
@@ -173,6 +179,8 @@ class InvoiceService {
     if (input.in_number !== undefined) data.in_number = input.in_number;
     if (input.invoiceDate !== undefined) data.invoiceDate = new Date(input.invoiceDate as any);
     if (input.subtotal !== undefined) data.subtotal = (typeof input.subtotal === 'number' ? input.subtotal : Number(input.subtotal)).toFixed(2);
+    if (input.discount !== undefined) data.discount = (typeof input.discount === 'number' ? input.discount : Number(input.discount)).toFixed(2);
+    if (input.paid_status !== undefined) data.paid_status = input.paid_status;
 
     const invoice = await (prisma as any).invoice.update({ where: { id }, data });
     return invoice as InvoiceDTO;

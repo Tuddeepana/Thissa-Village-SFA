@@ -245,10 +245,10 @@ const Invoices = () => {
           items,
           subtotal: Number(inv.subtotal ?? 0),
           tax: 0,
-          discount: 0,
-          total: Number(inv.subtotal ?? 0),
+          discount: Number(inv.discount ?? 0),
+          total: Number(inv.subtotal ?? 0) - Number(inv.discount ?? 0),
           paymentMethod: 'cash',
-          status: 'pending',
+          status: String(inv.paid_status ?? 'PENDING').toLowerCase() as 'paid' | 'pending' | 'cancelled',
           createdAt: new Date(inv.createdAt),
           updatedAt: new Date(inv.updatedAt),
         };
