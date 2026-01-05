@@ -243,12 +243,14 @@ export const printBillNewWindow = (bill: Bill, storeName: string = "VinoPOS Pro"
   const printWindow = window.open('', '_blank', 'width=302,height=500');
   if (!printWindow) return;
 
+  const billNo = (bill as any).billNumber || bill.id;
+
   const billHTML = `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>Bill #${bill.id}</title>
+      <title>Bill #${billNo}</title>
       <style>
         @media print {
           @page {
@@ -336,7 +338,7 @@ export const printBillNewWindow = (bill: Bill, storeName: string = "VinoPOS Pro"
         <div>Point of Sale System</div>
       </div>
       
-      <div class="info-line"><strong>Bill #:</strong> ${bill.id}</div>
+      <div class="info-line"><strong>Bill #:</strong> ${billNo}</div>
       <div class="info-line"><strong>Date:</strong> ${format(bill.createdAt, 'dd/MM/yyyy HH:mm:ss')}</div>
       ${bill.customerName ? `<div class="info-line"><strong>Customer:</strong> ${bill.customerName}</div>` : ''}
       ${bill.customerPhone ? `<div class="info-line"><strong>Phone:</strong> ${bill.customerPhone}</div>` : ''}

@@ -133,6 +133,7 @@ const Bills = () => {
         // Map backend DTOs to frontend Bill shape (shallow - items will be fetched when viewing)
         const mapped: Bill[] = (list as any[]).map((b: any) => ({
           id: b.id,
+          billNumber: b.bill_number ?? b.billNo ?? undefined,
           items: new Array(b.item_count || 0).fill({} as any),
           subtotal: Number(b.total || 0) - Number(b.tax || 0),
           tax: b.tax !== undefined && b.tax !== null ? Number(b.tax) : 0,
@@ -209,6 +210,7 @@ const Bills = () => {
 
         const mappedBill = {
           id: detailed.id || bill.id,
+          billNumber: detailed.bill_number || detailed.billNo || bill.billNumber,
           items: mappedItems,
           subtotal: subtotalNum,
           tax: taxNum,
@@ -525,7 +527,7 @@ const Bills = () => {
                 ) : (
                   paginatedBills.map((bill) => (
                     <TableRow key={bill.id}>
-                      <TableCell className="font-mono text-sm">{bill.id}</TableCell>
+                      <TableCell className="font-mono text-sm">{bill.billNumber || bill.id}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3 text-muted-foreground" />
@@ -593,7 +595,7 @@ const Bills = () => {
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="font-mono text-sm font-medium">{bill.id}</p>
+                      <p className="font-mono text-sm font-medium">{bill.billNumber || bill.id}</p>
                       <p className="text-xs text-muted-foreground">
                         {format(bill.createdAt, "MMM dd, yyyy hh:mm a")}
                       </p>
@@ -743,7 +745,7 @@ const Bills = () => {
               Bill Details
             </DialogTitle>
             <DialogDescription>
-              {selectedBill?.id}
+              {selectedBill?.billNumber || selectedBill?.id}
             </DialogDescription>
           </DialogHeader>
 
