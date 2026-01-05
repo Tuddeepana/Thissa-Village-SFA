@@ -234,6 +234,46 @@ class BillService {
 
     return { data, page, pageSize, total, card: cardSummary } as any;
   }
+
+  async updatePayment(id: string, input: {
+    payment_method?: 'CASH' | 'CARD' | 'CREDIT' | 'OTHER' | string;
+    cash_given?: number | string | null;
+    balance_given?: number | string | null;
+    credit_note?: string | null;
+    customer_name?: string | null;
+    tax?: number | string | null;
+    total?: number | string | null;
+  }): Promise<BillDTO | null> {
+    const updated = await (prisma as any).bill.update({
+      where: { id },
+      data: {
+        payment_method: input.payment_method ?? undefined,
+        cash_given: input.cash_given !== undefined ? (input.cash_given === null ? null : (typeof input.cash_given === 'number' ? input.cash_given : Number(input.cash_given))) : undefined,
+        balance_given: input.balance_given !== undefined ? (input.balance_given === null ? null : (typeof input.balance_given === 'number' ? input.balance_given : Number(input.balance_given))) : undefined,
+        credit_note: input.credit_note !== undefined ? input.credit_note : undefined,
+        customer_name: input.customer_name !== undefined ? input.customer_name : undefined,
+        tax: input.tax !== undefined ? (input.tax === null ? null : (typeof input.tax === 'number' ? input.tax : Number(input.tax))) : undefined,
+        total: input.total !== undefined ? (input.total === null ? null : (typeof input.total === 'number' ? input.total : Number(input.total))) : undefined,
+      },
+    }).catch(() => null);
+    if (!updated) return null;
+    return {
+      id: updated.id,
+      bill_number: updated.bill_number,
+      date: updated.date instanceof Date ? updated.date.toISOString() : String(updated.date),
+      payment_method: updated.payment_method,
+      customer_name: updated.customer_name ?? null,
+      total: updated.total !== undefined && updated.total !== null ? String(updated.total) : '0',
+      cashier_name: updated.cashier_name,
+      item_count: updated.item_count,
+      credit_note: updated.credit_note ?? null,
+      cash_given: updated.cash_given !== undefined && updated.cash_given !== null ? String(updated.cash_given) : '0',
+      balance_given: updated.balance_given !== undefined && updated.balance_given !== null ? String(updated.balance_given) : '0',
+      tax: updated.tax !== undefined && updated.tax !== null ? String(updated.tax) : null,
+      createdAt: updated.createdAt instanceof Date ? updated.createdAt.toISOString() : String(updated.createdAt),
+      updatedAt: updated.updatedAt instanceof Date ? updated.updatedAt.toISOString() : String(updated.updatedAt),
+    } as BillDTO;
+  }
 }
 
 export const billService = new BillService();

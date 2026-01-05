@@ -267,41 +267,50 @@ const Bills = () => {
     if (!billForPayment) return;
     const now = new Date();
     const change = paymentMethod === 'credit' ? 0 : amountPaid - billForPayment.total;
-    const cashierName = (() => {
+    // Persist payment update to backend
+    (async () => {
       try {
-        const raw = localStorage.getItem('authUser');
-        if (!raw) return 'Cashier';
-        const user = JSON.parse(raw);
-        return user?.name ?? 'Cashier';
-      } catch {
-        return 'Cashier';
+        const payload: any = {
+          payment_method: paymentMethod.toUpperCase(),
+          cash_given: paymentMethod === 'credit' ? 0 : amountPaid,
+          balance_given: paymentMethod === 'credit' ? 0 : Math.max(0, change),
+          credit_note: paymentMethod === 'credit' ? (creditDescription || null) : null,
+          customer_name: customerName || null,
+        };
+        await api.patch(`/bills/${encodeURIComponent(billForPayment.id)}/payment`, payload);
+        // Optimistically update list UI
+        setBills((prev) => prev.map((b) => b.id === billForPayment.id ? {
+          ...b,
+          paymentMethod,
+          amountPaid,
+          change: Math.max(0, change),
+          creditDescription: paymentMethod === 'credit' ? (creditDescription || null as any) : null as any,
+          customerName: customerName || b.customerName,
+        } : b));
+      } catch (e) {
+        console.error('Failed updating bill payment, proceeding to print locally', e);
       }
+      const printable: Bill = {
+        id: billForPayment.id,
+        items: billForPayment.items,
+        subtotal: billForPayment.subtotal,
+        tax: billForPayment.tax,
+        taxRate: billForPayment.taxRate,
+        discount: billForPayment.discount ?? 0,
+        discountRate: billForPayment.discountRate ?? 0,
+        total: billForPayment.total,
+        customerName: customerName ?? billForPayment.customerName,
+        customerPhone: customerPhone ?? billForPayment.customerPhone,
+        paymentMethod,
+        amountPaid,
+        change,
+        creditDescription,
+        createdAt: now,
+      };
+      printBillNewWindow(printable);
+      setIsPaymentDialogOpen(false);
+      setBillForPayment(null);
     })();
-
-    const printable: Bill = {
-      id: billForPayment.id,
-      items: billForPayment.items,
-      subtotal: billForPayment.subtotal,
-      tax: billForPayment.tax,
-      taxRate: billForPayment.taxRate,
-      discount: billForPayment.discount ?? 0,
-      discountRate: billForPayment.discountRate ?? 0,
-      total: billForPayment.total,
-      customerName: customerName ?? billForPayment.customerName,
-      customerPhone: customerPhone ?? billForPayment.customerPhone,
-      paymentMethod,
-      amountPaid,
-      change,
-      creditDescription,
-      createdAt: now,
-    };
-
-    // Print receipt
-    printBillNewWindow(printable);
-
-    // Close dialog
-    setIsPaymentDialogOpen(false);
-    setBillForPayment(null);
   };
 
   return (
@@ -552,8 +561,11 @@ const Bills = () => {
                               variant="default"
                               size="sm"
                               onClick={() => handleOpenPayment(bill)}
+                              aria-label="Collect Payment"
+                              title="Collect Payment"
+                              className="p-2"
                             >
-                              Pay
+                              <Banknote className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
@@ -606,7 +618,15 @@ const Bills = () => {
                         View
                       </Button>
                       {selectedModule === 'pos' && bill.paymentMethod === 'credit' && (
-                        <Button size="sm" onClick={() => handleOpenPayment(bill)}>Pay</Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleOpenPayment(bill)}
+                          aria-label="Collect Payment"
+                          title="Collect Payment"
+                          className="p-2"
+                        >
+                          <Banknote className="h-4 w-4" />
+                        </Button>
                       )}
                     </div>
                   </div>
