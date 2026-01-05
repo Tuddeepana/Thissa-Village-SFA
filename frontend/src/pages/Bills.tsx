@@ -44,8 +44,11 @@ import {
   Clock,
 } from "lucide-react";
 import { format } from "date-fns";
-import { Bill, BillItem } from "@/types/pos";
+import { Bill } from "@/types/pos";
 import api from '@/api/client';
+import { PaymentDialog } from "@/components/pos/PaymentDialog";
+import { printBillNewWindow } from "@/lib/billPrinter";
+import { STORAGE_KEYS } from "@/utils/constants";
 
 const Bills = () => {
   // Server-driven state
@@ -62,7 +65,18 @@ const Bills = () => {
   const [selectedBill, setSelectedBill] = useState<any | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isLoadingBill, setIsLoadingBill] = useState(false);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [billForPayment, setBillForPayment] = useState<Bill | null>(null);
   const itemsPerPage = 15;
+
+  // Determine selected module safely (default to 'pos')
+  const selectedModule = (() => {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.selectedModule) || 'pos';
+    } catch {
+      return 'pos';
+    }
+  })();
 
   // Reset page when filters change
   useEffect(() => {
@@ -236,6 +250,58 @@ const Bills = () => {
       default:
         return <Badge variant="secondary">{method}</Badge>;
     }
+  };
+
+  const handleOpenPayment = (bill: Bill) => {
+    setBillForPayment(bill);
+    setIsPaymentDialogOpen(true);
+  };
+
+  const handleConfirmPayment = (
+    paymentMethod: 'cash' | 'card' | 'credit' | 'other',
+    amountPaid: number,
+    customerName?: string,
+    customerPhone?: string,
+    creditDescription?: string
+  ) => {
+    if (!billForPayment) return;
+    const now = new Date();
+    const change = paymentMethod === 'credit' ? 0 : amountPaid - billForPayment.total;
+    const cashierName = (() => {
+      try {
+        const raw = localStorage.getItem('authUser');
+        if (!raw) return 'Cashier';
+        const user = JSON.parse(raw);
+        return user?.name ?? 'Cashier';
+      } catch {
+        return 'Cashier';
+      }
+    })();
+
+    const printable: Bill = {
+      id: billForPayment.id,
+      items: billForPayment.items,
+      subtotal: billForPayment.subtotal,
+      tax: billForPayment.tax,
+      taxRate: billForPayment.taxRate,
+      discount: billForPayment.discount ?? 0,
+      discountRate: billForPayment.discountRate ?? 0,
+      total: billForPayment.total,
+      customerName: customerName ?? billForPayment.customerName,
+      customerPhone: customerPhone ?? billForPayment.customerPhone,
+      paymentMethod,
+      amountPaid,
+      change,
+      creditDescription,
+      createdAt: now,
+    };
+
+    // Print receipt
+    printBillNewWindow(printable);
+
+    // Close dialog
+    setIsPaymentDialogOpen(false);
+    setBillForPayment(null);
   };
 
   return (
@@ -472,14 +538,25 @@ const Bills = () => {
                         {getPaymentMethodBadge(bill.paymentMethod)}
                       </TableCell>
                       <TableCell className="text-center">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewBill(bill)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
+                        <div className="flex items-center justify-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewBill(bill)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                          {selectedModule === 'pos' && bill.paymentMethod === 'credit' && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => handleOpenPayment(bill)}
+                            >
+                              Pay
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -523,14 +600,15 @@ const Bills = () => {
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t">
                     <span className="text-xs text-muted-foreground">{bill.items.length} items</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewBill(bill)}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      View
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleViewBill(bill)}>
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                      {selectedModule === 'pos' && bill.paymentMethod === 'credit' && (
+                        <Button size="sm" onClick={() => handleOpenPayment(bill)}>Pay</Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))
@@ -785,6 +863,14 @@ const Bills = () => {
           )}
          </DialogContent>
        </Dialog>
+
+      {/* Payment Dialog for POS */}
+      <PaymentDialog
+        open={isPaymentDialogOpen}
+        onOpenChange={setIsPaymentDialogOpen}
+        total={billForPayment?.total || 0}
+        onConfirmPayment={handleConfirmPayment}
+      />
      </div>
    );
  };
