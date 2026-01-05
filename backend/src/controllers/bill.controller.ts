@@ -58,3 +58,19 @@ export const create = async (req: Request, res: Response) => {
   const created = await billService.createBillWithItems(parsed.data as any);
   res.status(201).json({ success: true, data: created });
 };
+
+export const updatePayment = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { payment_method, cash_given, balance_given, credit_note, customer_name, tax, total } = req.body;
+  const updated = await billService.updatePayment(id, {
+    payment_method,
+    cash_given,
+    balance_given,
+    credit_note,
+    customer_name,
+    tax,
+    total,
+  });
+  if (!updated) throw new AppError('Bill not found', 404);
+  res.json({ success: true, data: updated });
+};

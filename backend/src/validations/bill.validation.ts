@@ -54,3 +54,13 @@ export const billQuerySchema = z
     }
     return true;
   }, { message: 'dateFrom cannot be after dateTo', path: ['dateFrom', 'dateTo'] });
+
+export const updateBillPaymentSchema = z.object({
+  payment_method: z.string().optional(),
+  cash_given: z.union([z.number(), z.string()]).optional().nullable(),
+  balance_given: z.union([z.number(), z.string()]).optional().nullable(),
+  credit_note: z.string().optional().nullable(),
+  customer_name: z.string().optional().nullable(),
+  tax: z.union([z.number(), z.string()]).optional().nullable(),
+  total: z.union([z.number(), z.string()]).optional().nullable(),
+});

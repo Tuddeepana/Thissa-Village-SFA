@@ -1,12 +1,11 @@
 import { NavLink } from "@/components/NavLink";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
     LayoutDashboard,
     Wine,
     Package,
     FileText,
-    AlertCircle,
     ShoppingCart,
     FolderTree,
     Warehouse,
@@ -32,16 +31,15 @@ const sfaItems = [
   { title: "Invoices", url: "/invoices", icon: FileText },
   { title: "Bills", url: "/bills", icon: Receipt },
   { title: "Users", url: "/users", icon: Users },
-  // { title: "Low Stock", url: "/low-stock", icon: AlertCircle }, Not needed
 ];
 
 const posItems = [
   { title: "POS System", url: "/pos", icon: ShoppingCart },
+  { title: "Bills", url: "/bills", icon: Receipt },
 ];
 
 export function AppSidebar() {
   const location = useLocation();
-  const navigate = useNavigate();
   const [selectedModule, setSelectedModule] = useState<string | null>(null);
 
   useEffect(() => {

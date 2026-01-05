@@ -44,8 +44,11 @@ import {
   Clock,
 } from "lucide-react";
 import { format } from "date-fns";
-import { Bill, BillItem } from "@/types/pos";
+import { Bill } from "@/types/pos";
 import api from '@/api/client';
+import { PaymentDialog } from "@/components/pos/PaymentDialog";
+import { printBillNewWindow } from "@/lib/billPrinter";
+import { STORAGE_KEYS } from "@/utils/constants";
 
 const Bills = () => {
   // Server-driven state
@@ -62,7 +65,18 @@ const Bills = () => {
   const [selectedBill, setSelectedBill] = useState<any | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isLoadingBill, setIsLoadingBill] = useState(false);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [billForPayment, setBillForPayment] = useState<Bill | null>(null);
   const itemsPerPage = 15;
+
+  // Determine selected module safely (default to 'pos')
+  const selectedModule = (() => {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.selectedModule) || 'pos';
+    } catch {
+      return 'pos';
+    }
+  })();
 
   // Reset page when filters change
   useEffect(() => {
@@ -119,6 +133,7 @@ const Bills = () => {
         // Map backend DTOs to frontend Bill shape (shallow - items will be fetched when viewing)
         const mapped: Bill[] = (list as any[]).map((b: any) => ({
           id: b.id,
+          billNumber: b.bill_number ?? b.billNo ?? undefined,
           items: new Array(b.item_count || 0).fill({} as any),
           subtotal: Number(b.total || 0) - Number(b.tax || 0),
           tax: b.tax !== undefined && b.tax !== null ? Number(b.tax) : 0,
@@ -195,6 +210,7 @@ const Bills = () => {
 
         const mappedBill = {
           id: detailed.id || bill.id,
+          billNumber: detailed.bill_number || detailed.billNo || bill.billNumber,
           items: mappedItems,
           subtotal: subtotalNum,
           tax: taxNum,
@@ -236,6 +252,67 @@ const Bills = () => {
       default:
         return <Badge variant="secondary">{method}</Badge>;
     }
+  };
+
+  const handleOpenPayment = (bill: Bill) => {
+    setBillForPayment(bill);
+    setIsPaymentDialogOpen(true);
+  };
+
+  const handleConfirmPayment = (
+    paymentMethod: 'cash' | 'card' | 'credit' | 'other',
+    amountPaid: number,
+    customerName?: string,
+    customerPhone?: string,
+    creditDescription?: string
+  ) => {
+    if (!billForPayment) return;
+    const now = new Date();
+    const change = paymentMethod === 'credit' ? 0 : amountPaid - billForPayment.total;
+    // Persist payment update to backend
+    (async () => {
+      try {
+        const payload: any = {
+          payment_method: paymentMethod.toUpperCase(),
+          cash_given: paymentMethod === 'credit' ? 0 : amountPaid,
+          balance_given: paymentMethod === 'credit' ? 0 : Math.max(0, change),
+          credit_note: paymentMethod === 'credit' ? (creditDescription || null) : null,
+          customer_name: customerName || null,
+        };
+        await api.patch(`/bills/${encodeURIComponent(billForPayment.id)}/payment`, payload);
+        // Optimistically update list UI
+        setBills((prev) => prev.map((b) => b.id === billForPayment.id ? {
+          ...b,
+          paymentMethod,
+          amountPaid,
+          change: Math.max(0, change),
+          creditDescription: paymentMethod === 'credit' ? (creditDescription || null as any) : null as any,
+          customerName: customerName || b.customerName,
+        } : b));
+      } catch (e) {
+        console.error('Failed updating bill payment, proceeding to print locally', e);
+      }
+      const printable: Bill = {
+        id: billForPayment.id,
+        items: billForPayment.items,
+        subtotal: billForPayment.subtotal,
+        tax: billForPayment.tax,
+        taxRate: billForPayment.taxRate,
+        discount: billForPayment.discount ?? 0,
+        discountRate: billForPayment.discountRate ?? 0,
+        total: billForPayment.total,
+        customerName: customerName ?? billForPayment.customerName,
+        customerPhone: customerPhone ?? billForPayment.customerPhone,
+        paymentMethod,
+        amountPaid,
+        change,
+        creditDescription,
+        createdAt: now,
+      };
+      printBillNewWindow(printable);
+      setIsPaymentDialogOpen(false);
+      setBillForPayment(null);
+    })();
   };
 
   return (
@@ -450,7 +527,7 @@ const Bills = () => {
                 ) : (
                   paginatedBills.map((bill) => (
                     <TableRow key={bill.id}>
-                      <TableCell className="font-mono text-sm">{bill.id}</TableCell>
+                      <TableCell className="font-mono text-sm">{bill.billNumber || bill.id}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3 text-muted-foreground" />
@@ -472,14 +549,28 @@ const Bills = () => {
                         {getPaymentMethodBadge(bill.paymentMethod)}
                       </TableCell>
                       <TableCell className="text-center">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewBill(bill)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
+                        <div className="flex items-center justify-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewBill(bill)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                          {selectedModule === 'pos' && bill.paymentMethod === 'credit' && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => handleOpenPayment(bill)}
+                              aria-label="Collect Payment"
+                              title="Collect Payment"
+                              className="p-2"
+                            >
+                              <Banknote className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -504,7 +595,7 @@ const Bills = () => {
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="font-mono text-sm font-medium">{bill.id}</p>
+                      <p className="font-mono text-sm font-medium">{bill.billNumber || bill.id}</p>
                       <p className="text-xs text-muted-foreground">
                         {format(bill.createdAt, "MMM dd, yyyy hh:mm a")}
                       </p>
@@ -523,14 +614,23 @@ const Bills = () => {
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t">
                     <span className="text-xs text-muted-foreground">{bill.items.length} items</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewBill(bill)}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      View
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleViewBill(bill)}>
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                      {selectedModule === 'pos' && bill.paymentMethod === 'credit' && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleOpenPayment(bill)}
+                          aria-label="Collect Payment"
+                          title="Collect Payment"
+                          className="p-2"
+                        >
+                          <Banknote className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))
@@ -645,7 +745,7 @@ const Bills = () => {
               Bill Details
             </DialogTitle>
             <DialogDescription>
-              {selectedBill?.id}
+              {selectedBill?.billNumber || selectedBill?.id}
             </DialogDescription>
           </DialogHeader>
 
@@ -785,6 +885,14 @@ const Bills = () => {
           )}
          </DialogContent>
        </Dialog>
+
+      {/* Payment Dialog for POS */}
+      <PaymentDialog
+        open={isPaymentDialogOpen}
+        onOpenChange={setIsPaymentDialogOpen}
+        total={billForPayment?.total || 0}
+        onConfirmPayment={handleConfirmPayment}
+      />
      </div>
    );
  };

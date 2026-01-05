@@ -21,6 +21,7 @@ export interface BillItem {
 
 export interface Bill {
   id: string;
+  billNumber?: string;
   items: BillItem[];
   subtotal: number;
   tax: number;
