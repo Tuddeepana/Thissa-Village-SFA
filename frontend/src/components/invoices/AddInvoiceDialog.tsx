@@ -97,6 +97,8 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
       setDate(invoiceToEdit.date ?? new Date());
       setCustomerName(invoiceToEdit.customerName ?? "");
       setCustomerPhone(invoiceToEdit.customerPhone ?? "");
+      setDiscount(invoiceToEdit.discount ?? 0);
+      setStatus(invoiceToEdit.status ?? 'pending');
       // map items
       const mappedItems: ProductItem[] = (invoiceToEdit.items || []).map(i => ({
         productId: i.productId ?? String(Math.random()),
@@ -208,6 +210,8 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
       in_number: invoiceNumber,
       invoiceDate: date.toISOString(),
       subtotal: subtotal,
+      discount: discount,
+      paid_status: status.toUpperCase() === 'PAID' ? 'PAID' : 'PENDING',
       items: items.map(i => ({ productId: i.productId, quantityMoved: i.quantity })),
     };
 
@@ -289,6 +293,31 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
                     />
                   </PopoverContent>
                 </Popover>
+              </div>
+            </div>
+
+            {/* Discount and Status */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="discount">Discount</Label>
+                <Input
+                  id="discount"
+                  type="number"
+                  value={discount}
+                  onChange={(e) => setDiscount(Number.parseFloat(e.target.value) || 0)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="status">Paid Status</Label>
+                <Select value={status} onValueChange={(val: 'paid' | 'pending' | 'cancelled') => setStatus(val)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -392,11 +421,17 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
         <div className="px-4 pt-4">
           <div className="flex justify-end">
             <div className="w-full max-w-sm">
-              
-             
+              <div className="flex justify-between">
+                <div className="text-sm">Subtotal</div>
+                <div className="font-semibold">Rs. {subtotal.toFixed(2)}</div>
+              </div>
+              <div className="flex justify-between">
+                <div className="text-sm">Discount</div>
+                <div className="font-semibold">Rs. {discount.toFixed(2)}</div>
+              </div>
               <div className="border-t mt-2 pt-2 flex justify-between">
                 <div className="text-sm">Total</div>
-                <div className="font-bold">Rs. {subtotal.toFixed(2)}</div>
+                <div className="font-bold">Rs. {total.toFixed(2)}</div>
               </div>
             </div>
           </div>

@@ -10,6 +10,9 @@ export const updateInvoiceSchema = z.object({
   invoiceDate: z
     .preprocess((val) => (typeof val === 'string' ? new Date(val) : val), z.date())
     .optional(),
+  subtotal: z.coerce.number().nonnegative().optional(),
+  discount: z.coerce.number().nonnegative().optional(),
+  paid_status: z.enum(['PAID', 'PENDING']).optional(),
 });
 
 export const invoiceQuerySchema = z.object({
@@ -34,6 +37,8 @@ export const createInvoiceWithItemsSchema = z.object({
   invoiceDate: z.preprocess((val) => (typeof val === 'string' ? new Date(val) : val), z.date()),
   // frontend must provide subtotal (sum of item unit price * qty)
   subtotal: z.coerce.number().nonnegative(),
+  discount: z.coerce.number().nonnegative().default(0).optional(),
+  paid_status: z.enum(['PAID', 'PENDING']).default('PENDING').optional(),
   items: z
     .array(
       z.object({

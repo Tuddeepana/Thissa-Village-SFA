@@ -3,6 +3,8 @@ export type InvoiceDTO = {
   in_number: string;
   invoiceDate: string; // ISO string
   subtotal: number; // Decimal as string
+  discount: number; // Decimal as number
+  paid_status: 'PAID' | 'PENDING';
   createdAt: string;
   updatedAt: string;
 };
@@ -11,12 +13,16 @@ export type InvoiceCreateInput = {
   in_number: string;
   invoiceDate: string | Date;
   subtotal?: number | string; // optional on create, will be computed server-side if omitted
+  discount?: number | string;
+  paid_status?: 'PAID' | 'PENDING';
 };
 
 export type InvoiceUpdateInput = Partial<{
   in_number: string;
   invoiceDate: string | Date;
   subtotal: number | string;
+  discount: number | string;
+  paid_status: 'PAID' | 'PENDING';
 }>;
 
 export type InvoiceListQuery = {
@@ -57,6 +63,8 @@ export type InvoiceWithProductsDTO = {
   createdAt: string;
   updatedAt: string;
   subtotal: string;
+  discount: string;
+  paid_status: 'PAID' | 'PENDING';
   itemCount: number;
   products: InvoiceProductDetail[];
 };

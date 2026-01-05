@@ -21,6 +21,11 @@ enum BottleVolume {
   ML
 }
 
+enum PaidStatus {
+  PAID
+  PENDING
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -76,6 +81,8 @@ model Invoice {
   in_number   String   @unique
   invoiceDate DateTime
   subtotal    Decimal  @default(0) @db.Decimal(10, 2)
+  discount    Decimal  @default(0) @db.Decimal(10, 2)
+  paid_status PaidStatus @default(PENDING)
 
   // Inventory movements
   inventoryRecords Inventory[]

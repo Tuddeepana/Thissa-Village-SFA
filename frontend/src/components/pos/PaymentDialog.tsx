@@ -48,6 +48,7 @@ export function PaymentDialog({
   const amountPaidNum = parseFloat(amountPaid) || 0;
   const change = Math.max(0, amountPaidNum - total);
   const isCredit = paymentMethod === 'credit';
+  const creditMissing = isCredit && creditDescription.trim() === '';
 
   const handleConfirm = () => {
     // For credit, amount paid can be 0, otherwise must be >= total
@@ -136,6 +137,9 @@ export function PaymentDialog({
                 onChange={(e) => setCreditDescription(e.target.value)}
                 rows={3}
               />
+              {creditMissing && (
+                <p className="text-sm text-red-500">Credit note is required for credit payments</p>
+              )}
             </div>
           )}
 
@@ -226,7 +230,8 @@ export function PaymentDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={!isCredit && amountPaidNum < total}
+            disabled={(!isCredit && amountPaidNum < total) || creditMissing}
+            aria-disabled={(!isCredit && amountPaidNum < total) || creditMissing}
           >
             {isCredit ? "Confirm Credit Sale" : "Confirm & Print Bill"}
           </Button>
