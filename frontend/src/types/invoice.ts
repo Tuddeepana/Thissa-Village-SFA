@@ -23,6 +23,8 @@ export interface InvoiceItem {
   unitPrice: number;
   costPrice?: number;
   total: number;
+  litersPerUnit?: number; // liters per one bottle/unit
+  bottleVolume?: string;  // e.g., "750 ml" or "1 l"
 }
 
 export interface InvoiceFilters {

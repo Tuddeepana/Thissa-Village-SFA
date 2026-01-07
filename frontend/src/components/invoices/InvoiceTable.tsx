@@ -214,24 +214,58 @@ export function InvoiceTable({
                         <TableHead>Qty</TableHead>
                         <TableHead>Cost Price</TableHead>
                         <TableHead>Total</TableHead>
+                        <TableHead>Liters</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedInvoice.items.map((item, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{item.productName}</TableCell>
-                          <TableCell>{item.category}</TableCell>
-                          <TableCell>{item.quantity}</TableCell>
-                          <TableCell>Rs. {(item.costPrice ?? item.unitPrice).toFixed(2)}</TableCell>
-                          <TableCell>Rs. {(item.quantity * (item.costPrice ?? item.unitPrice)).toFixed(2)}</TableCell>
-                        </TableRow>
-                      ))}
+                      {selectedInvoice.items.map((item, index) => {
+                        const litersPerUnit = item.litersPerUnit ?? (() => {
+                          // fallback parse from bottleVolume like "750 ml" or "1 l"
+                          if (!item.bottleVolume) return undefined;
+                          const parts = item.bottleVolume.trim().toLowerCase().split(/\s+/);
+                          const val = parseFloat(parts[0]);
+                          const unit = parts[1] || '';
+                          if (isNaN(val)) return undefined;
+                          return unit === 'ml' ? val / 1000 : val;
+                        })();
+                        const totalLiters = litersPerUnit ? litersPerUnit * item.quantity : undefined;
+                        return (
+                          <TableRow key={index}>
+                            <TableCell>{item.productName}</TableCell>
+                            <TableCell>{item.category}</TableCell>
+                            <TableCell>{item.quantity}</TableCell>
+                            <TableCell>Rs. {(item.costPrice ?? item.unitPrice).toFixed(2)}</TableCell>
+                            <TableCell>Rs. {(item.quantity * (item.costPrice ?? item.unitPrice)).toFixed(2)}</TableCell>
+                            <TableCell>{totalLiters !== undefined ? totalLiters.toFixed(2) : '-'}</TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
               </div>
 
               <div className="space-y-2 border-t pt-4">
+                {(() => {
+                  const totalLitersAll = selectedInvoice.items.reduce((acc, item) => {
+                    const litersPerUnit = item.litersPerUnit ?? (() => {
+                      if (!item.bottleVolume) return undefined;
+                      const parts = item.bottleVolume.trim().toLowerCase().split(/\s+/);
+                      const val = parseFloat(parts[0]);
+                      const unit = parts[1] || '';
+                      if (isNaN(val)) return undefined;
+                      return unit === 'ml' ? val / 1000 : val;
+                    })();
+                    const lineLiters = litersPerUnit ? litersPerUnit * item.quantity : 0;
+                    return acc + lineLiters;
+                  }, 0);
+                  return (
+                    <div className="flex justify-between text-sm">
+                      <span>Total Liters</span>
+                      <span>{totalLitersAll.toFixed(2)} L</span>
+                    </div>
+                  );
+                })()}
                 <div className="flex justify-between text-sm">
                   <span>Subtotal</span>
                   <span>Rs. {selectedInvoice.subtotal.toFixed(2)}</span>

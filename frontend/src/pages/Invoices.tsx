@@ -14,6 +14,32 @@ import { Input } from "@/components/ui/input";
 import { authService } from "@/api/services/authService";
 import LocalLoader from "@/components/common/LocalLoader";
 
+// API response shapes from backend for invoices and nested products
+interface ApiProduct {
+  productId: string;
+  name?: string;
+  category?: string;
+  categoryName?: string;
+  quantity_moved?: number;
+  selling_price?: number;
+  cost_price?: number;
+  // Optional size fields from backend used for CSV export
+  litres?: number | null;
+  bottle_volume?: string | null;
+}
+
+interface ApiInvoice {
+  id: string;
+  in_number: string;
+  invoiceDate: string | Date;
+  subtotal?: number;
+  discount?: number;
+  paid_status?: 'PAID' | 'PENDING';
+  createdAt: string | Date;
+  updatedAt: string | Date;
+  products?: ApiProduct[];
+}
+
 const Invoices = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -82,7 +108,7 @@ const Invoices = () => {
 
       const qs = params.join('&');
   const res = await api.get(`/invoices/with-products?${qs}`, { meta: { showLoader: 'local', loaderKey: 'invoices' } });
-      const all = res.data?.data ?? [];
+      const all: ApiInvoice[] = res.data?.data ?? [];
 
       // Flatten product rows with required columns
       type Row = { date: string; category: string; product: string; quantity: number; sellingPrice: number; costPrice: number; bottleVolume: string; litersPerUnit: number };
@@ -94,7 +120,7 @@ const Invoices = () => {
           const qty = Number(p.quantity_moved ?? 0);
           const sp = Number(p.selling_price ?? 0);
           const cp = Number(p.cost_price ?? 0);
-          const litresRaw = p.litres !== undefined && p.litres !== null ? Number(p.litres) : 0;
+          const litresRaw = p.litres !== undefined && p.litres !== null ? Number(p.litres) : 0 as number;
           const unit = String(p.bottle_volume ?? '').toUpperCase();
           const bottleVolume = `${litresRaw} ${unit.toLowerCase()}`;
           const litersPerUnit = unit === 'ML' ? litresRaw / 1000 : litresRaw;
@@ -219,12 +245,16 @@ const Invoices = () => {
       const qs = params.join('&');
   const res = await api.get(`/invoices/with-products?${qs}`, { meta: { showLoader: 'local', loaderKey: 'invoices' } });
       const payload = res.data;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mapped: Invoice[] = (payload.data || []).map((inv: any) => {
-        const items = (inv.products || []).map((p: any) => {
+      const data: ApiInvoice[] = payload.data || [];
+      const mapped: Invoice[] = data.map((inv: ApiInvoice) => {
+        const items = (inv.products || []).map((p: ApiProduct) => {
           const unit = Number(p.selling_price ?? p.cost_price ?? 0);
           const cost = p.cost_price !== undefined && p.cost_price !== null ? Number(p.cost_price) : undefined;
           const qty = Number(p.quantity_moved ?? 0);
+          const litresRaw = p.litres !== undefined && p.litres !== null ? Number(p.litres) : 0;
+          const unitKey = String(p.bottle_volume ?? '').toUpperCase();
+          const litersPerUnit = unitKey === 'ML' ? litresRaw / 1000 : litresRaw;
+          const bottleVolume = litresRaw ? `${litresRaw} ${unitKey.toLowerCase()}` : undefined;
           return {
             productId: p.productId,
             productName: p.name ?? '',
@@ -233,6 +263,8 @@ const Invoices = () => {
             unitPrice: unit,
             costPrice: cost,
             total: unit * qty,
+            litersPerUnit,
+            bottleVolume,
           };
         });
 
@@ -275,7 +307,7 @@ const Invoices = () => {
     (async () => {
       await fetchInvoices(1, itemsPerPage);
     })();
-  }, []);
+  }, [fetchInvoices]);
 
   // Extract unique categories from invoices (for filter dropdown)
   const categories = useMemo(() => {
@@ -293,16 +325,23 @@ const Invoices = () => {
   useEffect(() => {
     setCurrentPage(1);
     (async () => { await fetchInvoices(1, itemsPerPage); })();
-  }, [filters.invoiceNumber, filters.category, filters.month, filters.year, filters.dateFrom, filters.dateTo]);
+  }, [filters.invoiceNumber, filters.category, filters.month, filters.year, filters.dateFrom, filters.dateTo, fetchInvoices]);
 
-  // Statistics (basic)
+  // Statistics (updated)
   const stats = useMemo(() => {
-    const total = filteredInvoices.reduce((sum, inv) => sum + inv.total, 0);
-    const profit = filteredInvoices.reduce((sum, inv) => sum + (inv.total - inv.tax), 0);
+    const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + inv.total, 0);
+    const totalCost = filteredInvoices.reduce((sum, inv) => {
+      const invCost = inv.items.reduce((s, item) => s + (item.costPrice ?? 0) * item.quantity, 0);
+      return sum + invCost;
+    }, 0);
+    const pendingCount = filteredInvoices.filter(inv => inv.status === 'pending').length;
+    const paidCount = filteredInvoices.filter(inv => inv.status === 'paid').length;
     return {
       totalInvoices: filteredInvoices.length,
-      totalRevenue: total,
-      totalProfit: profit,
+      totalRevenue,
+      totalCost,
+      pendingCount,
+      paidCount,
     };
   }, [filteredInvoices]);
 
@@ -319,6 +358,19 @@ const Invoices = () => {
   };
 
   const missingDates = getDatesWithNoInvoices();
+
+  // Handler to mark invoice as paid
+  const handleMarkPaid = async (invoice: Invoice) => {
+    try {
+      if (!invoice.id) throw new Error('Missing invoice id');
+      await api.put(`/invoices/${invoice.id}`, { paid_status: 'PAID' }, { meta: { showLoader: 'local', loaderKey: 'invoices' } });
+      toast.success(`Invoice ${invoice.invoiceNumber} marked as paid`);
+      await fetchInvoices(currentPage, itemsPerPage);
+    } catch (err) {
+      console.error('Failed to mark as paid', err);
+      toast.error('Failed to mark invoice as paid');
+    }
+  };
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -340,7 +392,7 @@ const Invoices = () => {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Invoices</CardTitle>
@@ -352,26 +404,34 @@ const Invoices = () => {
             </p>
           </CardContent>
         </Card>
+        {/* Pending Invoices */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <CardTitle className="text-sm font-medium">Pending Invoices</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Rs. {stats.totalRevenue.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">
-              From {stats.totalInvoices} invoices
-            </p>
+            <div className="text-2xl font-bold">{stats.pendingCount}</div>
+            <p className="text-xs text-muted-foreground">Awaiting payment</p>
           </CardContent>
         </Card>
+        {/* Paid Invoices */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
+            <CardTitle className="text-sm font-medium">Paid Invoices</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Rs. {stats.totalProfit.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">
-              Revenue minus tax
-            </p>
+            <div className="text-2xl font-bold">{stats.paidCount}</div>
+            <p className="text-xs text-muted-foreground">Completed payments</p>
+          </CardContent>
+        </Card>
+        {/* Total Cost */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">Rs. {stats.totalCost.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">Sum of item costs</p>
           </CardContent>
         </Card>
       </div>
@@ -431,6 +491,7 @@ const Invoices = () => {
               setIsAddDialogOpen(true);
             }}
             onDelete={requestDeleteInvoice}
+            onMarkPaid={handleMarkPaid}
             />
           </LocalLoader>
         </CardContent>
