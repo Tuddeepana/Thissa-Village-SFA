@@ -11,6 +11,7 @@ import {
     Warehouse,
     Receipt,
     Users,
+    TrendingUp,
 } from "lucide-react";
 import {
   Sidebar,
@@ -30,6 +31,7 @@ const sfaItems = [
   { title: "My Stock", url: "/my-stock", icon: Warehouse },
   { title: "Invoices", url: "/invoices", icon: FileText },
   { title: "Bills", url: "/bills", icon: Receipt },
+  { title: "Sales Summary", url: "/sales-summary", icon: TrendingUp },
   { title: "Users", url: "/users", icon: Users },
 ];
 
