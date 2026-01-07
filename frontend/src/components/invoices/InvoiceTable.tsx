@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Eye, Edit, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, Edit, Trash2, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 import { Invoice } from "@/types/invoice";
 import { useState } from "react";
@@ -26,6 +26,7 @@ interface InvoiceTableProps {
   onPageChange: (page: number) => void;
   onEdit?: (invoice: Invoice) => void;
   onDelete?: (invoice: Invoice) => void;
+  onMarkPaid?: (invoice: Invoice) => void;
 }
 
 export function InvoiceTable({
@@ -35,9 +36,11 @@ export function InvoiceTable({
   onPageChange,
   onEdit,
   onDelete,
+  onMarkPaid,
 }: InvoiceTableProps) {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
+  const [invoiceToPay, setInvoiceToPay] = useState<Invoice | null>(null);
 
   // Check if invoice is editable (within 5 hours of creation)
   const isEditable = (invoice: Invoice): boolean => {
@@ -122,6 +125,19 @@ export function InvoiceTable({
                         </Button>
                       </>
                     )}
+                    {invoice.status === "pending" && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        aria-label="Mark as Paid"
+                        title="Mark as Paid"
+                        onClick={() => setInvoiceToPay(invoice)}
+                        className="ml-2"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        Pay
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -198,24 +214,58 @@ export function InvoiceTable({
                         <TableHead>Qty</TableHead>
                         <TableHead>Cost Price</TableHead>
                         <TableHead>Total</TableHead>
+                        <TableHead>Liters</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedInvoice.items.map((item, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{item.productName}</TableCell>
-                          <TableCell>{item.category}</TableCell>
-                          <TableCell>{item.quantity}</TableCell>
-                          <TableCell>Rs. {(item.costPrice ?? item.unitPrice).toFixed(2)}</TableCell>
-                          <TableCell>Rs. {(item.quantity * (item.costPrice ?? item.unitPrice)).toFixed(2)}</TableCell>
-                        </TableRow>
-                      ))}
+                      {selectedInvoice.items.map((item, index) => {
+                        const litersPerUnit = item.litersPerUnit ?? (() => {
+                          // fallback parse from bottleVolume like "750 ml" or "1 l"
+                          if (!item.bottleVolume) return undefined;
+                          const parts = item.bottleVolume.trim().toLowerCase().split(/\s+/);
+                          const val = parseFloat(parts[0]);
+                          const unit = parts[1] || '';
+                          if (isNaN(val)) return undefined;
+                          return unit === 'ml' ? val / 1000 : val;
+                        })();
+                        const totalLiters = litersPerUnit ? litersPerUnit * item.quantity : undefined;
+                        return (
+                          <TableRow key={index}>
+                            <TableCell>{item.productName}</TableCell>
+                            <TableCell>{item.category}</TableCell>
+                            <TableCell>{item.quantity}</TableCell>
+                            <TableCell>Rs. {(item.costPrice ?? item.unitPrice).toFixed(2)}</TableCell>
+                            <TableCell>Rs. {(item.quantity * (item.costPrice ?? item.unitPrice)).toFixed(2)}</TableCell>
+                            <TableCell>{totalLiters !== undefined ? totalLiters.toFixed(2) : '-'}</TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
               </div>
 
               <div className="space-y-2 border-t pt-4">
+                {(() => {
+                  const totalLitersAll = selectedInvoice.items.reduce((acc, item) => {
+                    const litersPerUnit = item.litersPerUnit ?? (() => {
+                      if (!item.bottleVolume) return undefined;
+                      const parts = item.bottleVolume.trim().toLowerCase().split(/\s+/);
+                      const val = parseFloat(parts[0]);
+                      const unit = parts[1] || '';
+                      if (isNaN(val)) return undefined;
+                      return unit === 'ml' ? val / 1000 : val;
+                    })();
+                    const lineLiters = litersPerUnit ? litersPerUnit * item.quantity : 0;
+                    return acc + lineLiters;
+                  }, 0);
+                  return (
+                    <div className="flex justify-between text-sm">
+                      <span>Total Liters</span>
+                      <span>{totalLitersAll.toFixed(2)} L</span>
+                    </div>
+                  );
+                })()}
                 <div className="flex justify-between text-sm">
                   <span>Subtotal</span>
                   <span>Rs. {selectedInvoice.subtotal.toFixed(2)}</span>
@@ -247,6 +297,38 @@ export function InvoiceTable({
             <Button variant="outline" onClick={() => setInvoiceToDelete(null)}>Cancel</Button>
             <Button variant="destructive" onClick={() => { if (invoiceToDelete) { onDelete?.(invoiceToDelete); } setInvoiceToDelete(null); }}>
               Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pay Confirmation Dialog */}
+      <Dialog open={!!invoiceToPay} onOpenChange={() => setInvoiceToPay(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark Invoice as Paid</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            {invoiceToPay ? (
+              <>
+                <p className="mb-2">Are you sure you want to mark invoice {invoiceToPay.invoiceNumber} as paid?</p>
+              </>
+            ) : (
+              <p className="mb-2">Are you sure you want to mark this invoice as paid?</p>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setInvoiceToPay(null)}>No</Button>
+            <Button
+              variant="default"
+              onClick={() => {
+                if (invoiceToPay) {
+                  onMarkPaid?.(invoiceToPay);
+                }
+                setInvoiceToPay(null);
+              }}
+            >
+              Yes, Mark Paid
             </Button>
           </div>
         </DialogContent>
