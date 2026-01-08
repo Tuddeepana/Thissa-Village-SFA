@@ -248,7 +248,7 @@ const SalesSummary = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3 md:p-4 pt-0">
-              <div className="text-xl md:text-2xl font-bold text-green-600">
+              <div className="text-xl md:text-2xl font-bold ">
                 Rs.{stats.totalRevenue.toFixed(0)}
               </div>
             </CardContent>
@@ -262,7 +262,7 @@ const SalesSummary = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3 md:p-4 pt-0">
-              <div className="text-xl md:text-2xl font-bold text-orange-600">
+              <div className="text-xl md:text-2xl font-bold ">
                 Rs.{stats.totalCost.toFixed(0)}
               </div>
             </CardContent>
@@ -276,7 +276,7 @@ const SalesSummary = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3 md:p-4 pt-0">
-              <div className="text-xl md:text-2xl font-bold text-blue-600">
+              <div className="text-xl md:text-2xl font-bold ">
                 Rs.{stats.totalProfit.toFixed(0)}
               </div>
             </CardContent>
@@ -304,7 +304,7 @@ const SalesSummary = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3 md:p-4 pt-0">
-              <div className="text-xl md:text-2xl font-bold text-purple-600">
+              <div className="text-xl md:text-2xl font-bold ">
                 {stats.profitMargin}%
               </div>
             </CardContent>
@@ -476,18 +476,18 @@ const SalesSummary = () => {
                     {salesData.map((d, idx) => (
                       <tr key={idx} className="border-t">
                         <td className="p-2">{format(new Date(d.date), 'MMM dd, yyyy')}</td>
-                        <td className="p-2 text-right text-green-600 font-medium">Rs.{d.revenue.toFixed(2)}</td>
-                        <td className="p-2 text-right text-orange-600">Rs.{d.cost.toFixed(2)}</td>
-                        <td className="p-2 text-right text-blue-600 font-medium">Rs.{d.profit.toFixed(2)}</td>
+                        <td className="p-2 text-right  font-medium">Rs.{d.revenue.toFixed(2)}</td>
+                        <td className="p-2 text-right ">Rs.{d.cost.toFixed(2)}</td>
+                        <td className="p-2 text-right  font-medium">Rs.{d.profit.toFixed(2)}</td>
                         <td className="p-2 text-right">{d.itemsSold}</td>
                         <td className="p-2 text-right">{d.revenue > 0 ? ((d.profit / d.revenue) * 100).toFixed(1) : '0.0'}%</td>
                       </tr>
                     ))}
                     <tr className="border-t-2 font-bold bg-muted">
                       <td className="p-2">TOTAL</td>
-                      <td className="p-2 text-right text-green-600">Rs.{stats.totalRevenue.toFixed(2)}</td>
-                      <td className="p-2 text-right text-orange-600">Rs.{stats.totalCost.toFixed(2)}</td>
-                      <td className="p-2 text-right text-blue-600">Rs.{stats.totalProfit.toFixed(2)}</td>
+                      <td className="p-2 text-right ">Rs.{stats.totalRevenue.toFixed(2)}</td>
+                      <td className="p-2 text-right ">Rs.{stats.totalCost.toFixed(2)}</td>
+                      <td className="p-2 text-right ">Rs.{stats.totalProfit.toFixed(2)}</td>
                       <td className="p-2 text-right">{stats.totalItemsSold}</td>
                       <td className="p-2 text-right">{stats.profitMargin}%</td>
                     </tr>

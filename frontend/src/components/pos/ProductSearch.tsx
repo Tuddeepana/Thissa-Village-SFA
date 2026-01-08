@@ -110,9 +110,16 @@ export function ProductSearch({ products, onAddProduct }: ProductSearchProps) {
                     )}
                   </div>
 
-                  <Badge variant="secondary" className="text-xs">
-                    {product.category}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {product.category}
+                    </Badge>
+                    {product.bottleVolume && (
+                      <Badge variant="outline" className="text-[10px]">
+                        {String(product.bottleVolume).replace(/\s+/g, '').toUpperCase()}
+                      </Badge>
+                    )}
+                  </div>
 
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">Stock:</span>
