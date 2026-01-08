@@ -6,6 +6,8 @@ export interface Product {
   cost: number; // Cost price for profit calculation
   stock: number;
   minStock: number; // Minimum stock level for warnings
+  // Optional bottle volume label (e.g., "750 ml" or "1 L")
+  bottleVolume?: string;
   barcode?: string;
   image?: string;
   description?: string;

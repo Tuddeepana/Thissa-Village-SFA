@@ -40,6 +40,7 @@ const POS = () => {
           cost: r.sellingPrice ?? 0,
           stock: r.availableQuantity,
           minStock: r.minStock ?? 0,
+          bottleVolume: r.bottle_size ?? undefined,
           barcode: undefined,
           image: undefined,
           description: undefined,

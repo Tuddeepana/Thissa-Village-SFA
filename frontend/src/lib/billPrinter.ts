@@ -77,6 +77,8 @@ export const printBill = (bill: Bill, storeName: string = "Thissa Village") => {
           border-bottom: 1px solid #000;
           padding: 5px 0;
         }
+        /* Ensure numeric headers align with their column values */
+        .items-table th.text-right { text-align: right; }
         
         .items-table td {
           padding: 3px 0;
@@ -145,6 +147,7 @@ export const printBill = (bill: Bill, storeName: string = "Thissa Village") => {
         <thead>
           <tr>
             <th>Item</th>
+            <th class="text-right">V</th>
             <th class="text-right">Qty</th>
             <th class="text-right">Price</th>
             <th class="text-right">Total</th>
@@ -154,6 +157,7 @@ export const printBill = (bill: Bill, storeName: string = "Thissa Village") => {
           ${bill.items.map(item => `
             <tr>
               <td class="item-name">${item.product.name}</td>
+              <td class="text-right">${(item as any).product?.bottleVolume ?? '-'}</td>
               <td class="text-right">${item.quantity}</td>
               <td class="text-right">${item.product.price.toFixed(2)}</td>
               <td class="text-right">${item.subtotal.toFixed(2)}</td>
@@ -215,10 +219,10 @@ export const printBill = (bill: Bill, storeName: string = "Thissa Village") => {
       </div>
       
       <div class="footer">
-        <div>Thank you for your business!</div>
-        <div>Please come again</div>
-        <div style="margin-top: 10px;">---</div>
-        <div>Powered by Wrenix Pvt Ltd</div>
+        <div>Thank you for your Buissness</div>
+        <div>Come Again!</div>
+        <div style="margin-top: 10px;">powerd by Wrenix pvt ltd</div>
+        <div>v.001</div>
       </div>
       
       <script>
@@ -239,7 +243,7 @@ export const printBill = (bill: Bill, storeName: string = "Thissa Village") => {
 };
 
 // Alternative: Generate print-friendly content in new window
-export const printBillNewWindow = (bill: Bill, storeName: string = "VinoPOS Pro") => {
+export const printBillNewWindow = (bill: Bill, storeName: string = "Thissa Village") => {
   const printWindow = window.open('', '_blank', 'width=302,height=500');
   if (!printWindow) return;
 
@@ -290,6 +294,8 @@ export const printBillNewWindow = (bill: Bill, storeName: string = "VinoPOS Pro"
           border-bottom: 1px solid #000;
           padding: 5px 0;
         }
+        /* Ensure numeric headers align with their column values */
+        .items-table th.text-right { text-align: right; }
         .items-table td { padding: 3px 0; }
         .text-right { text-align: right; }
         .totals {
@@ -347,6 +353,7 @@ export const printBillNewWindow = (bill: Bill, storeName: string = "VinoPOS Pro"
         <thead>
           <tr>
             <th>Item</th>
+            <th class="text-right">V</th>
             <th class="text-right">Qty</th>
             <th class="text-right">Price</th>
             <th class="text-right">Total</th>
@@ -356,6 +363,7 @@ export const printBillNewWindow = (bill: Bill, storeName: string = "VinoPOS Pro"
           ${bill.items.map(item => `
             <tr>
               <td>${item.product.name}</td>
+              <td class="text-right">${(item as any).product?.bottleVolume ?? '-'}</td>
               <td class="text-right">${item.quantity}</td>
               <td class="text-right">${item.product.price.toFixed(2)}</td>
               <td class="text-right">${item.subtotal.toFixed(2)}</td>
@@ -417,10 +425,10 @@ export const printBillNewWindow = (bill: Bill, storeName: string = "VinoPOS Pro"
       </div>
       
       <div class="footer">
-        <div>Thank you for your business!</div>
-        <div>Please come again</div>
-        <div style="margin-top: 10px;">---</div>
-        <div>Powered by VinoPOS Pro</div>
+        <div>Thank you for your Buissness</div>
+        <div>Come Again!</div>
+        <div style="margin-top: 10px;">powerd by Wrenix pvt ltd</div>
+        <div>v.001</div>
       </div>
       
       <div class="no-print">
