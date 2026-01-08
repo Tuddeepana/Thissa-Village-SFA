@@ -49,6 +49,7 @@ import api from '@/api/client';
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import { printBillNewWindow } from "@/lib/billPrinter";
 import { STORAGE_KEYS } from "@/utils/constants";
+import LocalLoader from "@/components/common/LocalLoader";
 
 const Bills = () => {
   // Server-driven state
@@ -124,7 +125,7 @@ const Bills = () => {
         if (dateFrom) params.dateFrom = dateFrom;
         if (dateTo) params.dateTo = dateTo;
 
-        const resp = await api.get('/bills', { params, signal: controller.signal });
+  const resp = await api.get('/bills', { params, signal: controller.signal, meta: { showLoader: 'local', loaderKey: 'bills' } });
         const respData = resp.data;
         const list = respData?.billsResponse?.data ?? respData?.data ?? [];
         const pagination = respData?.billsResponse?.pagination ?? {};
@@ -507,6 +508,7 @@ const Bills = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
+          <LocalLoader loaderKey="bills">
           {/* Desktop Table */}
           <div className="hidden md:block rounded-md border overflow-x-auto">
             <Table>
@@ -644,6 +646,7 @@ const Bills = () => {
               ))
             )}
           </div>
+          </LocalLoader>
 
           {/* Pagination */}
           {totalPages > 1 && (
