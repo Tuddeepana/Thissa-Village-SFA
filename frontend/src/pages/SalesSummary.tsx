@@ -14,6 +14,8 @@ import {
 import { Download, Filter, TrendingUp, DollarSign, ShoppingCart, Package } from "lucide-react";
 import { format } from "date-fns";
 import api from '@/api/client';
+import LocalLoader from '@/components/common/LocalLoader';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface SalesData {
   date: string;
@@ -63,7 +65,7 @@ const SalesSummary = () => {
         }
 
         // Fetch from bills endpoint with aggregation
-        const resp = await api.get('/bills', { params: { ...params, noPagination: true } });
+  const resp = await api.get('/bills', { params: { ...params, noPagination: true }, meta: { showLoader: 'local', loaderKey: 'sales-summary' } });
         const bills = resp.data?.billsResponse?.data ?? resp.data?.data ?? [];
 
         // Aggregate by date
@@ -219,78 +221,96 @@ const SalesSummary = () => {
         </Button>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
-        <Card>
-          <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground flex items-center gap-1">
-              <DollarSign className="h-3 w-3" />
-              Total Revenue
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-xl md:text-2xl font-bold text-green-600">
-              Rs.{stats.totalRevenue.toFixed(0)}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Statistics Cards with Loader */}
+      <LocalLoader
+        loaderKey="sales-summary"
+        renderSkeleton={() => (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Card key={i}>
+                <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+                  <Skeleton className="h-4 w-28" />
+                </CardHeader>
+                <CardContent className="p-3 md:p-4 pt-0">
+                  <Skeleton className="h-6 w-24" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      >
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
+          <Card>
+            <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground flex items-center gap-1">
+                <DollarSign className="h-3 w-3" />
+                Total Revenue
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-xl md:text-2xl font-bold text-green-600">
+                Rs.{stats.totalRevenue.toFixed(0)}
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground flex items-center gap-1">
-              <Package className="h-3 w-3" />
-              Total Cost
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-xl md:text-2xl font-bold text-orange-600">
-              Rs.{stats.totalCost.toFixed(0)}
-            </div>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground flex items-center gap-1">
+                <Package className="h-3 w-3" />
+                Total Cost
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-xl md:text-2xl font-bold text-orange-600">
+                Rs.{stats.totalCost.toFixed(0)}
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground flex items-center gap-1">
-              <TrendingUp className="h-3 w-3" />
-              Total Profit
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-xl md:text-2xl font-bold text-blue-600">
-              Rs.{stats.totalProfit.toFixed(0)}
-            </div>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" />
+                Total Profit
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-xl md:text-2xl font-bold text-blue-600">
+                Rs.{stats.totalProfit.toFixed(0)}
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground flex items-center gap-1">
-              <ShoppingCart className="h-3 w-3" />
-              Items Sold
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-xl md:text-2xl font-bold">
-              {stats.totalItemsSold}
-            </div>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground flex items-center gap-1">
+                <ShoppingCart className="h-3 w-3" />
+                Items Sold
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-xl md:text-2xl font-bold">
+                {stats.totalItemsSold}
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground flex items-center gap-1">
-              <TrendingUp className="h-3 w-3" />
-              Profit Margin
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-xl md:text-2xl font-bold text-purple-600">
-              {stats.profitMargin}%
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          <Card>
+            <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" />
+                Profit Margin
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-xl md:text-2xl font-bold text-purple-600">
+                {stats.profitMargin}%
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </LocalLoader>
 
       {/* Filters */}
       <Card>
@@ -404,50 +424,82 @@ const SalesSummary = () => {
         </CardContent>
       </Card>
 
-      {/* Summary Table */}
-      {salesData.length > 0 && (
-        <Card>
-          <CardHeader className="p-4 md:p-6">
-            <CardTitle className="text-base md:text-lg">Daily Breakdown</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
-            <div className="rounded-md border overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="p-2 text-left font-medium">Date</th>
-                    <th className="p-2 text-right font-medium">Revenue</th>
-                    <th className="p-2 text-right font-medium">Cost</th>
-                    <th className="p-2 text-right font-medium">Profit</th>
-                    <th className="p-2 text-right font-medium">Items</th>
-                    <th className="p-2 text-right font-medium">Margin %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {salesData.map((d, idx) => (
-                    <tr key={idx} className="border-t">
-                      <td className="p-2">{format(new Date(d.date), 'MMM dd, yyyy')}</td>
-                      <td className="p-2 text-right text-green-600 font-medium">Rs.{d.revenue.toFixed(2)}</td>
-                      <td className="p-2 text-right text-orange-600">Rs.{d.cost.toFixed(2)}</td>
-                      <td className="p-2 text-right text-blue-600 font-medium">Rs.{d.profit.toFixed(2)}</td>
-                      <td className="p-2 text-right">{d.itemsSold}</td>
-                      <td className="p-2 text-right">{d.revenue > 0 ? ((d.profit / d.revenue) * 100).toFixed(1) : '0.0'}%</td>
+      {/* Summary Table with Loader */}
+      <Card>
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="text-base md:text-lg">Daily Breakdown</CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
+          <LocalLoader
+            loaderKey="sales-summary"
+            renderSkeleton={() => (
+              <div className="rounded-md border overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted">
+                    <tr>
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <th key={i} className="p-2">
+                          <Skeleton className="h-4 w-24" />
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                  <tr className="border-t-2 font-bold bg-muted">
-                    <td className="p-2">TOTAL</td>
-                    <td className="p-2 text-right text-green-600">Rs.{stats.totalRevenue.toFixed(2)}</td>
-                    <td className="p-2 text-right text-orange-600">Rs.{stats.totalCost.toFixed(2)}</td>
-                    <td className="p-2 text-right text-blue-600">Rs.{stats.totalProfit.toFixed(2)}</td>
-                    <td className="p-2 text-right">{stats.totalItemsSold}</td>
-                    <td className="p-2 text-right">{stats.profitMargin}%</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                  </thead>
+                  <tbody>
+                    {Array.from({ length: 6 }).map((_, r) => (
+                      <tr key={r} className="border-t">
+                        {Array.from({ length: 6 }).map((_, c) => (
+                          <td key={c} className="p-2">
+                            <Skeleton className="h-4 w-full" />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          >
+            {salesData.length > 0 ? (
+              <div className="rounded-md border overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="p-2 text-left font-medium">Date</th>
+                      <th className="p-2 text-right font-medium">Revenue</th>
+                      <th className="p-2 text-right font-medium">Cost</th>
+                      <th className="p-2 text-right font-medium">Profit</th>
+                      <th className="p-2 text-right font-medium">Items</th>
+                      <th className="p-2 text-right font-medium">Margin %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {salesData.map((d, idx) => (
+                      <tr key={idx} className="border-t">
+                        <td className="p-2">{format(new Date(d.date), 'MMM dd, yyyy')}</td>
+                        <td className="p-2 text-right text-green-600 font-medium">Rs.{d.revenue.toFixed(2)}</td>
+                        <td className="p-2 text-right text-orange-600">Rs.{d.cost.toFixed(2)}</td>
+                        <td className="p-2 text-right text-blue-600 font-medium">Rs.{d.profit.toFixed(2)}</td>
+                        <td className="p-2 text-right">{d.itemsSold}</td>
+                        <td className="p-2 text-right">{d.revenue > 0 ? ((d.profit / d.revenue) * 100).toFixed(1) : '0.0'}%</td>
+                      </tr>
+                    ))}
+                    <tr className="border-t-2 font-bold bg-muted">
+                      <td className="p-2">TOTAL</td>
+                      <td className="p-2 text-right text-green-600">Rs.{stats.totalRevenue.toFixed(2)}</td>
+                      <td className="p-2 text-right text-orange-600">Rs.{stats.totalCost.toFixed(2)}</td>
+                      <td className="p-2 text-right text-blue-600">Rs.{stats.totalProfit.toFixed(2)}</td>
+                      <td className="p-2 text-right">{stats.totalItemsSold}</td>
+                      <td className="p-2 text-right">{stats.profitMargin}%</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center text-muted-foreground py-8">No data for selected filters</div>
+            )}
+          </LocalLoader>
+        </CardContent>
+      </Card>
     </div>
   );
 };
