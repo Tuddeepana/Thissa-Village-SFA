@@ -9,13 +9,14 @@ import { printBillNewWindow } from "@/lib/billPrinter";
 import { toast } from "sonner";
 import type { MyStockResponse, MyStockTableRow } from '@/types/mystock';
 import { Button } from "@/components/ui/button";
+import LocalLoader from "@/components/common/LocalLoader";
 
 const PAGE_SIZE = 50;
 
 const POS = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [billItems, setBillItems] = useState<BillItem[]>([]);
-  const [taxRate, setTaxRate] = useState(15); // 15% default tax
+  const [taxRate, setTaxRate] = useState(0);
   const [discountRate, setDiscountRate] = useState(0);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -28,7 +29,7 @@ const POS = () => {
     const fetchProducts = async () => {
       setLoadingProducts(true);
       try {
-        const res = await api.get<MyStockResponse>('/mystock', { params: { page, pageSize: PAGE_SIZE } });
+  const res = await api.get<MyStockResponse>('/mystock', { params: { page, pageSize: PAGE_SIZE }, meta: { showLoader: 'local', loaderKey: 'pos-products' } });
         if (cancelled) return;
         const rows: MyStockTableRow[] = res.data.tableResponse?.data ?? [];
         const mapped: Product[] = rows.map((r) => ({
@@ -307,7 +308,9 @@ const POS = () => {
                   <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
                 </div>
               </div>
-              <ProductSearch products={products} onAddProduct={handleAddProduct} />
+              <LocalLoader loaderKey="pos-products">
+                <ProductSearch products={products} onAddProduct={handleAddProduct} />
+              </LocalLoader>
               {loadingProducts && <p className="text-xs text-muted-foreground mt-2">Loading products...</p>}
             </CardContent>
           </Card>

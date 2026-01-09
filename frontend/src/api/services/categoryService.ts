@@ -7,6 +7,7 @@ export const categoryService = {
   async list(query: CategoryListQuery = {}) {
     const res = await api.get<ApiResponse<{ data: Category[]; page?: number; limit?: number; total?: number } | any>>(ENDPOINTS.categories, {
       params: query,
+      meta: { showLoader: 'local', loaderKey: 'categories' },
     });
     // Controller returns { success, data, page, limit, total }
     const payload = res.data as any;

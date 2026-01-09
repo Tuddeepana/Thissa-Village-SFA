@@ -17,6 +17,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import api from '@/api/client';
+import LocalLoader from '@/components/common/LocalLoader';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // color palette for pie slices
 const COLOR_VARS = [
@@ -52,7 +54,7 @@ const Dashboard = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const resp = await api.get('/dashboard/summary');
+  const resp = await api.get('/dashboard/summary', { meta: { showLoader: 'local', loaderKey: 'dashboard-stats' } });
         const payload = resp.data?.response ?? resp.data;
 
         if (cancelled) return;
@@ -103,7 +105,26 @@ const Dashboard = () => {
         <div className="text-sm text-destructive">Error loading dashboard: {error}</div>
       )}
 
-      {/* Stat Cards */}
+      {/* Stat Cards with Loader */}
+      <LocalLoader
+        loaderKey="dashboard-stats"
+        renderSkeleton={() => (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i}>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-4" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-6 w-28" />
+                  <Skeleton className="h-3 w-24 mt-2" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      >
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -156,6 +177,7 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+      </LocalLoader>
 
       {/* Charts */}
       <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
