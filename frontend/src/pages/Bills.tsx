@@ -50,6 +50,7 @@ import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import { printBillNewWindow } from "@/lib/billPrinter";
 import { STORAGE_KEYS } from "@/utils/constants";
 import LocalLoader from "@/components/common/LocalLoader";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Bills = () => {
   // Server-driven state
@@ -340,7 +341,24 @@ const Bills = () => {
         </Button>
       </div>
 
-      {/* Statistics Cards */}
+      {/* Statistics Cards with Loader */}
+      <LocalLoader
+        loaderKey="bills"
+        renderSkeleton={() => (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Card key={i}>
+                <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+                  <Skeleton className="h-4 w-24" />
+                </CardHeader>
+                <CardContent className="p-3 md:p-4 pt-0">
+                  <Skeleton className="h-6 w-20" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      >
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
         <Card>
           <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
@@ -395,6 +413,7 @@ const Bills = () => {
           </CardContent>
         </Card>
       </div>
+      </LocalLoader>
 
       {/* Filters */}
       <Card>

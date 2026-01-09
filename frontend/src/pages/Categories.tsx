@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { DeleteButton } from "@/components/common";
+import LocalLoader from "@/components/common/LocalLoader";
 import { useQuery } from "@tanstack/react-query";
 import { categoryService } from "@/api/services/categoryService";
 import type { Category } from "@/types/category.types";
@@ -138,7 +139,8 @@ const Categories = () => {
           <CardTitle className="text-base md:text-lg">All Categories</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
-          <Table>
+          <LocalLoader loaderKey="categories">
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
@@ -167,7 +169,8 @@ const Categories = () => {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+            </Table>
+          </LocalLoader>
         </CardContent>
       </Card>
 

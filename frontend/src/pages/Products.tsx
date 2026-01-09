@@ -22,6 +22,7 @@ import { Pencil, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { DeleteButton } from "@/components/common";
+import LocalLoader from "@/components/common/LocalLoader";
 import { useQuery } from "@tanstack/react-query";
 import { productService } from "@/api/services/productService";
 import { categoryService } from "@/api/services/categoryService";
@@ -353,6 +354,7 @@ const Products = () => {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
+                    <LocalLoader loaderKey="products">
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -459,6 +461,7 @@ const Products = () => {
                             ))}
                         </TableBody>
                     </Table>
+                    </LocalLoader>
                     {/* Pagination */}
                     {totalPages > 1 && (
                         <div className="flex items-center justify-between gap-3 mt-4">

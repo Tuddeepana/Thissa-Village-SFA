@@ -21,6 +21,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Download, Search, Package, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import api from "@/api/client";
+import LocalLoader from "@/components/common/LocalLoader";
+import { Skeleton } from "@/components/ui/skeleton";
 import { categoryService } from '@/api/services/categoryService';
 import type { Category } from '@/types/category.types';
 import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
@@ -57,6 +59,7 @@ const MyStock = () => {
               categoryId: categoryId || undefined,
               status: stockFilter === ALL_STOCK_VALUE ? undefined : stockFilter,
             },
+            meta: { showLoader: 'local', loaderKey: 'mystock-cards' },
           }
         );
         if (cancelled) return;
@@ -223,7 +226,24 @@ const MyStock = () => {
         </Button>
       </div>
 
-      {/* Statistics Cards */}
+      {/* Statistics Cards with Loader */}
+      <LocalLoader
+        loaderKey="mystock-cards"
+        renderSkeleton={() => (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i}>
+                <CardHeader className="p-3 md:pb-2 md:p-6">
+                  <Skeleton className="h-4 w-24" />
+                </CardHeader>
+                <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+                  <Skeleton className="h-6 w-20" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      >
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
         <Card>
           <CardHeader className="p-3 md:pb-2 md:p-6">
@@ -270,6 +290,7 @@ const MyStock = () => {
           </CardContent>
         </Card>
       </div>
+      </LocalLoader>
 
       {/* Filters */}
       <Card>

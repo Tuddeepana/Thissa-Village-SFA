@@ -4,7 +4,7 @@ import { ApiResponse, AuthResponse, LoginPayload, User } from '@/types/user.type
 
 export const authService = {
 	async login(payload: LoginPayload) {
-		const res = await api.post<ApiResponse<AuthResponse>>(ENDPOINTS.users.login, payload);
+		const res = await api.post<ApiResponse<AuthResponse>>(ENDPOINTS.users.login, payload, { meta: { showLoader: 'global' } });
 		return res.data.data;
 	},
 	async me() {

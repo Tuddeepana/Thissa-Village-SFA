@@ -16,7 +16,7 @@ export const productService = {
         }>
     >(
       ENDPOINTS.products,
-      { params: query }
+      { params: query, meta: { showLoader: 'local', loaderKey: 'products' } }
     );
     const payload = res.data as any;
     const dataField = payload?.data;
