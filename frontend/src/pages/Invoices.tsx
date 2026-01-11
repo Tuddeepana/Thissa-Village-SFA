@@ -42,6 +42,7 @@ interface ApiInvoice {
 
 const Invoices = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [serverStats, setServerStats] = useState<{ totalInvoices: number; paidInvoices: number; pendingInvoices: number; totalCost: number } | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [filters, setFilters] = useState<InvoiceFilters>({});
@@ -106,9 +107,9 @@ const Invoices = () => {
       if (filters.dateTo) params.push(`dateTo=${encodeURIComponent(filters.dateTo.toISOString())}`);
       params.push(`noPagination=true`);
 
-      const qs = params.join('&');
-  const res = await api.get(`/invoices/with-products?${qs}`, { meta: { showLoader: 'local', loaderKey: 'invoices' } });
-      const all: ApiInvoice[] = res.data?.data ?? [];
+    const qs = params.join('&');
+    const res = await api.get(`/invoices/with-products?${qs}`, { meta: { showLoader: 'local', loaderKey: 'invoices' } });
+    const all: ApiInvoice[] = res.data?.tableResponse?.data ?? res.data?.data ?? [];
 
       // Flatten product rows with required columns
       type Row = { date: string; category: string; product: string; quantity: number; sellingPrice: number; costPrice: number; bottleVolume: string; litersPerUnit: number };
@@ -242,10 +243,10 @@ const Invoices = () => {
       if (filters.dateFrom) params.push(`dateFrom=${encodeURIComponent(filters.dateFrom.toISOString())}`);
       if (filters.dateTo) params.push(`dateTo=${encodeURIComponent(filters.dateTo.toISOString())}`);
 
-      const qs = params.join('&');
-  const res = await api.get(`/invoices/with-products?${qs}`, { meta: { showLoader: 'local', loaderKey: 'invoices' } });
-      const payload = res.data;
-      const data: ApiInvoice[] = payload.data || [];
+    const qs = params.join('&');
+    const res = await api.get(`/invoices/with-products?${qs}`, { meta: { showLoader: 'local', loaderKey: 'invoices' } });
+    const payload = res.data;
+    const data: ApiInvoice[] = payload.tableResponse?.data || payload.data || [];
       const mapped: Invoice[] = data.map((inv: ApiInvoice) => {
         const items = (inv.products || []).map((p: ApiProduct) => {
           const unit = Number(p.selling_price ?? p.cost_price ?? 0);
@@ -287,8 +288,20 @@ const Invoices = () => {
       });
 
       setInvoices(mapped);
-      const total = Number(payload.total ?? mapped.length);
-      const pageLimit = Number(payload.limit ?? limit);
+      // Set server stats if provided
+      if (payload.cardResponse) {
+        const cr = payload.cardResponse;
+        setServerStats({
+          totalInvoices: Number(cr.totalInvoices ?? mapped.length),
+          paidInvoices: Number(cr.paidInvoices ?? mapped.filter(inv => inv.status === 'paid').length),
+          pendingInvoices: Number(cr.pendingInvoices ?? mapped.filter(inv => inv.status === 'pending').length),
+          totalCost: Number(cr.totalCost ?? 0),
+        });
+      } else {
+        setServerStats(null);
+      }
+      const total = Number(payload.tableResponse?.pagination?.totalRecords ?? payload.total ?? mapped.length);
+      const pageLimit = Number(payload.tableResponse?.pagination?.pageSize ?? payload.limit ?? limit);
       setServerTotalPages(Math.max(1, Math.ceil(total / pageLimit)));
     } catch (err) {
       // fallback to mock data if available
@@ -329,6 +342,15 @@ const Invoices = () => {
 
   // Statistics (updated)
   const stats = useMemo(() => {
+    if (serverStats) {
+      return {
+        totalInvoices: serverStats.totalInvoices,
+        totalRevenue: filteredInvoices.reduce((sum, inv) => sum + inv.total, 0), // keep local revenue if needed
+        totalCost: serverStats.totalCost,
+        pendingCount: serverStats.pendingInvoices,
+        paidCount: serverStats.paidInvoices,
+      };
+    }
     const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + inv.total, 0);
     const totalCost = filteredInvoices.reduce((sum, inv) => {
       const invCost = inv.items.reduce((s, item) => s + (item.costPrice ?? 0) * item.quantity, 0);
@@ -343,7 +365,7 @@ const Invoices = () => {
       pendingCount,
       paidCount,
     };
-  }, [filteredInvoices]);
+  }, [filteredInvoices, serverStats]);
 
   // Dates with no invoices (helper)
   const getDatesWithNoInvoices = () => {

@@ -174,6 +174,136 @@ class InvoiceService {
     return { data, page: useNoPagination ? 1 : page, limit: useNoPagination ? total : limit, total };
   }
 
+  // Combined response for invoices page: card metrics + table data
+  async listInvoicesWithProductsCombined(query: { page?: number; limit?: number; search?: string; category?: string; month?: number; year?: number; dateFrom?: Date | string; dateTo?: Date | string; noPagination?: boolean }): Promise<{
+    cardResponse: { totalInvoices: number; paidInvoices: number; pendingInvoices: number; totalCost: number };
+    tableResponse: { data: InvoiceWithProductsDTO[]; pagination: { currentPage: number; pageSize: number; totalPages: number; totalRecords: number } };
+  }> {
+    const page = query.page && query.page > 0 ? query.page : 1;
+    const limit = query.limit && query.limit > 0 ? query.limit : 10;
+    const where: any = {};
+
+    const andClauses: any[] = [];
+
+    if (query.search) {
+      andClauses.push({ in_number: { contains: query.search, mode: 'insensitive' } });
+    }
+
+    // Date filters: month/year or explicit date range
+    let startDate: Date | undefined;
+    let endDate: Date | undefined;
+
+    if (query.month !== undefined && query.year !== undefined) {
+      startDate = new Date(query.year, query.month, 1);
+      endDate = new Date(query.year, query.month + 1, 0, 23, 59, 59, 999);
+    } else if (query.year !== undefined && query.month === undefined) {
+      startDate = new Date(query.year, 0, 1);
+      endDate = new Date(query.year, 11, 31, 23, 59, 59, 999);
+    }
+
+    if (query.dateFrom) {
+      const df = typeof query.dateFrom === 'string' ? new Date(query.dateFrom) : query.dateFrom;
+      startDate = df;
+    }
+    if (query.dateTo) {
+      const dt = typeof query.dateTo === 'string' ? new Date(query.dateTo) : query.dateTo;
+      endDate = dt;
+    }
+
+    if (startDate || endDate) {
+      const dateClause: any = {};
+      if (startDate) dateClause.gte = startDate;
+      if (endDate) dateClause.lte = endDate;
+      andClauses.push({ invoiceDate: dateClause });
+    }
+
+    // Category filter: invoices that have at least one inventory record whose product's category matches
+    if (query.category) {
+      andClauses.push({
+        inventoryRecords: {
+          some: {
+            product: {
+              category: { name: { equals: query.category, mode: 'insensitive' } },
+            },
+          },
+        },
+      });
+    }
+
+    if (andClauses.length > 0) {
+      where.AND = andClauses;
+    }
+
+    const useNoPagination = !!query.noPagination;
+
+    // Table: paginated invoices with products
+    const [total, items] = await Promise.all([
+      (prisma as any).invoice.count({ where }),
+      (prisma as any).invoice.findMany({
+        where,
+        skip: useNoPagination ? undefined : (page - 1) * limit,
+        take: useNoPagination ? undefined : limit,
+        orderBy: { createdAt: 'desc' },
+        include: { inventoryRecords: { include: { product: { include: { category: true } } } } },
+      }),
+    ]);
+
+    const data = (items as any[]).map((inv) => ({
+      id: inv.id,
+      in_number: inv.in_number,
+      invoiceDate: inv.invoiceDate instanceof Date ? inv.invoiceDate.toISOString() : String(inv.invoiceDate),
+      createdAt: inv.createdAt instanceof Date ? inv.createdAt.toISOString() : String(inv.createdAt),
+      updatedAt: inv.updatedAt instanceof Date ? inv.updatedAt.toISOString() : String(inv.updatedAt),
+      subtotal: inv.subtotal !== undefined ? String(inv.subtotal) : '0',
+      discount: inv.discount !== undefined ? String(inv.discount) : '0',
+      paid_status: inv.paid_status ?? 'PENDING',
+      itemCount: (inv.inventoryRecords || []).length,
+      products: (inv.inventoryRecords || []).map((rec: any) => ({
+        productId: rec.productId,
+        name: rec.product?.name ?? null,
+        categoryName: rec.product?.category?.name ?? null,
+        litres: rec.product?.litres !== undefined ? String(rec.product.litres) : null,
+        bottle_volume: rec.product?.bottle_volume ?? null,
+        cost_price: rec.product?.cost_price !== undefined ? String(rec.product.cost_price) : null,
+        selling_price: rec.product?.selling_price !== undefined ? String(rec.product.selling_price) : null,
+        quantity_moved: rec.quantity_moved,
+      })),
+    })) as InvoiceWithProductsDTO[];
+
+    const tableResponse = {
+      data,
+      pagination: {
+        currentPage: useNoPagination ? 1 : page,
+        pageSize: useNoPagination ? total : limit,
+        totalPages: useNoPagination ? 1 : Math.max(1, Math.ceil(total / limit)),
+        totalRecords: total,
+      },
+    };
+
+    // Card metrics: compute from all filtered invoices (not just paginated)
+    const allInvoices = await (prisma as any).invoice.findMany({ where, select: { id: true, paid_status: true } });
+    const ids = allInvoices.map((i: any) => i.id);
+    const totalInvoices = allInvoices.length;
+    const paidInvoices = allInvoices.filter((i: any) => i.paid_status === 'PAID').length;
+    const pendingInvoices = allInvoices.filter((i: any) => i.paid_status === 'PENDING').length;
+
+    let totalCost = 0;
+    if (ids.length) {
+      const invMovements = await (prisma as any).inventory.findMany({
+        where: { invoiceId: { in: ids } },
+        include: { product: { select: { cost_price: true } } },
+      });
+      for (const mv of invMovements) {
+        const cp = mv.product?.cost_price !== undefined && mv.product?.cost_price !== null ? Number(mv.product.cost_price) : 0;
+        totalCost += cp * Number(mv.quantity_moved ?? 0);
+      }
+    }
+
+    const cardResponse = { totalInvoices, paidInvoices, pendingInvoices, totalCost: Number(totalCost.toFixed(2)) };
+
+    return { cardResponse, tableResponse };
+  }
+
   async updateInvoice(id: string, input: InvoiceUpdateInput): Promise<InvoiceDTO> {
     const data: any = {};
     if (input.in_number !== undefined) data.in_number = input.in_number;
