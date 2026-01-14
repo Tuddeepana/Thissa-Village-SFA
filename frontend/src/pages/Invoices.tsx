@@ -278,6 +278,7 @@ const Invoices = () => {
           items,
           subtotal: Number(inv.subtotal ?? 0),
           tax: 0,
+          // API stores discount as an amount; UI components can derive percentage from subtotal
           discount: Number(inv.discount ?? 0),
           total: Number(inv.subtotal ?? 0) - Number(inv.discount ?? 0),
           paymentMethod: 'cash',
