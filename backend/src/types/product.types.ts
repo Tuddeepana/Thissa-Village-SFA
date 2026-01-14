@@ -4,6 +4,7 @@ export interface ProductDTO {
   id: string;
   name: string;
   description?: string | null;
+  barcode?: string | null;
   litres: string; // Prisma Decimal serialized as string
   cost_price: string; // Decimal
   selling_price: string; // Decimal
@@ -18,6 +19,7 @@ export interface ProductDTO {
 export type ProductCreateInput = {
   name: string;
   description?: string | null;
+  barcode?: string | null;
   litres: number | string;
   cost_price: number | string;
   selling_price: number | string;
@@ -29,6 +31,7 @@ export type ProductCreateInput = {
 export type ProductUpdateInput = Partial<{
   name: string;
   description: string | null;
+  barcode: string | null;
   litres: number | string;
   cost_price: number | string;
   selling_price: number | string;

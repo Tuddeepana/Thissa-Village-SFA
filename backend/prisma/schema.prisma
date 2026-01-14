@@ -58,6 +58,7 @@ model Product {
   id            String       @id @default(uuid())
   name          String
   description   String?
+  barcode       String?      @unique
   litres        Decimal      @db.Decimal(10, 2)
   cost_price    Decimal      @db.Decimal(10, 2)
   selling_price Decimal      @db.Decimal(10, 2)
@@ -77,11 +78,11 @@ model Product {
 }
 
 model Invoice {
-  id          String   @id @default(uuid())
-  in_number   String   @unique
+  id          String     @id @default(uuid())
+  in_number   String     @unique
   invoiceDate DateTime
-  subtotal    Decimal  @default(0) @db.Decimal(10, 2)
-  discount    Decimal  @default(0) @db.Decimal(10, 2)
+  subtotal    Decimal    @default(0) @db.Decimal(10, 2)
+  discount    Decimal    @default(0) @db.Decimal(10, 2)
   paid_status PaidStatus @default(PENDING)
 
   // Inventory movements
