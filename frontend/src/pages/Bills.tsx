@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -42,6 +44,7 @@ import {
   User,
   Phone,
   Clock,
+  Keyboard,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Bill } from "@/types/pos";
@@ -53,6 +56,8 @@ import LocalLoader from "@/components/common/LocalLoader";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const Bills = () => {
+  const navigate = useNavigate();
+
   // Server-driven state
   const [bills, setBills] = useState<Bill[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -325,6 +330,37 @@ const Bills = () => {
     })();
   };
 
+  // Keyboard shortcuts handler
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input, textarea, or select
+      const target = e.target as HTMLElement;
+      const isInputField = target.tagName === 'INPUT' ||
+                          target.tagName === 'TEXTAREA' ||
+                          target.tagName === 'SELECT' ||
+                          target.isContentEditable;
+
+      // Allow shortcuts only if not in dialog and not typing in input fields
+      if (isViewDialogOpen || isPaymentDialogOpen || isInputField) return;
+
+      const key = e.key.toLowerCase();
+
+      switch (key) {
+        case 'p':
+          // Navigate to POS page
+          e.preventDefault();
+          navigate('/pos');
+          break;
+
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [navigate, isViewDialogOpen, isPaymentDialogOpen]);
+
   return (
     <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
@@ -335,10 +371,37 @@ const Bills = () => {
             View and manage all sales bills
           </p>
         </div>
-        <Button variant="outline" className="gap-2">
-          <Download className="h-4 w-4" />
-          Export Bills
-        </Button>
+        <div className="flex items-center gap-2">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Keyboard className="h-4 w-4 mr-2" />
+                Shortcuts
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[400px]">
+              <DialogHeader>
+                <DialogTitle>Keyboard Shortcuts</DialogTitle>
+                <DialogDescription>
+                  Use these keyboard shortcuts to navigate faster
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-[80px_1fr] gap-4 items-center">
+                  <Badge variant="secondary" className="justify-center text-lg font-mono">P</Badge>
+                  <p className="text-sm">Navigate to <strong>POS System</strong> page</p>
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground pt-2 border-t">
+                <p>💡 Tip: Shortcuts are disabled when typing in input fields or when dialogs are open.</p>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Button variant="outline" className="gap-2">
+            <Download className="h-4 w-4" />
+            Export Bills
+          </Button>
+        </div>
       </div>
 
       {/* Statistics Cards with Loader */}

@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProductSearch } from "@/components/pos/ProductSearch";
 import { BillCart } from "@/components/pos/BillCart";
@@ -10,10 +11,23 @@ import { toast } from "sonner";
 import type { MyStockResponse, MyStockTableRow } from '@/types/mystock';
 import { Button } from "@/components/ui/button";
 import LocalLoader from "@/components/common/LocalLoader";
+import { Keyboard } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 const PAGE_SIZE = 50;
 
 const POS = () => {
+  const navigate = useNavigate();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   const [products, setProducts] = useState<Product[]>([]);
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [taxRate, setTaxRate] = useState(0);
@@ -106,6 +120,84 @@ const POS = () => {
     }
   }, [stockWarnings]);
 
+  // Handler functions
+  const handleCompleteBill = useCallback(() => {
+    if (billItems.length === 0) {
+      toast.error("Add items to the bill first!");
+      return;
+    }
+    setIsPaymentDialogOpen(true);
+  }, [billItems.length]);
+
+  // Keyboard shortcuts handler
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input, textarea, or select
+      const target = e.target as HTMLElement;
+      const isInputField = target.tagName === 'INPUT' ||
+                          target.tagName === 'TEXTAREA' ||
+                          target.tagName === 'SELECT' ||
+                          target.isContentEditable;
+
+      // Allow shortcuts only if not in payment dialog and not typing in input fields
+      if (isPaymentDialogOpen || isInputField) return;
+
+      const key = e.key.toLowerCase();
+
+      switch (key) {
+        case 'b':
+          // Navigate to Bills page
+          e.preventDefault();
+          navigate('/bills');
+          toast.info('Navigating to Bills page...');
+          break;
+
+        case 's':
+          // Focus on search bar
+          e.preventDefault();
+          searchInputRef.current?.focus();
+          toast.info('Search bar focused');
+          break;
+
+        case 't':
+          // Toggle tax (cycle through 0%, 5%, 10%, 15%)
+          e.preventDefault();
+          setTaxRate((prev) => {
+            const rates = [0, 5, 10, 15];
+            const currentIndex = rates.indexOf(prev);
+            const nextIndex = (currentIndex + 1) % rates.length;
+            const newRate = rates[nextIndex];
+            toast.info(`Tax rate set to ${newRate}%`);
+            return newRate;
+          });
+          break;
+
+        case 'c':
+          // Complete bill (open payment dialog)
+          e.preventDefault();
+          handleCompleteBill();
+          break;
+
+        case 'm':
+          // Open payment dialog for payment method selection
+          e.preventDefault();
+          if (billItems.length > 0) {
+            setIsPaymentDialogOpen(true);
+            toast.info('Payment dialog opened');
+          } else {
+            toast.error('Add items to the bill first!');
+          }
+          break;
+
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [navigate, isPaymentDialogOpen, billItems.length, handleCompleteBill]);
+
   const handleAddProduct = (product: Product) => {
     if (product.stock === 0) {
       toast.error("Product is out of stock!");
@@ -167,14 +259,6 @@ const POS = () => {
     setBillItems([]);
     setDiscountRate(0);
     toast.info("Bill cleared");
-  };
-
-  const handleCompleteBill = () => {
-    if (billItems.length === 0) {
-      toast.error("Add items to the bill first!");
-      return;
-    }
-    setIsPaymentDialogOpen(true);
   };
 
   const handleConfirmPayment = (
@@ -289,11 +373,54 @@ const POS = () => {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">POS System</h1>
-        <p className="text-sm md:text-base text-muted-foreground">
-          Fast and efficient point of sale
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">POS System</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Fast and efficient point of sale
+          </p>
+        </div>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Keyboard className="h-4 w-4 mr-2" />
+              Shortcuts
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Keyboard Shortcuts</DialogTitle>
+              <DialogDescription>
+                Use these keyboard shortcuts to navigate and work faster in the POS system
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                <Badge variant="secondary" className="justify-center text-lg font-mono">B</Badge>
+                <p className="text-sm">Navigate to <strong>Bills</strong> page</p>
+              </div>
+              <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                <Badge variant="secondary" className="justify-center text-lg font-mono">S</Badge>
+                <p className="text-sm">Focus on <strong>Search</strong> bar</p>
+              </div>
+              <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                <Badge variant="secondary" className="justify-center text-lg font-mono">T</Badge>
+                <p className="text-sm">Toggle <strong>Tax</strong> rate (cycles: 0%, 5%, 10%, 15%)</p>
+              </div>
+              <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                <Badge variant="secondary" className="justify-center text-lg font-mono">C</Badge>
+                <p className="text-sm"><strong>Complete</strong> bill (open payment dialog)</p>
+              </div>
+              <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                <Badge variant="secondary" className="justify-center text-lg font-mono">M</Badge>
+                <p className="text-sm">Open payment <strong>Method</strong> selection dialog</p>
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground pt-2 border-t">
+              <p>💡 Tip: Shortcuts are disabled when typing in input fields or during payment processing.</p>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -309,7 +436,7 @@ const POS = () => {
                 </div>
               </div>
               <LocalLoader loaderKey="pos-products">
-                <ProductSearch products={products} onAddProduct={handleAddProduct} />
+                <ProductSearch ref={searchInputRef} products={products} onAddProduct={handleAddProduct} />
               </LocalLoader>
               {loadingProducts && <p className="text-xs text-muted-foreground mt-2">Loading products...</p>}
             </CardContent>

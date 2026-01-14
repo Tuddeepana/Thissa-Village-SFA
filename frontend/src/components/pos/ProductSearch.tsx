@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, forwardRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,7 +18,8 @@ interface ProductSearchProps {
   onAddProduct: (product: Product) => void;
 }
 
-export function ProductSearch({ products, onAddProduct }: ProductSearchProps) {
+export const ProductSearch = forwardRef<HTMLInputElement, ProductSearchProps>(
+  ({ products, onAddProduct }, ref) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
@@ -59,6 +60,7 @@ export function ProductSearch({ products, onAddProduct }: ProductSearchProps) {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
+            ref={ref}
             placeholder="Search by name, barcode, or description..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -168,4 +170,7 @@ export function ProductSearch({ products, onAddProduct }: ProductSearchProps) {
       </div>
     </div>
   );
-}
+});
+
+ProductSearch.displayName = "ProductSearch";
+
