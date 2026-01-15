@@ -11,6 +11,7 @@ import inventoryRoutes from './routes/inventory.routes';
 import billRoutes from './routes/bill.routes';
 import mystockRoutes from './routes/mystock.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import salesSummaryRoutes from './routes/sales-summary.routes';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 
 // Load environment variables
@@ -42,6 +43,7 @@ app.use('/api/bills', billRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/mystock', mystockRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/sales-summary', salesSummaryRoutes);
 
 
 // Health check

@@ -61,7 +61,8 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [barcode, setBarcode] = useState<string>("");
   const [quantity, setQuantity] = useState<number>(1);
-  const [discount, setDiscount] = useState<number>(0);
+  // Discount entered by user as a percentage (0-100)
+  const [discountPercent, setDiscountPercent] = useState<number>(0);
   const [taxRate, setTaxRate] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'other'>('cash');
   const [status, setStatus] = useState<'paid' | 'pending' | 'cancelled'>('pending');
@@ -101,7 +102,11 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
       setDate(invoiceToEdit.date ?? new Date());
       setCustomerName(invoiceToEdit.customerName ?? "");
       setCustomerPhone(invoiceToEdit.customerPhone ?? "");
-      setDiscount(invoiceToEdit.discount ?? 0);
+  // invoiceToEdit.discount is stored as amount; convert to percent for UI
+  const invSubtotal = invoiceToEdit.subtotal ?? 0;
+  const invDiscountAmount = invoiceToEdit.discount ?? 0;
+  const computedPercent = invSubtotal > 0 ? (invDiscountAmount / invSubtotal) * 100 : 0;
+  setDiscountPercent(Number.isFinite(computedPercent) ? Number(computedPercent.toFixed(2)) : 0);
       setStatus(invoiceToEdit.status ?? 'pending');
       // map items
       const mappedItems: ProductItem[] = (invoiceToEdit.items || []).map(i => ({
@@ -159,6 +164,11 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
   const tax = useMemo(() => {
     return (subtotal * taxRate) / 100;
   }, [subtotal, taxRate]);
+
+  // Discount amount computed from percentage
+  const discount = useMemo(() => {
+    return (subtotal * discountPercent) / 100;
+  }, [subtotal, discountPercent]);
 
   const total = useMemo(() => {
     return subtotal + tax - discount;
@@ -224,7 +234,7 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
     setSelectedProductId("");
     setBarcode("");
     setQuantity(1);
-    setDiscount(0);
+    setDiscountPercent(0);
     setTaxRate(0);
     setPaymentMethod('cash');
     setStatus('pending');
@@ -237,7 +247,8 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
       in_number: invoiceNumber,
       invoiceDate: date.toISOString(),
       subtotal: subtotal,
-      discount: discount,
+      // Backend expects discount as percentage (0-100)
+      discount: discountPercent,
       paid_status: status.toUpperCase() === 'PAID' ? 'PAID' : 'PENDING',
       items: items.map(i => ({ productId: i.productId, quantityMoved: i.quantity })),
     };
@@ -326,12 +337,14 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
             {/* Discount and Status */}
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="discount">Discount</Label>
+                <Label htmlFor="discount">Discount %</Label>
                 <Input
                   id="discount"
                   type="number"
-                  value={discount}
-                  onChange={(e) => setDiscount(Number.parseFloat(e.target.value) || 0)}
+                  min={0}
+                  max={100}
+                  value={discountPercent}
+                  onChange={(e) => setDiscountPercent(Number.parseFloat(e.target.value) || 0)}
                 />
               </div>
               <div className="grid gap-2">
@@ -460,7 +473,7 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
                 <div className="font-semibold">Rs. {subtotal.toFixed(2)}</div>
               </div>
               <div className="flex justify-between">
-                <div className="text-sm">Discount</div>
+                <div className="text-sm">Discount ({discountPercent.toFixed(2)}%)</div>
                 <div className="font-semibold">Rs. {discount.toFixed(2)}</div>
               </div>
               <div className="border-t mt-2 pt-2 flex justify-between">

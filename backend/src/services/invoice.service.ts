@@ -18,7 +18,9 @@ class InvoiceService {
     const result = await (prisma as any).$transaction(async (tx: any) => {
       // Use subtotal provided by the frontend (assumed to be numeric or numeric-string)
       const providedSubtotal = input.subtotal !== undefined ? Number(input.subtotal) : 0;
-      const providedDiscount = input.discount !== undefined ? Number(input.discount) : 0;
+      // Frontend sends discount as a percentage (0-100). store discount as an amount in DB.
+      const providedDiscountRate = input.discount !== undefined ? Number(input.discount) : 0;
+      const providedDiscount = (providedSubtotal * providedDiscountRate) / 100;
       const providedStatus = input.paid_status ?? 'PENDING';
 
       const createdInvoice = await tx.invoice.create({
@@ -309,7 +311,20 @@ class InvoiceService {
     if (input.in_number !== undefined) data.in_number = input.in_number;
     if (input.invoiceDate !== undefined) data.invoiceDate = new Date(input.invoiceDate as any);
     if (input.subtotal !== undefined) data.subtotal = (typeof input.subtotal === 'number' ? input.subtotal : Number(input.subtotal)).toFixed(2);
-    if (input.discount !== undefined) data.discount = (typeof input.discount === 'number' ? input.discount : Number(input.discount)).toFixed(2);
+    // Frontend sends discount as a percentage (0-100). store discount as an amount in DB.
+    if (input.discount !== undefined) {
+      const discountRate = typeof input.discount === 'number' ? input.discount : Number(input.discount);
+      const subtotal = input.subtotal !== undefined ? (typeof input.subtotal === 'number' ? input.subtotal : Number(input.subtotal)) : undefined;
+
+      if (subtotal !== undefined) {
+        data.discount = ((subtotal * discountRate) / 100).toFixed(2);
+      } else {
+        // If subtotal isn't provided in the update request, fetch current subtotal to compute discount amount.
+        const existing = await (prisma as any).invoice.findUnique({ where: { id }, select: { subtotal: true } });
+        const existingSubtotal = existing?.subtotal !== undefined && existing?.subtotal !== null ? Number(existing.subtotal) : 0;
+        data.discount = ((existingSubtotal * discountRate) / 100).toFixed(2);
+      }
+    }
     if (input.paid_status !== undefined) data.paid_status = input.paid_status;
 
     const invoice = await (prisma as any).invoice.update({ where: { id }, data });
