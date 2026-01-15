@@ -28,6 +28,8 @@ import { generateProducts } from "@/lib/productData";
 import { productService } from '@/api/services/productService';
 import api from '@/api/client';
 import type { Product } from '@/types/product.types';
+import { BarcodeScanner } from "@/components/common";
+import { useToast } from "@/hooks/use-toast";
 
 interface ProductItem {
   productId: string;
@@ -50,12 +52,14 @@ interface AddInvoiceDialogProps {
 }
 
 export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, invoiceToEdit }: AddInvoiceDialogProps) {
+  const { toast } = useToast();
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [date, setDate] = useState<Date>(new Date());
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [items, setItems] = useState<ProductItem[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const [barcode, setBarcode] = useState<string>("");
   const [quantity, setQuantity] = useState<number>(1);
   const [discount, setDiscount] = useState<number>(0);
   const [taxRate, setTaxRate] = useState<number>(0);
@@ -114,6 +118,28 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
 
   // choose source products: prefer fetchedProducts
   const productOptions = fetchedProducts && fetchedProducts.length > 0 ? fetchedProducts : (products as unknown as Product[]);
+
+  // Handle barcode scanning - find and select product by barcode
+  useEffect(() => {
+    if (barcode && barcode.trim()) {
+      const foundProduct = productOptions.find(p => p.barcode === barcode.trim());
+      if (foundProduct) {
+        setSelectedProductId(foundProduct.id);
+        setBarcode(""); // Clear barcode after successful match
+        toast({
+          title: "Product Found",
+          description: `${foundProduct.name} selected`
+        });
+      } else {
+        toast({
+          title: "Product Not Found",
+          description: "No product with this barcode exists",
+          variant: "destructive"
+        });
+        setBarcode(""); // Clear barcode even if not found
+      }
+    }
+  }, [barcode, productOptions, toast]);
 
   // update unit price when selection changes
   const effectiveSelectedProduct = productOptions.find(p => p.id === selectedProductId);
@@ -196,6 +222,7 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
     setCustomerPhone("");
     setItems([]);
     setSelectedProductId("");
+    setBarcode("");
     setQuantity(1);
     setDiscount(0);
     setTaxRate(0);
@@ -323,6 +350,13 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
 
             {/* Product Selection Section */}
             <div className="grid gap-4">
+              <BarcodeScanner
+                value={barcode}
+                onChange={setBarcode}
+                label="Scan Product Barcode"
+                placeholder="Scan barcode to auto-select product"
+              />
+
               <div className="grid gap-2">
                 <Label htmlFor="product">Select Product</Label>
                 <Select

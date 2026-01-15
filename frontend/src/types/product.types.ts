@@ -2,6 +2,7 @@ export type Product = {
   id: string;
   name: string;
   description?: string | null;
+  barcode?: string | null;
   // Decimal fields are serialized as strings from backend; handle as string in UI and coerce as needed
   litres: string; // stored as litres (e.g., "0.75")
   cost_price: string;
@@ -17,6 +18,7 @@ export type Product = {
 export type CreateProductPayload = {
   name: string;
   description?: string | null;
+  barcode?: string | null;
   litres: string; // send as string
   cost_price: string; // send as string
   selling_price: string; // send as string
@@ -28,6 +30,7 @@ export type CreateProductPayload = {
 export type UpdateProductPayload = Partial<{
   name: string;
   description?: string | null;
+  barcode?: string | null;
   litres: string;
   cost_price: string;
   selling_price: string;
