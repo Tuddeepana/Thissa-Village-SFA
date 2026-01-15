@@ -38,3 +38,27 @@ export interface SalesSummaryResponse {
     };
   };
 }
+
+// Volume-wise summary types
+export interface VolumeWiseSummaryRow {
+  dateRange: string; // e.g., "Jan 01, 2026 - Jan 15, 2026"
+  productName: string;
+  categoryName: string;
+  quantity: number;
+  volume: string; // e.g., "1 L" or "500 ML"
+  revenue: number;
+  profit: number;
+  totalVolume: string; // e.g., "150.5 L" (quantity * unit volume)
+}
+
+export interface VolumeWiseSummaryResponse {
+  tableResponse: {
+    data: VolumeWiseSummaryRow[];
+    pagination: {
+      currentPage: number;
+      pageSize: number;
+      totalPages: number;
+      totalRecords: number;
+    };
+  };
+}

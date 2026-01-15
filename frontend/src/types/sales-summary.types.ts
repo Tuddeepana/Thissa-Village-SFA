@@ -39,3 +39,28 @@ export interface SalesSummaryResponse {
     };
   };
 }
+
+// Volume-wise summary types
+export interface VolumeWiseSummaryRow {
+  dateRange: string;
+  productName: string;
+  categoryName: string;
+  quantity: number;
+  volume: string;
+  revenue: number;
+  profit: number;
+  totalVolume: string;
+}
+
+export interface VolumeWiseSummaryResponse {
+  success: boolean;
+  tableResponse: {
+    data: VolumeWiseSummaryRow[];
+    pagination: {
+      currentPage: number;
+      pageSize: number;
+      totalPages: number;
+      totalRecords: number;
+    };
+  };
+}

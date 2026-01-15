@@ -26,12 +26,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { salesSummaryService } from '@/api/services/salesSummaryService';
 import { categoryService } from '@/api/services/categoryService';
 import { productService } from '@/api/services/productService';
-import type { SalesSummaryResponse, SalesSummaryTableRow } from '@/types/sales-summary.types';
+import type { SalesSummaryResponse, VolumeWiseSummaryResponse } from '@/types/sales-summary.types';
 import type { Category } from '@/types/category.types';
 import type { Product } from '@/types/product.types';
 
 const SalesSummary = () => {
   const [salesResponse, setSalesResponse] = useState<SalesSummaryResponse | null>(null);
+  const [volumeWiseResponse, setVolumeWiseResponse] = useState<VolumeWiseSummaryResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // Filters
@@ -50,6 +51,10 @@ const SalesSummary = () => {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(20);
+  
+  // Volume-wise pagination
+  const [volumeWiseCurrentPage, setVolumeWiseCurrentPage] = useState(1);
+  const [volumeWisePageSize] = useState(20);
 
   // Fetch categories and products on mount
   useEffect(() => {
@@ -91,30 +96,55 @@ const SalesSummary = () => {
           pageSize,
         };
 
+        const volumeWiseQuery: any = {
+          page: volumeWiseCurrentPage,
+          pageSize: volumeWisePageSize,
+        };
+
         if (filterToday) {
           query.today = true;
+          volumeWiseQuery.today = true;
         } else {
-          if (dateFrom) query.fromDate = dateFrom;
-          if (dateTo) query.toDate = dateTo;
-          if (selectedYear && !dateFrom && !dateTo) query.year = selectedYear;
+          if (dateFrom) {
+            query.fromDate = dateFrom;
+            volumeWiseQuery.fromDate = dateFrom;
+          }
+          if (dateTo) {
+            query.toDate = dateTo;
+            volumeWiseQuery.toDate = dateTo;
+          }
+          if (selectedYear && !dateFrom && !dateTo) {
+            query.year = selectedYear;
+            volumeWiseQuery.year = selectedYear;
+          }
         }
 
         if (selectedCategory && selectedCategory !== "all") {
           query.categoryId = selectedCategory;
+          volumeWiseQuery.categoryId = selectedCategory;
         }
 
         if (selectedProduct && selectedProduct !== "all") {
           query.productId = selectedProduct;
+          volumeWiseQuery.productId = selectedProduct;
         }
 
-        const data = await salesSummaryService.getSalesSummary(query);
+        // Fetch both summaries in parallel
+        const [salesData, volumeWiseData] = await Promise.all([
+          salesSummaryService.getSalesSummary(query),
+          salesSummaryService.getVolumeWiseSummary(volumeWiseQuery),
+        ]);
 
         if (!cancelled) {
-          setSalesResponse(data);
+          setSalesResponse(salesData);
+          setVolumeWiseResponse(volumeWiseData);
         }
       } catch (err) {
         console.error('Failed to fetch sales summary', err);
-        if (!cancelled) setSalesResponse(null);
+        if (!cancelled) {
+          setSalesResponse(null);
+          setVolumeWiseResponse(null);
+        }
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -124,7 +154,7 @@ const SalesSummary = () => {
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [filterToday, selectedYear, dateFrom, dateTo, selectedCategory, selectedProduct, currentPage, pageSize]);
+  }, [filterToday, selectedYear, dateFrom, dateTo, selectedCategory, selectedProduct, currentPage, pageSize, volumeWiseCurrentPage, volumeWisePageSize]);
 
   // Clear filters
   const clearFilters = () => {
@@ -135,6 +165,7 @@ const SalesSummary = () => {
     setSelectedCategory("all");
     setSelectedProduct("all");
     setCurrentPage(1);
+    setVolumeWiseCurrentPage(1);
   };
 
   // Download CSV report
@@ -487,6 +518,112 @@ const SalesSummary = () => {
                         size="sm"
                         disabled={currentPage >= salesResponse.tableResponse.pagination.totalPages}
                         onClick={() => setCurrentPage(p => p + 1)}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center text-muted-foreground py-8">No data for selected filters</div>
+            )}
+          </LocalLoader>
+        </CardContent>
+      </Card>
+
+      {/* Volume-Wise Summary Table */}
+      <Card>
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="text-base md:text-lg">Volume-Wise Sales Summary</CardTitle>
+          <p className="text-xs md:text-sm text-muted-foreground mt-1">
+            Sales grouped by product and bottle size
+          </p>
+        </CardHeader>
+        <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
+          <LocalLoader
+            loaderKey="volume-wise-summary"
+            renderSkeleton={() => (
+              <div className="rounded-md border overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted">
+                    <tr>
+                      {Array.from({ length: 8 }).map((_, i) => (
+                        <th key={i} className="p-2">
+                          <Skeleton className="h-4 w-24" />
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from({ length: 6 }).map((_, r) => (
+                      <tr key={r} className="border-t">
+                        {Array.from({ length: 8 }).map((_, c) => (
+                          <td key={c} className="p-2">
+                            <Skeleton className="h-4 w-full" />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          >
+            {volumeWiseResponse?.tableResponse?.data && volumeWiseResponse.tableResponse.data.length > 0 ? (
+              <>
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date Range</TableHead>
+                        <TableHead>Product Name</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
+                        <TableHead>Volume</TableHead>
+                        <TableHead className="text-right">Revenue</TableHead>
+                        <TableHead className="text-right">Profit</TableHead>
+                        <TableHead className="text-right">Total Volume</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {volumeWiseResponse.tableResponse.data.map((row, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell className="font-medium">{row.dateRange}</TableCell>
+                          <TableCell>{row.productName}</TableCell>
+                          <TableCell>{row.categoryName}</TableCell>
+                          <TableCell className="text-right">{row.quantity}</TableCell>
+                          <TableCell>{row.volume}</TableCell>
+                          <TableCell className="text-right font-medium">Rs.{row.revenue.toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-medium">Rs.{row.profit.toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-bold text-primary">{row.totalVolume}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Pagination */}
+                {volumeWiseResponse.tableResponse.pagination.totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4">
+                    <div className="text-sm text-muted-foreground">
+                      Page {volumeWiseResponse.tableResponse.pagination.currentPage} of {volumeWiseResponse.tableResponse.pagination.totalPages} 
+                      {' '}({volumeWiseResponse.tableResponse.pagination.totalRecords} total records)
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={volumeWiseCurrentPage === 1}
+                        onClick={() => setVolumeWiseCurrentPage(p => Math.max(1, p - 1))}
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={volumeWiseCurrentPage >= volumeWiseResponse.tableResponse.pagination.totalPages}
+                        onClick={() => setVolumeWiseCurrentPage(p => p + 1)}
                       >
                         Next
                       </Button>
