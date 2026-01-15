@@ -404,6 +404,14 @@ const POS = () => {
                 <p className="text-sm">Focus on <strong>Search</strong> bar</p>
               </div>
               <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                <Badge variant="secondary" className="justify-center text-lg font-mono">↑ ↓ ← →</Badge>
+                <p className="text-sm">Navigate through <strong>products</strong> in all directions (2D grid navigation)</p>
+              </div>
+              <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                <Badge variant="secondary" className="justify-center text-lg font-mono">Enter</Badge>
+                <p className="text-sm">Add selected <strong>product to cart</strong> (when product is highlighted)</p>
+              </div>
+              <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
                 <Badge variant="secondary" className="justify-center text-lg font-mono">T</Badge>
                 <p className="text-sm">Toggle <strong>Tax</strong> rate (cycles: 0%, 5%, 10%, 15%)</p>
               </div>
@@ -417,7 +425,7 @@ const POS = () => {
               </div>
             </div>
             <div className="text-xs text-muted-foreground pt-2 border-t">
-              <p>💡 Tip: Shortcuts are disabled when typing in input fields or during payment processing.</p>
+              <p>💡 Tip: Use arrow keys (↑↓←→) after focusing search bar (press S) to navigate products like a 2D grid. Press Enter to add highlighted product to cart.</p>
             </div>
           </DialogContent>
         </Dialog>

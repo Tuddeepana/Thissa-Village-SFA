@@ -1,4 +1,4 @@
-import { useState, useMemo, forwardRef } from "react";
+import { useState, useMemo, forwardRef, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Search, Plus, AlertTriangle } from "lucide-react";
 import { Product } from "@/types/pos";
+import { toast } from "sonner";
 
 interface ProductSearchProps {
   products: Product[];
@@ -22,12 +23,35 @@ export const ProductSearch = forwardRef<HTMLInputElement, ProductSearchProps>(
   ({ products, onAddProduct }, ref) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedProductIndex, setSelectedProductIndex] = useState<number>(-1);
+  const productRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [gridColumns, setGridColumns] = useState<number>(4);
 
   // Extract unique categories
   const categories = useMemo(() => {
     const categorySet = new Set(products.map((p) => p.category));
     return ["all", ...Array.from(categorySet).sort()];
   }, [products]);
+
+  // Calculate grid columns based on window width
+  useEffect(() => {
+    const updateGridColumns = () => {
+      const width = window.innerWidth;
+      if (width < 768) {
+        setGridColumns(1); // mobile
+      } else if (width < 1024) {
+        setGridColumns(2); // md
+      } else if (width < 1280) {
+        setGridColumns(3); // lg
+      } else {
+        setGridColumns(4); // xl
+      }
+    };
+
+    updateGridColumns();
+    window.addEventListener('resize', updateGridColumns);
+    return () => window.removeEventListener('resize', updateGridColumns);
+  }, []);
 
   // Filter products based on search and category
   const filteredProducts = useMemo(() => {
@@ -44,6 +68,161 @@ export const ProductSearch = forwardRef<HTMLInputElement, ProductSearchProps>(
       return matchesSearch && matchesCategory;
     });
   }, [products, searchQuery, selectedCategory]);
+
+  // Reset selected index when filtered products change
+  useEffect(() => {
+    setSelectedProductIndex(-1);
+    productRefs.current = [];
+  }, [filteredProducts]);
+
+  // Handle keyboard navigation with 2D grid support
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle arrow keys and enter when search input is focused
+      const target = e.target as HTMLElement;
+      const isSearchInput = target === (ref as any)?.current;
+      
+      if (!isSearchInput || filteredProducts.length === 0) return;
+
+      const totalProducts = filteredProducts.length;
+      const currentRow = Math.floor(selectedProductIndex / gridColumns);
+      const currentCol = selectedProductIndex % gridColumns;
+      const totalRows = Math.ceil(totalProducts / gridColumns);
+
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setSelectedProductIndex((prev) => {
+            // If no selection, select first item
+            if (prev === -1) {
+              scrollToProduct(0);
+              return 0;
+            }
+            
+            // Move down one row
+            const nextIndex = prev + gridColumns;
+            
+            // If next row exists and has item at this column position
+            if (nextIndex < totalProducts) {
+              scrollToProduct(nextIndex);
+              return nextIndex;
+            }
+            
+            // Wrap to first row, same column (or first item if column doesn't exist)
+            const wrappedIndex = Math.min(currentCol, totalProducts - 1);
+            scrollToProduct(wrappedIndex);
+            return wrappedIndex;
+          });
+          break;
+
+        case 'ArrowUp':
+          e.preventDefault();
+          setSelectedProductIndex((prev) => {
+            // If no selection, select first item
+            if (prev === -1) {
+              scrollToProduct(0);
+              return 0;
+            }
+            
+            // Move up one row
+            const prevIndex = prev - gridColumns;
+            
+            // If previous row exists
+            if (prevIndex >= 0) {
+              scrollToProduct(prevIndex);
+              return prevIndex;
+            }
+            
+            // Wrap to last row, same column
+            const lastRowStartIndex = (totalRows - 1) * gridColumns;
+            const wrappedIndex = Math.min(lastRowStartIndex + currentCol, totalProducts - 1);
+            scrollToProduct(wrappedIndex);
+            return wrappedIndex;
+          });
+          break;
+
+        case 'ArrowRight':
+          e.preventDefault();
+          setSelectedProductIndex((prev) => {
+            // If no selection, select first item
+            if (prev === -1) {
+              scrollToProduct(0);
+              return 0;
+            }
+            
+            // Move right one column
+            const nextIndex = prev + 1;
+            
+            // If next item exists and is in the same row
+            if (nextIndex < totalProducts && Math.floor(nextIndex / gridColumns) === currentRow) {
+              scrollToProduct(nextIndex);
+              return nextIndex;
+            }
+            
+            // Wrap to beginning of current row
+            const rowStartIndex = currentRow * gridColumns;
+            scrollToProduct(rowStartIndex);
+            return rowStartIndex;
+          });
+          break;
+
+        case 'ArrowLeft':
+          e.preventDefault();
+          setSelectedProductIndex((prev) => {
+            // If no selection, select first item
+            if (prev === -1) {
+              scrollToProduct(0);
+              return 0;
+            }
+            
+            // Move left one column
+            const prevIndex = prev - 1;
+            
+            // If previous item exists and is in the same row
+            if (prevIndex >= 0 && Math.floor(prevIndex / gridColumns) === currentRow) {
+              scrollToProduct(prevIndex);
+              return prevIndex;
+            }
+            
+            // Wrap to end of current row
+            const rowStartIndex = currentRow * gridColumns;
+            const rowEndIndex = Math.min(rowStartIndex + gridColumns - 1, totalProducts - 1);
+            scrollToProduct(rowEndIndex);
+            return rowEndIndex;
+          });
+          break;
+
+        case 'Enter':
+          e.preventDefault();
+          if (selectedProductIndex >= 0 && selectedProductIndex < filteredProducts.length) {
+            const selectedProduct = filteredProducts[selectedProductIndex];
+            if (selectedProduct.stock > 0) {
+              onAddProduct(selectedProduct);
+              toast.success(`${selectedProduct.name} added to cart`);
+            } else {
+              toast.error(`${selectedProduct.name} is out of stock!`);
+            }
+          }
+          break;
+
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [filteredProducts, selectedProductIndex, onAddProduct, ref, gridColumns]);
+
+  // Scroll to the selected product
+  const scrollToProduct = (index: number) => {
+    if (productRefs.current[index]) {
+      productRefs.current[index]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
+  };
 
   const isLowStock = (product: Product) => {
     return product.stock <= product.minStock;
@@ -88,11 +267,16 @@ export const ProductSearch = forwardRef<HTMLInputElement, ProductSearchProps>(
             No products found
           </div>
         ) : (
-          filteredProducts.map((product) => (
+          filteredProducts.map((product, index) => (
             <Card
               key={product.id}
-              className={`hover:shadow-md transition-shadow ${
+              ref={(el) => (productRefs.current[index] = el)}
+              className={`hover:shadow-md transition-all ${
                 isOutOfStock(product) ? "opacity-50" : ""
+              } ${
+                selectedProductIndex === index
+                  ? "ring-2 ring-primary shadow-lg scale-105"
+                  : ""
               }`}
             >
               <CardContent className="p-4">
