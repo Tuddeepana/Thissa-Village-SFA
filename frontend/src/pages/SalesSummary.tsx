@@ -34,6 +34,7 @@ const SalesSummary = () => {
   const [salesResponse, setSalesResponse] = useState<SalesSummaryResponse | null>(null);
   const [volumeWiseResponse, setVolumeWiseResponse] = useState<VolumeWiseSummaryResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Filters
   const [dateFrom, setDateFrom] = useState("");
@@ -138,12 +139,14 @@ const SalesSummary = () => {
         if (!cancelled) {
           setSalesResponse(salesData);
           setVolumeWiseResponse(volumeWiseData);
+          setIsInitialLoad(false);
         }
       } catch (err) {
         console.error('Failed to fetch sales summary', err);
         if (!cancelled) {
           setSalesResponse(null);
           setVolumeWiseResponse(null);
+          setIsInitialLoad(false);
         }
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -223,7 +226,23 @@ const SalesSummary = () => {
 
 
   return (
-    <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
+    <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6 relative">
+      {/* Loading Overlay for Filter Changes */}
+      {isLoading && !isInitialLoad && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-card p-8 rounded-lg shadow-xl border flex flex-col items-center gap-4">
+            <div className="relative">
+              <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary/30"></div>
+              <div className="animate-spin rounded-full h-16 w-16 border-4 border-t-primary absolute inset-0"></div>
+            </div>
+            <div className="text-center">
+              <p className="text-base font-semibold mb-1">Loading Sales Data</p>
+              <p className="text-sm text-muted-foreground">Please wait...</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -244,12 +263,12 @@ const SalesSummary = () => {
         renderSkeleton={() => (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i}>
+              <Card key={i} className="animate-pulse">
                 <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
                   <Skeleton className="h-4 w-28" />
                 </CardHeader>
                 <CardContent className="p-3 md:p-4 pt-0">
-                  <Skeleton className="h-6 w-24" />
+                  <Skeleton className="h-8 w-24" />
                 </CardContent>
               </Card>
             ))}
@@ -444,21 +463,25 @@ const SalesSummary = () => {
                 <table className="w-full text-sm">
                   <thead className="bg-muted">
                     <tr>
-                      {Array.from({ length: 7 }).map((_, i) => (
-                        <th key={i} className="p-2">
-                          <Skeleton className="h-4 w-24" />
-                        </th>
-                      ))}
+                      <th className="p-3 text-left font-medium"><Skeleton className="h-4 w-16" /></th>
+                      <th className="p-3 text-left font-medium"><Skeleton className="h-4 w-28" /></th>
+                      <th className="p-3 text-left font-medium"><Skeleton className="h-4 w-20" /></th>
+                      <th className="p-3 text-right font-medium"><Skeleton className="h-4 w-12 ml-auto" /></th>
+                      <th className="p-3 text-right font-medium"><Skeleton className="h-4 w-16 ml-auto" /></th>
+                      <th className="p-3 text-right font-medium"><Skeleton className="h-4 w-16 ml-auto" /></th>
+                      <th className="p-3 text-right font-medium"><Skeleton className="h-4 w-14 ml-auto" /></th>
                     </tr>
                   </thead>
                   <tbody>
                     {Array.from({ length: 6 }).map((_, r) => (
-                      <tr key={r} className="border-t">
-                        {Array.from({ length: 7 }).map((_, c) => (
-                          <td key={c} className="p-2">
-                            <Skeleton className="h-4 w-full" />
-                          </td>
-                        ))}
+                      <tr key={r} className="border-t animate-pulse">
+                        <td className="p-3"><Skeleton className="h-4 w-20" /></td>
+                        <td className="p-3"><Skeleton className="h-4 w-32" /></td>
+                        <td className="p-3"><Skeleton className="h-4 w-24" /></td>
+                        <td className="p-3 text-right"><Skeleton className="h-4 w-8 ml-auto" /></td>
+                        <td className="p-3 text-right"><Skeleton className="h-4 w-12 ml-auto" /></td>
+                        <td className="p-3 text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                        <td className="p-3 text-right"><Skeleton className="h-4 w-12 ml-auto" /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -548,21 +571,27 @@ const SalesSummary = () => {
                 <table className="w-full text-sm">
                   <thead className="bg-muted">
                     <tr>
-                      {Array.from({ length: 8 }).map((_, i) => (
-                        <th key={i} className="p-2">
-                          <Skeleton className="h-4 w-24" />
-                        </th>
-                      ))}
+                      <th className="p-3 text-left font-medium"><Skeleton className="h-4 w-24" /></th>
+                      <th className="p-3 text-left font-medium"><Skeleton className="h-4 w-28" /></th>
+                      <th className="p-3 text-left font-medium"><Skeleton className="h-4 w-20" /></th>
+                      <th className="p-3 text-right font-medium"><Skeleton className="h-4 w-12 ml-auto" /></th>
+                      <th className="p-3 text-left font-medium"><Skeleton className="h-4 w-16" /></th>
+                      <th className="p-3 text-right font-medium"><Skeleton className="h-4 w-16 ml-auto" /></th>
+                      <th className="p-3 text-right font-medium"><Skeleton className="h-4 w-14 ml-auto" /></th>
+                      <th className="p-3 text-right font-medium"><Skeleton className="h-4 w-24 ml-auto" /></th>
                     </tr>
                   </thead>
                   <tbody>
                     {Array.from({ length: 6 }).map((_, r) => (
-                      <tr key={r} className="border-t">
-                        {Array.from({ length: 8 }).map((_, c) => (
-                          <td key={c} className="p-2">
-                            <Skeleton className="h-4 w-full" />
-                          </td>
-                        ))}
+                      <tr key={r} className="border-t animate-pulse">
+                        <td className="p-3"><Skeleton className="h-4 w-32" /></td>
+                        <td className="p-3"><Skeleton className="h-4 w-32" /></td>
+                        <td className="p-3"><Skeleton className="h-4 w-24" /></td>
+                        <td className="p-3 text-right"><Skeleton className="h-4 w-8 ml-auto" /></td>
+                        <td className="p-3"><Skeleton className="h-4 w-16" /></td>
+                        <td className="p-3 text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                        <td className="p-3 text-right"><Skeleton className="h-4 w-12 ml-auto" /></td>
+                        <td className="p-3 text-right"><Skeleton className="h-4 w-20 ml-auto" /></td>
                       </tr>
                     ))}
                   </tbody>
