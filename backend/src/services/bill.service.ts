@@ -75,19 +75,18 @@ class BillService {
       productId: rec.productId,
       name: rec.product?.name ?? null,
       categoryName: rec.product?.category?.name ?? null,
-      litres: rec.product?.litres !== undefined ? String(rec.product.litres) : null,
-      bottle_volume: rec.product?.bottle_volume ?? null,
       cost_price: rec.product?.cost_price !== undefined ? String(rec.product.cost_price) : null,
-      selling_price: rec.product?.selling_price !== undefined ? String(rec.product.selling_price) : null,
+      foreigner_price: rec.product?.foreigner_price !== undefined ? String(rec.product.foreigner_price) : null,
+      local_price: rec.product?.local_price !== undefined ? String(rec.product.local_price) : null,
       quantity_moved: rec.quantity_moved,
     }));
 
-    // Try compute subtotal from item selling prices when available
+    // Try compute subtotal from item foreigner prices when available (default)
     let subtotalFromItems = 0;
     let computedFromItems = false;
     for (const it of items) {
-      if (it.selling_price !== null && it.selling_price !== undefined) {
-        const price = Number(it.selling_price);
+      if (it.foreigner_price !== null && it.foreigner_price !== undefined) {
+        const price = Number(it.foreigner_price);
         if (!Number.isNaN(price)) {
           subtotalFromItems += price * Math.abs(it.quantity_moved ?? 0);
           computedFromItems = true;

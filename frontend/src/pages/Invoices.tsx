@@ -21,11 +21,9 @@ interface ApiProduct {
   category?: string;
   categoryName?: string;
   quantity_moved?: number;
-  selling_price?: number;
+  foreigner_price?: number;
+  local_price?: number;
   cost_price?: number;
-  // Optional size fields from backend used for CSV export
-  litres?: number | null;
-  bottle_volume?: string | null;
 }
 
 interface ApiInvoice {
@@ -112,28 +110,24 @@ const Invoices = () => {
     const all: ApiInvoice[] = res.data?.tableResponse?.data ?? res.data?.data ?? [];
 
       // Flatten product rows with required columns
-      type Row = { date: string; category: string; product: string; quantity: number; sellingPrice: number; costPrice: number; bottleVolume: string; litersPerUnit: number };
+      type Row = { date: string; category: string; product: string; quantity: number; foreignerPrice: number; localPrice: number; costPrice: number };
       const rows: Row[] = [];
 
       for (const inv of all) {
         const invDate = inv.invoiceDate ? new Date(inv.invoiceDate) : new Date();
         for (const p of (inv.products || [])) {
           const qty = Number(p.quantity_moved ?? 0);
-          const sp = Number(p.selling_price ?? 0);
+          const fp = Number(p.foreigner_price ?? 0);
+          const lp = Number(p.local_price ?? 0);
           const cp = Number(p.cost_price ?? 0);
-          const litresRaw = p.litres !== undefined && p.litres !== null ? Number(p.litres) : 0 as number;
-          const unit = String(p.bottle_volume ?? '').toUpperCase();
-          const bottleVolume = `${litresRaw} ${unit.toLowerCase()}`;
-          const litersPerUnit = unit === 'ML' ? litresRaw / 1000 : litresRaw;
           rows.push({
             date: format(invDate, 'yyyy-MM-dd'),
             category: p.categoryName ?? 'Uncategorized',
             product: p.name ?? '',
             quantity: qty,
-            sellingPrice: sp,
+            foreignerPrice: fp,
+            localPrice: lp,
             costPrice: cp,
-            bottleVolume,
-            litersPerUnit,
           });
         }
       }
@@ -143,9 +137,9 @@ const Invoices = () => {
         'Category',
         'Product Name',
         'Quantity',
-        'Selling Price',
+        'Foreigner Price',
+        'Local Price',
         'Cost Price',
-        'Bottle Volume',
       ];
 
       const detailsData = rows.map(r => [
@@ -153,30 +147,30 @@ const Invoices = () => {
         r.category,
         r.product,
         String(r.quantity),
-        r.sellingPrice.toFixed(2),
+        r.foreignerPrice.toFixed(2),
+        r.localPrice.toFixed(2),
         r.costPrice.toFixed(2),
-        r.bottleVolume,
       ]);
 
       // Build category summary
-      type Agg = { volumeL: number; selling: number; cost: number };
+      type Agg = { foreignerTotal: number; localTotal: number; cost: number };
       const byCat = new Map<string, Agg>();
       for (const r of rows) {
-        const a = byCat.get(r.category) ?? { volumeL: 0, selling: 0, cost: 0 };
-        a.volumeL += r.quantity * r.litersPerUnit;
-        a.selling += r.quantity * r.sellingPrice;
+        const a = byCat.get(r.category) ?? { foreignerTotal: 0, localTotal: 0, cost: 0 };
+        a.foreignerTotal += r.quantity * r.foreignerPrice;
+        a.localTotal += r.quantity * r.localPrice;
         a.cost += r.quantity * r.costPrice;
         byCat.set(r.category, a);
       }
 
-      const summaryHeaders = ['Category', 'Total Volume (L)', 'Total Selling Price', 'Total Cost Price', 'Profit'];
+      const summaryHeaders = ['Category', 'Total Foreigner Price', 'Total Local Price', 'Total Cost Price'];
       const summaryRows: string[][] = [];
-      let totalVol = 0, totalSell = 0, totalCost = 0;
+      let totalForeigner = 0, totalLocal = 0, totalCost = 0;
       for (const [cat, a] of Array.from(byCat.entries()).sort((a,b)=>a[0].localeCompare(b[0]))) {
-        totalVol += a.volumeL; totalSell += a.selling; totalCost += a.cost;
-        summaryRows.push([cat, a.volumeL.toFixed(2), a.selling.toFixed(2), a.cost.toFixed(2), (a.selling - a.cost).toFixed(2)]);
+        totalForeigner += a.foreignerTotal; totalLocal += a.localTotal; totalCost += a.cost;
+        summaryRows.push([cat, a.foreignerTotal.toFixed(2), a.localTotal.toFixed(2), a.cost.toFixed(2)]);
       }
-      const grandRow = ['TOTAL', totalVol.toFixed(2), totalSell.toFixed(2), totalCost.toFixed(2), (totalSell - totalCost).toFixed(2)];
+      const grandRow = ['TOTAL', totalForeigner.toFixed(2), totalLocal.toFixed(2), totalCost.toFixed(2)];
 
       const csvParts: string[] = [];
       csvParts.push(detailsHeaders.join(','));
@@ -187,32 +181,32 @@ const Invoices = () => {
       csvParts.push(...summaryRows.map(row => row.map(cell => `"${cell}"`).join(',')));
       csvParts.push(grandRow.map(cell => `"${cell}"`).join(','));
 
-      // Product + Bottle Size Summary (total quantity of each product-bottle combination)
-      const productBottleHeaders = ['Product', 'Bottle Size', 'Total Quantity', 'Total Selling Price', 'Total Cost Price', 'Profit'];
-      const byProductBottle = new Map<string, { product: string; bottle: string; qty: number; selling: number; cost: number }>();
+      // Product Summary (total quantity of each product)
+      const productHeaders = ['Product', 'Total Quantity', 'Total Foreigner Price', 'Total Local Price', 'Total Cost Price'];
+      const byProduct = new Map<string, { product: string; qty: number; foreigner: number; local: number; cost: number }>();
       for (const r of rows) {
-        const key = `${r.product}||${r.bottleVolume}`;
-        const cur = byProductBottle.get(key) ?? { product: r.product, bottle: r.bottleVolume, qty: 0, selling: 0, cost: 0 };
+        const key = r.product;
+        const cur = byProduct.get(key) ?? { product: r.product, qty: 0, foreigner: 0, local: 0, cost: 0 };
         cur.qty += r.quantity;
-        cur.selling += r.quantity * r.sellingPrice;
+        cur.foreigner += r.quantity * r.foreignerPrice;
+        cur.local += r.quantity * r.localPrice;
         cur.cost += r.quantity * r.costPrice;
-        byProductBottle.set(key, cur);
+        byProduct.set(key, cur);
       }
-      const productBottleRows = Array.from(byProductBottle.values())
-        .sort((a, b) => a.product.localeCompare(b.product) || a.bottle.localeCompare(b.bottle))
-        .map(({ product, bottle, qty, selling, cost }) => [
+      const productRows = Array.from(byProduct.values())
+        .sort((a, b) => a.product.localeCompare(b.product))
+        .map(({ product, qty, foreigner, local, cost }) => [
           product,
-          bottle,
           String(qty),
-          selling.toFixed(2),
+          foreigner.toFixed(2),
+          local.toFixed(2),
           cost.toFixed(2),
-          (selling - cost).toFixed(2),
         ]);
 
       csvParts.push('');
-      csvParts.push('Product + Bottle Size Summary');
-      csvParts.push(productBottleHeaders.join(','));
-      csvParts.push(...productBottleRows.map(row => row.map(cell => `"${cell}"`).join(',')));
+      csvParts.push('Product Summary');
+      csvParts.push(productHeaders.join(','));
+      csvParts.push(...productRows.map(row => row.map(cell => `"${cell}"`).join(',')));
 
       const csvContent = csvParts.join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -249,13 +243,9 @@ const Invoices = () => {
     const data: ApiInvoice[] = payload.tableResponse?.data || payload.data || [];
       const mapped: Invoice[] = data.map((inv: ApiInvoice) => {
         const items = (inv.products || []).map((p: ApiProduct) => {
-          const unit = Number(p.selling_price ?? p.cost_price ?? 0);
+          const unit = Number(p.cost_price ?? 0);
           const cost = p.cost_price !== undefined && p.cost_price !== null ? Number(p.cost_price) : undefined;
           const qty = Number(p.quantity_moved ?? 0);
-          const litresRaw = p.litres !== undefined && p.litres !== null ? Number(p.litres) : 0;
-          const unitKey = String(p.bottle_volume ?? '').toUpperCase();
-          const litersPerUnit = unitKey === 'ML' ? litresRaw / 1000 : litresRaw;
-          const bottleVolume = litresRaw ? `${litresRaw} ${unitKey.toLowerCase()}` : undefined;
           return {
             productId: p.productId,
             productName: p.name ?? '',
@@ -264,8 +254,6 @@ const Invoices = () => {
             unitPrice: unit,
             costPrice: cost,
             total: unit * qty,
-            litersPerUnit,
-            bottleVolume,
           };
         });
 

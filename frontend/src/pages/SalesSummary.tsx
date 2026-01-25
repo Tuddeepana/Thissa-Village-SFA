@@ -175,14 +175,15 @@ const SalesSummary = () => {
   const downloadReport = () => {
     try {
       const rows = salesResponse?.tableResponse?.data || [];
-      const headers = ['Date', 'Product Name', 'Category', 'Quantity', 'Volume', 'Revenue', 'Profit'];
-      
+      const headers = ['Date', 'Product Name', 'Category', 'Quantity', 'Foreigner Price', 'Local Price', 'Revenue', 'Profit'];
+
       const csvRows = rows.map(row => [
         row.date,
         row.productName,
         row.categoryName,
         row.quantity.toString(),
-        row.volume,
+        row.foreignerPrice.toFixed(2),
+        row.localPrice.toFixed(2),
         row.revenue.toFixed(2),
         row.profit.toFixed(2),
       ]);
@@ -194,7 +195,8 @@ const SalesSummary = () => {
         '',
         '',
         cards?.totalQuantity.toString() || '0',
-        cards?.totalVolume || '0 L',
+        '',
+        '',
         cards?.totalRevenue.toFixed(2) || '0.00',
         cards?.totalProfit.toFixed(2) || '0.00',
       ];
@@ -286,20 +288,6 @@ const SalesSummary = () => {
             <CardContent className="p-3 md:p-4 pt-0">
               <div className="text-xl md:text-2xl font-bold">
                 {salesResponse?.cardResponse?.totalQuantity || 0}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
-              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground flex items-center gap-1">
-                <Package className="h-3 w-3" />
-                Total Volume
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 md:p-4 pt-0">
-              <div className="text-xl md:text-2xl font-bold">
-                {salesResponse?.cardResponse?.totalVolume || '0 L'}
               </div>
             </CardContent>
           </Card>
@@ -499,7 +487,8 @@ const SalesSummary = () => {
                         <TableHead>Product Name</TableHead>
                         <TableHead>Category</TableHead>
                         <TableHead className="text-right">Qty</TableHead>
-                        <TableHead>Volume</TableHead>
+                        <TableHead className="text-right">Foreigner Price</TableHead>
+                        <TableHead className="text-right">Local Price</TableHead>
                         <TableHead className="text-right">Revenue</TableHead>
                         <TableHead className="text-right">Profit</TableHead>
                       </TableRow>
@@ -511,7 +500,8 @@ const SalesSummary = () => {
                           <TableCell>{row.productName}</TableCell>
                           <TableCell>{row.categoryName}</TableCell>
                           <TableCell className="text-right">{row.quantity}</TableCell>
-                          <TableCell>{row.volume}</TableCell>
+                          <TableCell className="text-right">Rs.{row.foreignerPrice.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">Rs.{row.localPrice.toFixed(2)}</TableCell>
                           <TableCell className="text-right font-medium">Rs.{row.revenue.toFixed(2)}</TableCell>
                           <TableCell className="text-right font-medium">Rs.{row.profit.toFixed(2)}</TableCell>
                         </TableRow>
@@ -609,10 +599,10 @@ const SalesSummary = () => {
                         <TableHead>Product Name</TableHead>
                         <TableHead>Category</TableHead>
                         <TableHead className="text-right">Qty</TableHead>
-                        <TableHead>Volume</TableHead>
+                        <TableHead className="text-right">Foreigner Price</TableHead>
+                        <TableHead className="text-right">Local Price</TableHead>
                         <TableHead className="text-right">Revenue</TableHead>
                         <TableHead className="text-right">Profit</TableHead>
-                        <TableHead className="text-right">Total Volume</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -622,10 +612,10 @@ const SalesSummary = () => {
                           <TableCell>{row.productName}</TableCell>
                           <TableCell>{row.categoryName}</TableCell>
                           <TableCell className="text-right">{row.quantity}</TableCell>
-                          <TableCell>{row.volume}</TableCell>
+                          <TableCell className="text-right">Rs.{row.foreignerPrice.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">Rs.{row.localPrice.toFixed(2)}</TableCell>
                           <TableCell className="text-right font-medium">Rs.{row.revenue.toFixed(2)}</TableCell>
                           <TableCell className="text-right font-medium">Rs.{row.profit.toFixed(2)}</TableCell>
-                          <TableCell className="text-right font-bold text-primary">{row.totalVolume}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

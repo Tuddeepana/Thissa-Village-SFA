@@ -2,13 +2,11 @@ export interface Product {
   id: string;
   name: string;
   category: string;
-  price: number;
+  foreignerPrice: number; // Selling price for foreigners
+  localPrice: number; // Selling price for locals
   cost: number; // Cost price for profit calculation
   stock: number;
   minStock: number; // Minimum stock level for warnings
-  // Optional bottle volume label (e.g., "750 ml" or "1 L")
-  bottleVolume?: string;
-  barcode?: string;
   image?: string;
   description?: string;
   createdAt: Date;

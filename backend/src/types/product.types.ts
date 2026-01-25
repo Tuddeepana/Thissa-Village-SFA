@@ -1,15 +1,11 @@
-import { BottleVolume } from '@prisma/client';
-
 export interface ProductDTO {
   id: string;
   name: string;
   description?: string | null;
-  barcode?: string | null;
-  litres: string; // Prisma Decimal serialized as string
   cost_price: string; // Decimal
-  selling_price: string; // Decimal
-  bottle_volume: BottleVolume;
-  low_stock: number;
+  foreigner_price: string; // Decimal
+  local_price: string; // Decimal
+  low_stock?: number | null;
   categoryId: string;
   categoryName?: string;
   createdAt: Date;
@@ -19,24 +15,20 @@ export interface ProductDTO {
 export type ProductCreateInput = {
   name: string;
   description?: string | null;
-  barcode?: string | null;
-  litres: number | string;
   cost_price: number | string;
-  selling_price: number | string;
-  bottle_volume?: BottleVolume;
-  low_stock: number;
+  foreigner_price: number | string;
+  local_price: number | string;
+  low_stock?: number | null;
   categoryId: string;
 };
 
 export type ProductUpdateInput = Partial<{
   name: string;
   description: string | null;
-  barcode: string | null;
-  litres: number | string;
   cost_price: number | string;
-  selling_price: number | string;
-  bottle_volume?: BottleVolume;
-  low_stock: number;
+  foreigner_price: number | string;
+  local_price: number | string;
+  low_stock: number | null;
   categoryId: string;
 }>;
 

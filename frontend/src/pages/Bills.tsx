@@ -188,26 +188,22 @@ const Bills = () => {
         // Map to the frontend Bill shape used in the modal
         const mappedItems = (detailed.Items || []).map((it: any) => {
           const qty = Math.abs(Number(it.quantity_moved || 0));
-          const price = it.selling_price !== undefined && it.selling_price !== null ? Number(it.selling_price) : 0;
-          // Build bottle volume label from litres and unit (ML/L)
-          const litresRaw = it.litres !== undefined && it.litres !== null ? Number(it.litres) : undefined;
-          const unitKey = String(it.bottle_volume ?? '').toUpperCase();
-          const bottleVolume = litresRaw !== undefined && !isNaN(litresRaw)
-            ? `${litresRaw} ${unitKey.toLowerCase()}`
-            : undefined;
+          // Use the price that was used for this sale (could be foreigner or local)
+          const price = it.unit_price !== undefined && it.unit_price !== null
+            ? Number(it.unit_price)
+            : (it.foreigner_price !== undefined ? Number(it.foreigner_price) : 0);
           return {
             product: {
               id: it.productId || it.productId || 'unknown',
               name: it.name || it.productName || 'Unknown Product',
               category: it.categoryName || it.category || 'General',
-              price: price,
+              foreignerPrice: it.foreigner_price !== undefined ? Number(it.foreigner_price) : price,
+              localPrice: it.local_price !== undefined ? Number(it.local_price) : price,
               cost: it.cost_price !== undefined && it.cost_price !== null ? Number(it.cost_price) : price * 0.7,
               stock: 0,
               minStock: 0,
               createdAt: new Date(),
               updatedAt: new Date(),
-              // Attach bottle volume for display
-              bottleVolume,
             },
             quantity: qty,
             subtotal: +(price * qty),

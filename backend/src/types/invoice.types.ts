@@ -49,10 +49,9 @@ export type InvoiceProductDetail = {
   productId: string;
   name?: string | null;
   categoryName?: string | null;
-  litres?: string | null; // Decimal as string
-  bottle_volume?: string | null;
   cost_price?: string | null;
-  selling_price?: string | null;
+  foreigner_price?: string | null;
+  local_price?: string | null;
   quantity_moved: number;
 };
 

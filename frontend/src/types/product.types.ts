@@ -2,41 +2,35 @@ export type Product = {
   id: string;
   name: string;
   description?: string | null;
-  barcode?: string | null;
   // Decimal fields are serialized as strings from backend; handle as string in UI and coerce as needed
-  litres: string; // stored as litres (e.g., "0.75")
   cost_price: string;
-  selling_price: string;
-  low_stock: number;
+  foreigner_price: string;
+  local_price: string;
+  low_stock?: number | null;
   categoryId: string;
   categoryName?: string;
   createdAt?: string;
   updatedAt?: string;
-  bottle_volume?: 'L' | 'ML' | string;
 };
 
 export type CreateProductPayload = {
   name: string;
   description?: string | null;
-  barcode?: string | null;
-  litres: string; // send as string
   cost_price: string; // send as string
-  selling_price: string; // send as string
-  low_stock: number;
+  foreigner_price: string; // send as string
+  local_price: string; // send as string
+  low_stock?: number | null;
   categoryId: string;
-  bottle_volume?: 'L' | 'ML' | string;
 };
 
 export type UpdateProductPayload = Partial<{
   name: string;
   description?: string | null;
-  barcode?: string | null;
-  litres: string;
   cost_price: string;
-  selling_price: string;
-  low_stock: number;
+  foreigner_price: string;
+  local_price: string;
+  low_stock: number | null;
   categoryId: string;
-  bottle_volume?: 'L' | 'ML' | string;
 }>;
 
 export type ProductListQuery = {
