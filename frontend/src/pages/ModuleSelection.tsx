@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { STORAGE_KEYS, ROLES } from "@/utils/constants";
 import { User } from "@/types/user.types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Wine, ShoppingCart, LayoutDashboard, Package, FileText, AlertCircle } from "lucide-react";
+import { ChefHat, ShoppingCart, LayoutDashboard, Package, FileText, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const ModuleSelection = () => {
@@ -38,10 +38,10 @@ const ModuleSelection = () => {
         <div className="text-center space-y-2">
           <div className="flex justify-center mb-4">
             <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center">
-              <Wine className="w-8 h-8 text-primary-foreground" />
+              <ChefHat className="w-8 h-8 text-primary-foreground" />
             </div>
           </div>
-          <h1 className="text-4xl font-bold text-primary">Welcome to Thissa Village</h1>
+          <h1 className="text-4xl font-bold text-primary">Welcome to Tasty Corner</h1>
           <p className="text-muted-foreground text-lg">Select a module to continue</p>
         </div>
 

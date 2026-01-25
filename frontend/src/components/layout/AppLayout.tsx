@@ -56,7 +56,7 @@ const AppLayout = () => {
                 Modules
               </Button>
               <h2 className="text-sm md:text-lg font-semibold text-foreground truncate">
-                Wine Management
+                Restaurant Management
               </h2>
             </div>
             <div className="flex items-center gap-2">

@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
     LayoutDashboard,
-    Wine,
+    ChefHat,
     Package,
     FileText,
     ShoppingCart,
@@ -58,10 +58,10 @@ export function AppSidebar() {
         <div className="p-4 md:p-6 border-b">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <Wine className="w-6 h-6 text-primary-foreground" />
+              <ChefHat className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-bold text-base md:text-lg text-foreground">Thissa Village</h1>
+              <h1 className="font-bold text-base md:text-lg text-foreground">Tasty Corner</h1>
               <p className="text-xs text-muted-foreground">{moduleLabel}</p>
             </div>
           </div>
