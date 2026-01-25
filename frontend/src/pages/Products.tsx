@@ -21,7 +21,7 @@ import {
 import { Pencil, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { DeleteButton } from "@/components/common";
+import { DeleteButton, BarcodeScanner } from "@/components/common";
 import LocalLoader from "@/components/common/LocalLoader";
 import { useQuery } from "@tanstack/react-query";
 import { productService } from "@/api/services/productService";
@@ -57,6 +57,8 @@ const Products = () => {
     const [editingSellingPrice, setEditingSellingPrice] = useState<number | "">("");
     const [editingBottleSize, setEditingBottleSize] = useState("");
     const [editingBottleUnit, setEditingBottleUnit] = useState("ml");
+    const [editingBarcode, setEditingBarcode] = useState("");
+
     // Controlled form state for minimal add form
     const [newName, setNewName] = useState("");
     const [newCategory, setNewCategory] = useState("");
@@ -65,6 +67,7 @@ const Products = () => {
     const [newSellingPrice, setNewSellingPrice] = useState<number | "">("");
     const [newBottleSize, setNewBottleSize] = useState(""); // New state for bottle size
     const [newBottleUnit, setNewBottleUnit] = useState("ml"); // New state for bottle unit
+    const [newBarcode, setNewBarcode] = useState(""); // New state for barcode
 
     const handleDelete = async (id: string) => {
         try {
@@ -94,6 +97,7 @@ const Products = () => {
         setEditingBottleSize(product.litres ?? "");
         const unit = (product.bottle_volume ?? "ML").toString().toLowerCase();
         setEditingBottleUnit(unit === "l" ? "l" : "ml");
+        setEditingBarcode(product.barcode ?? "");
     };
 
     const cancelEditing = () => {
@@ -103,6 +107,7 @@ const Products = () => {
         setEditingSellingPrice("");
         setEditingBottleSize(""); // Clear bottle size on cancel
         setEditingBottleUnit("ml"); // Reset bottle unit on cancel
+        setEditingBarcode(""); // Clear barcode on cancel
     };
 
     const toLitresString = (sizeStr: string, unit: string) => {
@@ -127,6 +132,7 @@ const Products = () => {
                 selling_price: Number.isNaN(sellingPriceNum) ? undefined : sellingPriceNum.toFixed(2),
                 litres: litresStr,
                 bottle_volume,
+                barcode: editingBarcode || null,
             });
             toast({ title: "Updated", description: "Product details updated" });
             setEditingId(null);
@@ -135,6 +141,7 @@ const Products = () => {
             setEditingSellingPrice("");
             setEditingBottleSize("");
             setEditingBottleUnit("ml");
+            setEditingBarcode("");
             refetchProducts();
         } catch (e: any) {
             toast({ title: "Error", description: e?.response?.data?.message ?? "Failed to update product" });
@@ -149,6 +156,7 @@ const Products = () => {
         setNewSellingPrice("");
         setNewBottleSize("");
         setNewBottleUnit("ml");
+        setNewBarcode("");
     };
 
     // Pagination
@@ -220,6 +228,7 @@ const Products = () => {
                 low_stock: Number.isNaN(alertLevel) ? 0 : alertLevel,
                 bottle_volume,
                 categoryId: newCategory,
+                barcode: newBarcode || null,
             });
             toast({ title: "Added", description: "Product added successfully" });
             resetForm();
@@ -272,6 +281,13 @@ const Products = () => {
                                     onChange={(e) => setNewName(e.target.value)}
                                 />
                             </div>
+
+                            <BarcodeScanner
+                                value={newBarcode}
+                                onChange={setNewBarcode}
+                                label="Barcode (Optional)"
+                                placeholder="Scan or enter barcode"
+                            />
 
                             <div className="space-y-2">
                                 <Label htmlFor="costPrice">Product Price</Label>
@@ -360,6 +376,7 @@ const Products = () => {
                             <TableRow>
                                 <TableHead>Name</TableHead>
                                 <TableHead>Category</TableHead>
+                                <TableHead>Barcode</TableHead>
                                 <TableHead>Bottle Size</TableHead>
                                 <TableHead>Product Price</TableHead>
                                 <TableHead>Selling Price</TableHead>
@@ -372,6 +389,18 @@ const Products = () => {
                                 <TableRow key={product.id}>
                                     <TableCell className="font-medium">{product.name}</TableCell>
                                     <TableCell>{categoryNameById[product.categoryId] ?? "-"}</TableCell>
+                                    <TableCell>
+                                        {editingId === product.id ? (
+                                            <Input
+                                                className="w-32"
+                                                value={editingBarcode}
+                                                onChange={(e) => setEditingBarcode(e.target.value)}
+                                                placeholder="Barcode"
+                                            />
+                                        ) : (
+                                            product.barcode || "-"
+                                        )}
+                                    </TableCell>
                                     <TableCell>
                                         {editingId === product.id ? (
                                             <div className="flex gap-2">

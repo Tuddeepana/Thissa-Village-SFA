@@ -18,6 +18,7 @@ export const createProductSchema = z.object({
 export const updateProductSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional().nullable(),
+  barcode: z.string().optional().nullable(),
   litres: decimalNumber.min(0, 'Litres must be >= 0').optional(),
   cost_price: decimalNumber.min(0, 'Cost price must be >= 0').optional(),
   selling_price: decimalNumber.min(0, 'Selling price must be >= 0').optional(),

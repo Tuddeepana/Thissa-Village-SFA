@@ -196,10 +196,7 @@ export function InvoiceTable({
                   <p className="text-base capitalize">{selectedInvoice.status}</p>
                 </div>
                 
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Payment Method</p>
-                  <p className="text-base capitalize">{selectedInvoice.paymentMethod}</p>
-                </div>
+                
                 
               </div>
 
@@ -272,7 +269,14 @@ export function InvoiceTable({
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Discount</span>
-                  <span>Rs. {selectedInvoice.discount.toFixed(2)}</span>
+                  {(() => {
+                    const discountPercent = selectedInvoice.subtotal > 0 ? (selectedInvoice.discount / selectedInvoice.subtotal) * 100 : 0;
+                    return (
+                      <span>
+                        {discountPercent.toFixed(2)}% (Rs. {selectedInvoice.discount.toFixed(2)})
+                      </span>
+                    );
+                  })()}
                 </div>
                 <div className="flex justify-between text-lg font-bold border-t pt-2">
                   <span>Total</span>

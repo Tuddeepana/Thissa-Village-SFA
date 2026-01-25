@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,33 +12,30 @@ import {
   User,
   Lock,
   Mail,
-  Phone,
   Calendar,
   Shield,
   CheckCircle2,
   AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
+import { authService } from "@/api/services/authService";
+import api from "@/api/client";
 
-interface UserProfile {
-  username: string;
+type BackendUser = {
+  id: string;
   email: string;
-  phone: string;
-  role: string;
-  createdAt: Date;
-  lastLogin: Date;
-}
+  name: string;
+  nic: string;
+  role: 'ADMIN' | 'CASHIER';
+  status: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
 
 const Profile = () => {
-  // Mock user data - in real app, this would come from auth context/API
-  const [user, setUser] = useState<UserProfile>({
-    username: "admin",
-    email: "admin@vinopro.com",
-    phone: "+94 77 123 4567",
-    role: "Administrator",
-    createdAt: new Date("2024-01-15"),
-    lastLogin: new Date(),
-  });
+  const [user, setUser] = useState<BackendUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Password change states
   const [currentPassword, setCurrentPassword] = useState("");
@@ -51,8 +48,40 @@ const Profile = () => {
 
   // Profile edit states
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [editedEmail, setEditedEmail] = useState(user.email);
-  const [editedPhone, setEditedPhone] = useState(user.phone);
+  const [editedEmail, setEditedEmail] = useState('');
+  const [editedName, setEditedName] = useState('');
+  const [editedNic, setEditedNic] = useState('');
+
+  const roleLabel = useMemo(() => {
+    if (!user) return '';
+    return user.role === 'ADMIN' ? 'Administrator' : 'Cashier';
+  }, [user]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setLoadError(null);
+        const me = await authService.me();
+        if (!mounted) return;
+
+        setUser(me as BackendUser);
+        setEditedEmail(me.email ?? '');
+        setEditedName(me.name ?? '');
+        setEditedNic(me.nic ?? '');
+      } catch (err: any) {
+        if (!mounted) return;
+        const msg = err?.response?.data?.message ?? 'Failed to load profile';
+        setLoadError(msg);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Password validation
   const passwordsMatch = newPassword === confirmPassword;
@@ -61,44 +90,60 @@ const Profile = () => {
 
   const handleChangePassword = async () => {
     if (!canChangePassword) return;
-
-    setIsChangingPassword(true);
-
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // In real app, validate current password and update
-    // For demo, we'll just show success
-    toast.success("Password changed successfully!", {
-      description: "Your password has been updated.",
+    toast.info('Password change isn\'t wired up yet', {
+      description: 'Backend endpoint for changing password is not available currently.',
     });
-
-    // Reset form
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setIsChangingPassword(false);
   };
 
-  const handleSaveProfile = () => {
-    setUser({
-      ...user,
-      email: editedEmail,
-      phone: editedPhone,
-    });
-    setIsEditingProfile(false);
-    toast.success("Profile updated successfully!");
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    try {
+      const res = await api.put('/users/me', {
+        email: editedEmail,
+        name: editedName,
+        nic: editedNic,
+      });
+      const updated = res.data?.data ?? res.data?.data?.data ?? res.data?.data;
+      // In this project, API responses are usually { success, data }
+      const updatedUser = (updated?.user ?? updated) as BackendUser;
+      setUser(updatedUser);
+      setIsEditingProfile(false);
+      toast.success('Profile updated successfully!');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? 'Failed to update profile';
+      toast.error(msg);
+    }
   };
 
   const handleCancelEdit = () => {
-    setEditedEmail(user.email);
-    setEditedPhone(user.phone);
+    if (user) {
+      setEditedEmail(user.email ?? '');
+      setEditedName(user.name ?? '');
+      setEditedNic(user.nic ?? '');
+    }
     setIsEditingProfile(false);
   };
 
-  const getInitials = (name: string) => {
-    return name.slice(0, 2).toUpperCase();
-  };
+  const getInitials = (name: string) => name.slice(0, 2).toUpperCase();
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6 max-w-4xl">
+        <h1 className="text-xl md:text-3xl font-bold text-foreground">User Profile</h1>
+        <p className="text-sm text-muted-foreground">Loading profile…</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6 max-w-4xl">
+        <h1 className="text-xl md:text-3xl font-bold text-foreground">User Profile</h1>
+        <p className="text-sm text-destructive">{loadError ?? 'Profile not available'}</p>
+        <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6 max-w-4xl">
@@ -124,14 +169,15 @@ const Profile = () => {
             {/* Avatar Section */}
             <div className="flex flex-col items-center gap-3">
               <Avatar className="h-24 w-24 md:h-32 md:w-32">
-                <AvatarImage src="" alt={user.username} />
+                {/* Backend doesn’t store profile images yet */}
+                <AvatarImage src={''} alt={user.name} />
                 <AvatarFallback className="text-2xl md:text-3xl bg-primary text-primary-foreground">
-                  {getInitials(user.username)}
+                  {getInitials(user.name)}
                 </AvatarFallback>
               </Avatar>
               <Badge variant="secondary" className="gap-1">
                 <Shield className="h-3 w-3" />
-                {user.role}
+                {roleLabel}
               </Badge>
             </div>
 
@@ -141,15 +187,18 @@ const Profile = () => {
               <div className="space-y-2">
                 <Label className="text-sm text-muted-foreground flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  Username
+                  Name
                 </Label>
                 <div className="flex items-center gap-2">
-                  <Input
-                    value={user.username}
-                    disabled
-                    className="bg-muted max-w-xs"
-                  />
-                  <Badge variant="outline" className="text-xs">Cannot be changed</Badge>
+                  {isEditingProfile ? (
+                    <Input
+                      value={editedName}
+                      onChange={(e) => setEditedName(e.target.value)}
+                      className="max-w-xs"
+                    />
+                  ) : (
+                    <Input value={user.name} disabled className="bg-muted max-w-xs" />
+                  )}
                 </div>
               </div>
 
@@ -171,21 +220,20 @@ const Profile = () => {
                 )}
               </div>
 
-              {/* Phone */}
+              {/* NIC */}
               <div className="space-y-2">
                 <Label className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Phone className="h-4 w-4" />
-                  Phone Number
+                  <span className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground">#</span>
+                  NIC
                 </Label>
                 {isEditingProfile ? (
                   <Input
-                    type="tel"
-                    value={editedPhone}
-                    onChange={(e) => setEditedPhone(e.target.value)}
+                    value={editedNic}
+                    onChange={(e) => setEditedNic(e.target.value)}
                     className="max-w-xs"
                   />
                 ) : (
-                  <p className="text-sm font-medium">{user.phone}</p>
+                  <p className="text-sm font-medium">{user.nic}</p>
                 )}
               </div>
 
@@ -196,7 +244,7 @@ const Profile = () => {
                   Account Created
                 </Label>
                 <p className="text-sm font-medium">
-                  {user.createdAt.toLocaleDateString("en-US", {
+                  {new Date(user.createdAt ?? Date.now()).toLocaleDateString("en-US", {
                     year: "numeric",
                     month: "long",
                     day: "numeric",
@@ -373,21 +421,13 @@ const Profile = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 rounded-lg bg-muted/50">
               <p className="text-sm text-muted-foreground">Last Login</p>
-              <p className="font-medium">
-                {user.lastLogin.toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
+              <p className="font-medium">Not available</p>
             </div>
             <div className="p-4 rounded-lg bg-muted/50">
               <p className="text-sm text-muted-foreground">Account Status</p>
               <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-green-500"></span>
-                <p className="font-medium text-green-600">Active</p>
+                <span className={`h-2 w-2 rounded-full ${user.status === 'Active' ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
+                <p className={`font-medium ${user.status === 'Active' ? 'text-green-600' : 'text-yellow-600'}`}>{user.status}</p>
               </div>
             </div>
           </div>

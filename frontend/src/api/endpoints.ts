@@ -9,5 +9,6 @@ export const ENDPOINTS = {
 	},
 	categories: '/categories',
 	products: '/products',
+	salesSummary: '/sales-summary',
 };
 
