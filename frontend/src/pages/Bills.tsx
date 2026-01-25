@@ -58,13 +58,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 const Bills = () => {
   const navigate = useNavigate();
 
+  // Default date to today (YYYY-MM-DD format for input[type="date"])
+  const todayStr = new Date().toISOString().split('T')[0];
+
   // Server-driven state
   const [bills, setBills] = useState<Bill[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [totalRecords, setTotalRecords] = useState(0);
   const [serverCard, setServerCard] = useState<any | null>(null);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(todayStr);
+  const [dateTo, setDateTo] = useState(todayStr);
   const [filterToday, setFilterToday] = useState(false);
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");

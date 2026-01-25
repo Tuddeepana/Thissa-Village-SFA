@@ -41,11 +41,19 @@ interface ApiInvoice {
 }
 
 const Invoices = () => {
+  // Default date filters to today
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+  const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [serverStats, setServerStats] = useState<{ totalInvoices: number; paidInvoices: number; pendingInvoices: number; totalCost: number } | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
-  const [filters, setFilters] = useState<InvoiceFilters>({});
+  const [filters, setFilters] = useState<InvoiceFilters>({
+    dateFrom: startOfToday,
+    dateTo: endOfToday,
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [serverTotalPages, setServerTotalPages] = useState(1);
