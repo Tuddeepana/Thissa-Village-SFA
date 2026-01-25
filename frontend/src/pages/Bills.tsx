@@ -849,7 +849,6 @@ const Bills = () => {
                         <TableHead className="text-center">Qty</TableHead>
                         <TableHead className="text-right">Price</TableHead>
                         <TableHead className="text-right">Total</TableHead>
-                        <TableHead className="text-right">Bottle Volume</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -857,9 +856,8 @@ const Bills = () => {
                         <TableRow key={index}>
                           <TableCell>{item.product.name}</TableCell>
                           <TableCell className="text-center">{item.quantity}</TableCell>
-                          <TableCell className="text-right">Rs.{item.product.price.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">Rs.{item.product.foreignerPrice?.toFixed(2) ?? '0.00'}</TableCell>
                           <TableCell className="text-right">Rs.{item.subtotal.toFixed(2)}</TableCell>
-                          <TableCell className="text-right">{item.product.bottleVolume ?? '-'}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -871,24 +869,6 @@ const Bills = () => {
 
               {/* Totals */}
               <div className="space-y-2">
-                {(() => {
-                  const totalLiters = (selectedBill.items || []).reduce((sum: number, item: { product?: { bottleVolume?: string }; quantity?: number }) => {
-                    const label: string | undefined = item?.product?.bottleVolume;
-                    if (!label) return sum;
-                    const parts = String(label).trim().toLowerCase().split(/\s+/);
-                    const val = parseFloat(parts[0]);
-                    const unit = parts[1] || '';
-                    if (isNaN(val)) return sum;
-                    const litersPerUnit = unit === 'ml' ? val / 1000 : val;
-                    return sum + litersPerUnit * Number(item.quantity || 0);
-                  }, 0);
-                  return (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total Liters</span>
-                      <span>{totalLiters.toFixed(2)} L</span>
-                    </div>
-                  );
-                })()}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>Rs.{selectedBill.subtotal.toFixed(2)}</span>

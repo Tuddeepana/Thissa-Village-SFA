@@ -88,7 +88,7 @@ export function BillCart({
                   <div className="flex-1">
                     <h4 className="font-medium text-sm">{item.product.name}</h4>
                     <p className="text-xs text-muted-foreground">
-                      Rs. {item.product.price.toFixed(2)} each
+                      Rs. {item.product.foreignerPrice.toFixed(2)} each
                     </p>
                   </div>
                   <DeleteButton

@@ -147,7 +147,6 @@ export const printBill = (bill: Bill, storeName: string = "Tasty Corner") => {
         <thead>
           <tr>
             <th>Item</th>
-            <th class="text-right">V</th>
             <th class="text-right">Qty</th>
             <th class="text-right">Price</th>
             <th class="text-right">Total</th>
@@ -157,9 +156,8 @@ export const printBill = (bill: Bill, storeName: string = "Tasty Corner") => {
           ${bill.items.map(item => `
             <tr>
               <td class="item-name">${item.product.name}</td>
-              <td class="text-right">${(item as any).product?.bottleVolume ?? '-'}</td>
               <td class="text-right">${item.quantity}</td>
-              <td class="text-right">${item.product.price.toFixed(2)}</td>
+              <td class="text-right">${item.product.foreignerPrice.toFixed(2)}</td>
               <td class="text-right">${item.subtotal.toFixed(2)}</td>
             </tr>
           `).join('')}
@@ -353,7 +351,6 @@ export const printBillNewWindow = (bill: Bill, storeName: string = "Tasty Corner
         <thead>
           <tr>
             <th>Item</th>
-            <th class="text-right">V</th>
             <th class="text-right">Qty</th>
             <th class="text-right">Price</th>
             <th class="text-right">Total</th>
@@ -363,9 +360,8 @@ export const printBillNewWindow = (bill: Bill, storeName: string = "Tasty Corner
           ${bill.items.map(item => `
             <tr>
               <td>${item.product.name}</td>
-              <td class="text-right">${(item as any).product?.bottleVolume ?? '-'}</td>
               <td class="text-right">${item.quantity}</td>
-              <td class="text-right">${item.product.price.toFixed(2)}</td>
+              <td class="text-right">${item.product.foreignerPrice.toFixed(2)}</td>
               <td class="text-right">${item.subtotal.toFixed(2)}</td>
             </tr>
           `).join('')}

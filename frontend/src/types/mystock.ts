@@ -11,8 +11,8 @@ export type MyStockTableRow = {
   category: { id: string; name: string } | null;
   availableQuantity: number;
   minStock: number;
-  sellingPrice: number | undefined;
-  bottle_size?: string | null;
+  foreignerPrice: number | undefined;
+  localPrice: number | undefined;
   status: 'InStock' | 'LowStock' | 'OutOfStock';
   lastUpdatedAt: string | null;
 };

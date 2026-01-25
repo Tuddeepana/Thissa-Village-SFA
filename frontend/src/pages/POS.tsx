@@ -36,13 +36,11 @@ const POS = () => {
           id: r.productId,
           name: r.productName,
           category: r.category?.name ?? '',
-          // Use sellingPrice returned by mystock if present (fallback to 0)
-          price: r.sellingPrice ?? 0,
-          cost: r.sellingPrice ?? 0,
+          foreignerPrice: r.foreignerPrice ?? 0,
+          localPrice: r.localPrice ?? 0,
+          cost: r.foreignerPrice ?? 0, // Use foreigner price as default for cost calculation
           stock: r.availableQuantity,
           minStock: r.minStock ?? 0,
-          bottleVolume: r.bottle_size ?? undefined,
-          barcode: undefined,
           image: undefined,
           description: undefined,
           createdAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
@@ -122,11 +120,11 @@ const POS = () => {
       }
       handleUpdateQuantity(product.id, existingItem.quantity + 1);
     } else {
-      // Add new item
+      // Add new item (using foreignerPrice as default)
       const newItem: BillItem = {
         product,
         quantity: 1,
-        subtotal: product.price,
+        subtotal: product.foreignerPrice,
       };
       setBillItems([...billItems, newItem]);
       toast.success(`${product.name} added to bill`);
@@ -150,7 +148,7 @@ const POS = () => {
           ? {
               ...item,
               quantity: newQuantity,
-              subtotal: item.product.price * newQuantity,
+              subtotal: item.product.foreignerPrice * newQuantity,
             }
           : item
       )
