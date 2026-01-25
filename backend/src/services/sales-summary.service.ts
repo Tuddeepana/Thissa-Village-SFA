@@ -76,21 +76,21 @@ export const getSalesSummary = async (query: SalesSummaryQuery): Promise<SalesSu
       if (query.productId && query.productId !== 'all' && product.id !== query.productId) continue;
 
       const qty = Math.abs(inv.quantity_moved || 0);
-      const litres = Number(product.litres || 0);
-      const bottleVolume = product.bottle_volume || 'ML';
-      const volume = `${litres} ${bottleVolume}`;
 
-      const sellingPrice = Number(product.selling_price || 0);
+      const foreignerPrice = Number(product.foreigner_price || 0);
+      const localPrice = Number(product.local_price || 0);
       const costPrice = Number(product.cost_price || 0);
-      const revenue = sellingPrice * qty;
-      const profit = (sellingPrice - costPrice) * qty;
+      // Use foreigner price as default revenue calculation
+      const revenue = foreignerPrice * qty;
+      const profit = (foreignerPrice - costPrice) * qty;
 
       allRows.push({
         date: bill.date.toISOString().split('T')[0],
         productName: product.name,
         categoryName: product.category?.name || 'N/A',
         quantity: qty,
-        volume,
+        foreignerPrice,
+        localPrice,
         revenue,
         profit,
       });
@@ -102,20 +102,6 @@ export const getSalesSummary = async (query: SalesSummaryQuery): Promise<SalesSu
   const totalRevenue = allRows.reduce((sum, row) => sum + row.revenue, 0);
   const totalProfit = allRows.reduce((sum, row) => sum + row.profit, 0);
 
-  // Calculate total volume
-  let totalVolumeInLitres = 0;
-  for (const row of allRows) {
-    const parts = row.volume.split(' ');
-    const value = parseFloat(parts[0]) || 0;
-    const unit = parts[1]?.toUpperCase() || 'ML';
-    if (unit === 'L') {
-      totalVolumeInLitres += value * row.quantity;
-    } else if (unit === 'ML') {
-      totalVolumeInLitres += (value / 1000) * row.quantity;
-    }
-  }
-  const totalVolume = `${totalVolumeInLitres.toFixed(2)} L`;
-
   // Paginate table rows
   const totalRecords = allRows.length;
   const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
@@ -124,7 +110,6 @@ export const getSalesSummary = async (query: SalesSummaryQuery): Promise<SalesSu
   return {
     cardResponse: {
       totalQuantity,
-      totalVolume,
       totalRevenue,
       totalProfit,
     },
@@ -197,15 +182,15 @@ export const getVolumeWiseSummary = async (query: SalesSummaryQuery): Promise<Vo
     orderBy: { date: 'asc' },
   });
 
-  // Group by product name + volume
+  // Group by product name
   const grouped = new Map<string, {
     productName: string;
     categoryName: string;
-    volume: string;
+    foreignerPrice: number;
+    localPrice: number;
     quantity: number;
     revenue: number;
     profit: number;
-    totalVolumeInLitres: number;
     minDate: Date;
     maxDate: Date;
   }>();
@@ -220,43 +205,32 @@ export const getVolumeWiseSummary = async (query: SalesSummaryQuery): Promise<Vo
       if (query.productId && query.productId !== 'all' && product.id !== query.productId) continue;
 
       const qty = Math.abs(inv.quantity_moved || 0);
-      const litres = Number(product.litres || 0);
-      const bottleVolume = product.bottle_volume || 'ML';
-      const volume = `${litres} ${bottleVolume}`;
 
-      // Create unique key: productName + volume
-      const key = `${product.name}|${volume}`;
+      // Create unique key: productName
+      const key = product.name;
 
-      const sellingPrice = Number(product.selling_price || 0);
+      const foreignerPrice = Number(product.foreigner_price || 0);
+      const localPrice = Number(product.local_price || 0);
       const costPrice = Number(product.cost_price || 0);
-      const revenue = sellingPrice * qty;
-      const profit = (sellingPrice - costPrice) * qty;
-
-      // Calculate volume in litres
-      let volumeInLitres = 0;
-      if (bottleVolume.toUpperCase() === 'L') {
-        volumeInLitres = litres * qty;
-      } else if (bottleVolume.toUpperCase() === 'ML') {
-        volumeInLitres = (litres / 1000) * qty;
-      }
+      const revenue = foreignerPrice * qty;
+      const profit = (foreignerPrice - costPrice) * qty;
 
       const existing = grouped.get(key);
       if (existing) {
         existing.quantity += qty;
         existing.revenue += revenue;
         existing.profit += profit;
-        existing.totalVolumeInLitres += volumeInLitres;
         if (bill.date < existing.minDate) existing.minDate = bill.date;
         if (bill.date > existing.maxDate) existing.maxDate = bill.date;
       } else {
         grouped.set(key, {
           productName: product.name,
           categoryName: product.category?.name || 'N/A',
-          volume,
+          foreignerPrice,
+          localPrice,
           quantity: qty,
           revenue,
           profit,
-          totalVolumeInLitres: volumeInLitres,
           minDate: bill.date,
           maxDate: bill.date,
         });
@@ -277,19 +251,15 @@ export const getVolumeWiseSummary = async (query: SalesSummaryQuery): Promise<Vo
       productName: item.productName,
       categoryName: item.categoryName,
       quantity: item.quantity,
-      volume: item.volume,
+      foreignerPrice: item.foreignerPrice,
+      localPrice: item.localPrice,
       revenue: item.revenue,
       profit: item.profit,
-      totalVolume: `${item.totalVolumeInLitres.toFixed(2)} L`,
     };
   });
 
-  // Sort by product name, then by volume
-  allRows.sort((a, b) => {
-    const nameCompare = a.productName.localeCompare(b.productName);
-    if (nameCompare !== 0) return nameCompare;
-    return a.volume.localeCompare(b.volume);
-  });
+  // Sort by product name
+  allRows.sort((a, b) => a.productName.localeCompare(b.productName));
 
   // Paginate
   const totalRecords = allRows.length;

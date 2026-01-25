@@ -46,7 +46,7 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
     const available = inv ? inv.available_quantity : 0;
     let status: 'InStock' | 'LowStock' | 'OutOfStock' = 'InStock';
     if (available <= 0) status = 'OutOfStock';
-    else if (available <= p.low_stock) status = 'LowStock';
+    else if (p.low_stock && available <= p.low_stock) status = 'LowStock';
 
     return {
       productId: p.id,
@@ -54,8 +54,8 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
       category: p.category ? { id: p.category.id, name: p.category.name } : null,
       availableQuantity: available,
       minStock: p.low_stock ?? 0,
-      sellingPrice: p.selling_price ? Number(p.selling_price) : undefined,
-      bottle_size: p.litres !== undefined && p.bottle_volume ? `${String(p.litres)} ${p.bottle_volume.toLowerCase()}` : null,
+      foreignerPrice: p.foreigner_price ? Number(p.foreigner_price) : undefined,
+      localPrice: p.local_price ? Number(p.local_price) : undefined,
       status,
       lastUpdatedAt: inv ? inv.updatedAt?.toISOString?.() ?? inv.updatedAt : null,
     } as MyStockTableRow;

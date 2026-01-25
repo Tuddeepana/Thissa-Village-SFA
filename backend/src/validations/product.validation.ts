@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { BottleVolume } from '@prisma/client';
 
 // Coerce string/number inputs into numbers
 const decimalNumber = z.coerce.number();
@@ -7,23 +6,20 @@ const decimalNumber = z.coerce.number();
 export const createProductSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional().nullable(),
-  litres: decimalNumber.min(0, 'Litres must be >= 0'),
   cost_price: decimalNumber.min(0, 'Cost price must be >= 0'),
-  selling_price: decimalNumber.min(0, 'Selling price must be >= 0'),
-  bottle_volume: z.nativeEnum(BottleVolume).optional(),
-  low_stock: z.number().int().nonnegative('Low stock must be >= 0'),
+  foreigner_price: decimalNumber.min(0, 'Foreigner price must be >= 0'),
+  local_price: decimalNumber.min(0, 'Local price must be >= 0'),
+  low_stock: z.number().int().nonnegative('Low stock must be >= 0').optional().nullable(),
   categoryId: z.string().uuid('Invalid category id'),
 });
 
 export const updateProductSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional().nullable(),
-  barcode: z.string().optional().nullable(),
-  litres: decimalNumber.min(0, 'Litres must be >= 0').optional(),
   cost_price: decimalNumber.min(0, 'Cost price must be >= 0').optional(),
-  selling_price: decimalNumber.min(0, 'Selling price must be >= 0').optional(),
-  bottle_volume: z.nativeEnum(BottleVolume).optional(),
-  low_stock: z.number().int().nonnegative('Low stock must be >= 0').optional(),
+  foreigner_price: decimalNumber.min(0, 'Foreigner price must be >= 0').optional(),
+  local_price: decimalNumber.min(0, 'Local price must be >= 0').optional(),
+  low_stock: z.number().int().nonnegative('Low stock must be >= 0').optional().nullable(),
   categoryId: z.string().uuid('Invalid category id').optional(),
 });
 

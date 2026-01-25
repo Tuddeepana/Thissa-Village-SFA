@@ -11,7 +11,6 @@ export interface SalesSummaryQuery {
 
 export interface SalesSummaryCardResponse {
   totalQuantity: number;
-  totalVolume: string;
   totalRevenue: number;
   totalProfit: number;
 }
@@ -21,7 +20,8 @@ export interface SalesSummaryTableRow {
   productName: string;
   categoryName: string;
   quantity: number;
-  volume: string;
+  foreignerPrice: number;
+  localPrice: number;
   revenue: number;
   profit: number;
 }
@@ -40,16 +40,16 @@ export interface SalesSummaryResponse {
   };
 }
 
-// Volume-wise summary types
+// Product-wise summary types (renamed from Volume-wise)
 export interface VolumeWiseSummaryRow {
   dateRange: string;
   productName: string;
   categoryName: string;
   quantity: number;
-  volume: string;
+  foreignerPrice: number;
+  localPrice: number;
   revenue: number;
   profit: number;
-  totalVolume: string;
 }
 
 export interface VolumeWiseSummaryResponse {

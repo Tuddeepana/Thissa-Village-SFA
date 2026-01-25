@@ -7,18 +7,13 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
 }
 
 enum Role {
   CASHIER
   ADMIN
-}
-
-enum BottleVolume {
-  L
-  ML
 }
 
 enum PaidStatus {
@@ -55,15 +50,13 @@ model Category {
 }
 
 model Product {
-  id            String       @id @default(uuid())
-  name          String
-  description   String?
-  barcode       String?      @unique
-  litres        Decimal      @db.Decimal(10, 2)
-  cost_price    Decimal      @db.Decimal(10, 2)
-  selling_price Decimal      @db.Decimal(10, 2)
-  low_stock     Int
-  bottle_volume BottleVolume @default(ML)
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  cost_price      Decimal  @db.Decimal(10, 2)
+  foreigner_price Decimal  @db.Decimal(10, 2)
+  local_price     Decimal  @db.Decimal(10, 2)
+  low_stock       Int?
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])

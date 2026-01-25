@@ -34,7 +34,6 @@ export function ProductSearch({ products, onAddProduct }: ProductSearchProps) {
       const matchesSearch =
         searchQuery === "" ||
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.barcode?.includes(searchQuery) ||
         product.description?.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesCategory =
@@ -59,7 +58,7 @@ export function ProductSearch({ products, onAddProduct }: ProductSearchProps) {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name, barcode, or description..."
+            placeholder="Search by name or description..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -114,11 +113,6 @@ export function ProductSearch({ products, onAddProduct }: ProductSearchProps) {
                     <Badge variant="secondary" className="text-xs">
                       {product.category}
                     </Badge>
-                    {product.bottleVolume && (
-                      <Badge variant="outline" className="text-[10px]">
-                        {String(product.bottleVolume).replace(/\s+/g, '').toUpperCase()}
-                      </Badge>
-                    )}
                   </div>
 
                   <div className="flex justify-between items-center text-sm">
@@ -136,10 +130,18 @@ export function ProductSearch({ products, onAddProduct }: ProductSearchProps) {
                     </span>
                   </div>
 
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-bold text-primary">
-                      Rs. {product.price.toFixed(2)}
-                    </span>
+                  <div className="flex flex-col gap-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Foreigner:</span>
+                      <span className="font-bold text-primary">Rs. {product.foreignerPrice.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Local:</span>
+                      <span className="font-bold text-green-600">Rs. {product.localPrice.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
                     <Button
                       size="sm"
                       onClick={() => onAddProduct(product)}

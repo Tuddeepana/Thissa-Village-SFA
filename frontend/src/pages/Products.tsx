@@ -21,7 +21,7 @@ import {
 import { Pencil, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { DeleteButton, BarcodeScanner } from "@/components/common";
+import { DeleteButton } from "@/components/common";
 import LocalLoader from "@/components/common/LocalLoader";
 import { useQuery } from "@tanstack/react-query";
 import { productService } from "@/api/services/productService";
@@ -50,24 +50,20 @@ const Products = () => {
 
     const [open, setOpen] = useState(false);
 
-    // Inline edit state for per-row editing of lowStockAlert
+    // Inline edit state for per-row editing
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingLow, setEditingLow] = useState<number | "">("");
     const [editingCostPrice, setEditingCostPrice] = useState<number | "">("");
-    const [editingSellingPrice, setEditingSellingPrice] = useState<number | "">("");
-    const [editingBottleSize, setEditingBottleSize] = useState("");
-    const [editingBottleUnit, setEditingBottleUnit] = useState("ml");
-    const [editingBarcode, setEditingBarcode] = useState("");
+    const [editingForeignerPrice, setEditingForeignerPrice] = useState<number | "">("");
+    const [editingLocalPrice, setEditingLocalPrice] = useState<number | "">("");
 
     // Controlled form state for minimal add form
     const [newName, setNewName] = useState("");
     const [newCategory, setNewCategory] = useState("");
     const [newLowStockAlert, setNewLowStockAlert] = useState<number | "">("");
     const [newCostPrice, setNewCostPrice] = useState<number | "">("");
-    const [newSellingPrice, setNewSellingPrice] = useState<number | "">("");
-    const [newBottleSize, setNewBottleSize] = useState(""); // New state for bottle size
-    const [newBottleUnit, setNewBottleUnit] = useState("ml"); // New state for bottle unit
-    const [newBarcode, setNewBarcode] = useState(""); // New state for barcode
+    const [newForeignerPrice, setNewForeignerPrice] = useState<number | "">("");
+    const [newLocalPrice, setNewLocalPrice] = useState<number | "">("");
 
     const handleDelete = async (id: string) => {
         try {
@@ -80,68 +76,37 @@ const Products = () => {
     };
 
     // Handlers for inline edit
-    const toBottleDisplay = (sizeStr?: string, unit?: string) => {
-        if (!sizeStr) return "-";
-        const normalizedUnit = unit === "L" ? "l" : unit === "ML" ? "ml" : "ml";
-        return `${sizeStr} ${normalizedUnit}`;
-        };
-
     const startEditing = (product: Product) => {
         setEditingId(product.id);
-        setEditingLow(product.low_stock);
+        setEditingLow(product.low_stock ?? "");
         setEditingCostPrice(Number.parseFloat(product.cost_price));
-        setEditingSellingPrice(Number.parseFloat(product.selling_price));
-
-        // Use the raw size string returned by the backend and the bottle_volume enum for unit.
-        // Defaults: empty size -> "", missing unit -> "ml"
-        setEditingBottleSize(product.litres ?? "");
-        const unit = (product.bottle_volume ?? "ML").toString().toLowerCase();
-        setEditingBottleUnit(unit === "l" ? "l" : "ml");
-        setEditingBarcode(product.barcode ?? "");
+        setEditingForeignerPrice(Number.parseFloat(product.foreigner_price));
+        setEditingLocalPrice(Number.parseFloat(product.local_price));
     };
 
     const cancelEditing = () => {
         setEditingId(null);
         setEditingLow("");
         setEditingCostPrice("");
-        setEditingSellingPrice("");
-        setEditingBottleSize(""); // Clear bottle size on cancel
-        setEditingBottleUnit("ml"); // Reset bottle unit on cancel
-        setEditingBarcode(""); // Clear barcode on cancel
-    };
-
-    const toLitresString = (sizeStr: string, unit: string) => {
-        const size = Number.parseFloat(sizeStr);
-        if (Number.isNaN(size)) return "0.00";
-        const litres = unit === "ml" ? size / 1000 : size;
-        return litres.toFixed(2);
+        setEditingForeignerPrice("");
+        setEditingLocalPrice("");
     };
 
     const saveEditing = async () => {
         if (editingId == null) return;
-        const alertLevel = typeof editingLow === "number" ? editingLow : Number.parseInt(String(editingLow || "0"), 10);
+        const alertLevel = editingLow === "" ? null : (typeof editingLow === "number" ? editingLow : Number.parseInt(String(editingLow || "0"), 10));
         const costPriceNum = typeof editingCostPrice === "number" ? editingCostPrice : Number.parseFloat(String(editingCostPrice || "0"));
-        const sellingPriceNum = typeof editingSellingPrice === "number" ? editingSellingPrice : Number.parseFloat(String(editingSellingPrice || "0"));
-        const litresStr = String(editingBottleSize).trim() || "0";
-        const unitToEnum = (unit: string) => (String(unit).toLowerCase() === "l" ? "L" : "ML");
-        const bottle_volume = unitToEnum(editingBottleUnit);
+        const foreignerPriceNum = typeof editingForeignerPrice === "number" ? editingForeignerPrice : Number.parseFloat(String(editingForeignerPrice || "0"));
+        const localPriceNum = typeof editingLocalPrice === "number" ? editingLocalPrice : Number.parseFloat(String(editingLocalPrice || "0"));
         try {
             await productService.update(editingId, {
-                low_stock: Number.isNaN(alertLevel) ? 0 : alertLevel,
+                low_stock: alertLevel,
                 cost_price: Number.isNaN(costPriceNum) ? undefined : costPriceNum.toFixed(2),
-                selling_price: Number.isNaN(sellingPriceNum) ? undefined : sellingPriceNum.toFixed(2),
-                litres: litresStr,
-                bottle_volume,
-                barcode: editingBarcode || null,
+                foreigner_price: Number.isNaN(foreignerPriceNum) ? undefined : foreignerPriceNum.toFixed(2),
+                local_price: Number.isNaN(localPriceNum) ? undefined : localPriceNum.toFixed(2),
             });
             toast({ title: "Updated", description: "Product details updated" });
-            setEditingId(null);
-            setEditingLow("");
-            setEditingCostPrice("");
-            setEditingSellingPrice("");
-            setEditingBottleSize("");
-            setEditingBottleUnit("ml");
-            setEditingBarcode("");
+            cancelEditing();
             refetchProducts();
         } catch (e: any) {
             toast({ title: "Error", description: e?.response?.data?.message ?? "Failed to update product" });
@@ -153,10 +118,8 @@ const Products = () => {
         setNewCategory("");
         setNewLowStockAlert("");
         setNewCostPrice("");
-        setNewSellingPrice("");
-        setNewBottleSize("");
-        setNewBottleUnit("ml");
-        setNewBarcode("");
+        setNewForeignerPrice("");
+        setNewLocalPrice("");
     };
 
     // Pagination
@@ -164,7 +127,7 @@ const Products = () => {
     const itemsPerPage = 10;
 
     // Fetch products with pagination
-    const { data: productResult, refetch: refetchProducts, isFetching } = useQuery<ProductListResult,Error, ProductListResult>({
+    const { data: productResult, refetch: refetchProducts, isFetching } = useQuery<ProductListResult, Error, ProductListResult>({
         queryKey: ["products", { page: currentPage, limit: itemsPerPage }],
         queryFn: async () => productService.list({ page: currentPage, limit: itemsPerPage }),
         staleTime: 10_000,
@@ -207,28 +170,20 @@ const Products = () => {
             toast({ title: "Validation", description: "Category is required" });
             return;
         }
-        if (!newBottleSize.trim()) {
-            toast({ title: "Validation", description: "Bottle size is required" });
-            return;
-        }
 
-        const alertLevel = typeof newLowStockAlert === "number" ? newLowStockAlert : Number.parseInt(String(newLowStockAlert || "0"), 10);
+        const alertLevel = newLowStockAlert === "" ? null : (typeof newLowStockAlert === "number" ? newLowStockAlert : Number.parseInt(String(newLowStockAlert || "0"), 10));
         const costPrice = typeof newCostPrice === "number" ? newCostPrice : Number.parseFloat(String(newCostPrice || "0"));
-        const sellingPrice = typeof newSellingPrice === "number" ? newSellingPrice : Number.parseFloat(String(newSellingPrice || "0"));
-        const unitToEnum = (unit: string) => (String(unit).toLowerCase() === "l" ? "L" : "ML");
-        const bottle_volume = unitToEnum(newBottleUnit);
-        const litresStr = String(newBottleSize).trim() || "0";
+        const foreignerPrice = typeof newForeignerPrice === "number" ? newForeignerPrice : Number.parseFloat(String(newForeignerPrice || "0"));
+        const localPrice = typeof newLocalPrice === "number" ? newLocalPrice : Number.parseFloat(String(newLocalPrice || "0"));
 
         try {
             await productService.create({
                 name: newName.trim(),
-                litres: litresStr,
                 cost_price: Number.isNaN(costPrice) ? "0.00" : costPrice.toFixed(2),
-                selling_price: Number.isNaN(sellingPrice) ? "0.00" : sellingPrice.toFixed(2),
-                low_stock: Number.isNaN(alertLevel) ? 0 : alertLevel,
-                bottle_volume,
+                foreigner_price: Number.isNaN(foreignerPrice) ? "0.00" : foreignerPrice.toFixed(2),
+                local_price: Number.isNaN(localPrice) ? "0.00" : localPrice.toFixed(2),
+                low_stock: alertLevel,
                 categoryId: newCategory,
-                barcode: newBarcode || null,
             });
             toast({ title: "Added", description: "Product added successfully" });
             resetForm();
@@ -244,7 +199,7 @@ const Products = () => {
             <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                 <div>
                     <h1 className="text-2xl md:text-3xl font-bold text-foreground">Product Management</h1>
-                    <p className="text-sm md:text-base text-muted-foreground">Manage your wine inventory and pricing</p>
+                    <p className="text-sm md:text-base text-muted-foreground">Manage your inventory and pricing</p>
                 </div>
                 <Dialog open={open} onOpenChange={setOpen}>
                     <DialogTrigger asChild>
@@ -282,15 +237,8 @@ const Products = () => {
                                 />
                             </div>
 
-                            <BarcodeScanner
-                                value={newBarcode}
-                                onChange={setNewBarcode}
-                                label="Barcode (Optional)"
-                                placeholder="Scan or enter barcode"
-                            />
-
                             <div className="space-y-2">
-                                <Label htmlFor="costPrice">Product Price</Label>
+                                <Label htmlFor="costPrice">Product Price (Cost)</Label>
                                 <Input
                                     id="costPrice"
                                     type="number"
@@ -304,42 +252,35 @@ const Products = () => {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="sellingPrice">Selling Price</Label>
+                                <Label htmlFor="foreignerPrice">Foreigner Price</Label>
                                 <Input
-                                    id="sellingPrice"
+                                    id="foreignerPrice"
                                     type="number"
-                                    placeholder="Enter selling price"
-                                    value={newSellingPrice === "" ? "" : String(newSellingPrice)}
+                                    placeholder="Enter selling price for foreigners"
+                                    value={newForeignerPrice === "" ? "" : String(newForeignerPrice)}
                                     onChange={(e) => {
                                         const val = e.target.value;
-                                        setNewSellingPrice(val === "" ? "" : Number(val));
+                                        setNewForeignerPrice(val === "" ? "" : Number(val));
                                     }}
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="bottleSize">Bottle Size</Label>
-                                <div className="flex gap-2">
-                                    <Input
-                                        id="bottleSize"
-                                        placeholder="Enter size"
-                                        value={newBottleSize}
-                                        onChange={(e) => setNewBottleSize(e.target.value)}
-                                    />
-                                    <Select value={newBottleUnit} onValueChange={(val) => setNewBottleUnit(val)}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Unit" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="ml">ML</SelectItem>
-                                            <SelectItem value="l">L</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                <Label htmlFor="localPrice">Local Price</Label>
+                                <Input
+                                    id="localPrice"
+                                    type="number"
+                                    placeholder="Enter selling price for locals"
+                                    value={newLocalPrice === "" ? "" : String(newLocalPrice)}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setNewLocalPrice(val === "" ? "" : Number(val));
+                                    }}
+                                />
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="lowStockAlert">Low Stock Alert Level</Label>
+                                <Label htmlFor="lowStockAlert">Low Stock Alert Level (Optional)</Label>
                                 <Input
                                     id="lowStockAlert"
                                     type="number"
@@ -376,10 +317,9 @@ const Products = () => {
                             <TableRow>
                                 <TableHead>Name</TableHead>
                                 <TableHead>Category</TableHead>
-                                <TableHead>Barcode</TableHead>
-                                <TableHead>Bottle Size</TableHead>
                                 <TableHead>Product Price</TableHead>
-                                <TableHead>Selling Price</TableHead>
+                                <TableHead>Foreigner Price</TableHead>
+                                <TableHead>Local Price</TableHead>
                                 <TableHead>Low Stock Alert</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
@@ -389,40 +329,6 @@ const Products = () => {
                                 <TableRow key={product.id}>
                                     <TableCell className="font-medium">{product.name}</TableCell>
                                     <TableCell>{categoryNameById[product.categoryId] ?? "-"}</TableCell>
-                                    <TableCell>
-                                        {editingId === product.id ? (
-                                            <Input
-                                                className="w-32"
-                                                value={editingBarcode}
-                                                onChange={(e) => setEditingBarcode(e.target.value)}
-                                                placeholder="Barcode"
-                                            />
-                                        ) : (
-                                            product.barcode || "-"
-                                        )}
-                                    </TableCell>
-                                    <TableCell>
-                                        {editingId === product.id ? (
-                                            <div className="flex gap-2">
-                                                <Input
-                                                    className="w-24"
-                                                    value={editingBottleSize}
-                                                    onChange={(e) => setEditingBottleSize(e.target.value)}
-                                                />
-                                                <Select value={editingBottleUnit} onValueChange={(val) => setEditingBottleUnit(val)}>
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Unit" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="ml">ML</SelectItem>
-                                                        <SelectItem value="l">L</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                        ) : (
-                                            toBottleDisplay(product.litres, product.bottle_volume)
-                                        )}
-                                    </TableCell>
                                     <TableCell>
                                         {editingId === product.id ? (
                                             <Input
@@ -443,14 +349,29 @@ const Products = () => {
                                             <Input
                                                 className="w-24"
                                                 type="number"
-                                                value={editingSellingPrice === "" ? "" : String(editingSellingPrice)}
+                                                value={editingForeignerPrice === "" ? "" : String(editingForeignerPrice)}
                                                 onChange={(e) => {
                                                     const val = e.target.value;
-                                                    setEditingSellingPrice(val === "" ? "" : Number(val));
+                                                    setEditingForeignerPrice(val === "" ? "" : Number(val));
                                                 }}
                                             />
                                         ) : (
-                                            product.selling_price
+                                            product.foreigner_price
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        {editingId === product.id ? (
+                                            <Input
+                                                className="w-24"
+                                                type="number"
+                                                value={editingLocalPrice === "" ? "" : String(editingLocalPrice)}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setEditingLocalPrice(val === "" ? "" : Number(val));
+                                                }}
+                                            />
+                                        ) : (
+                                            product.local_price
                                         )}
                                     </TableCell>
                                     <TableCell>
@@ -465,7 +386,7 @@ const Products = () => {
                                                 }}
                                             />
                                         ) : (
-                                            product.low_stock
+                                            product.low_stock ?? "-"
                                         )}
                                     </TableCell>
                                     <TableCell className="text-right">
