@@ -79,21 +79,23 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
   // unit price state (number)
   const [unitPrice, setUnitPrice] = useState<number>(0);
 
-  // load products from API on mount
-  useMemo(() => {
+  // Load products from API only when the dialog is open
+  useEffect(() => {
     let mounted = true;
+    if (!open) return () => { mounted = false; };
     (async () => {
       try {
         const res = await productService.list({ page: 1, limit: 100 });
         if (!mounted) return;
-        setFetchedProducts(res.items ?? res.items ?? []);
+        setFetchedProducts(res.items ?? []);
       } catch (err) {
-        // fallback to generateProducts
+        if (!mounted) return;
+        // fallback to generateProducts if API fails
         setFetchedProducts(generateProducts() as unknown as Product[]);
       }
     })();
     return () => { mounted = false; };
-  }, []);
+  }, [open]);
 
   // populate form when invoiceToEdit changes
   useEffect(() => {

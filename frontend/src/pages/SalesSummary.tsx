@@ -36,9 +36,12 @@ const SalesSummary = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
+  // Default date to today (YYYY-MM-DD format for input[type="date"])
+  const todayStr = new Date().toISOString().split('T')[0];
+
   // Filters
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(todayStr);
+  const [dateTo, setDateTo] = useState(todayStr);
   const [filterToday, setFilterToday] = useState(false);
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [selectedCategory, setSelectedCategory] = useState<string>("all");

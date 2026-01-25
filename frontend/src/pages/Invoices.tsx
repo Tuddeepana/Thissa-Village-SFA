@@ -41,11 +41,19 @@ interface ApiInvoice {
 }
 
 const Invoices = () => {
+  // Default date filters to today
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+  const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [serverStats, setServerStats] = useState<{ totalInvoices: number; paidInvoices: number; pendingInvoices: number; totalCost: number } | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
-  const [filters, setFilters] = useState<InvoiceFilters>({});
+  const [filters, setFilters] = useState<InvoiceFilters>({
+    dateFrom: startOfToday,
+    dateTo: endOfToday,
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [serverTotalPages, setServerTotalPages] = useState(1);
@@ -303,7 +311,10 @@ const Invoices = () => {
       }
       const total = Number(payload.tableResponse?.pagination?.totalRecords ?? payload.total ?? mapped.length);
       const pageLimit = Number(payload.tableResponse?.pagination?.pageSize ?? payload.limit ?? limit);
-      setServerTotalPages(Math.max(1, Math.ceil(total / pageLimit)));
+      const computedTotalPages = Math.max(1, Math.ceil(total / pageLimit));
+      setServerTotalPages(computedTotalPages);
+      // Update currentPage to match what we requested (the `page` argument)
+      setCurrentPage(page);
     } catch (err) {
       // fallback to mock data if available
       try {
@@ -314,14 +325,13 @@ const Invoices = () => {
         // ignore
       }
     }
-  }, [currentPage, itemsPerPage, filters.invoiceNumber, filters.category, filters.month, filters.year, filters.dateFrom, filters.dateTo]);
+  }, [itemsPerPage, filters.invoiceNumber, filters.category, filters.month, filters.year, filters.dateFrom, filters.dateTo]);
 
-  // initial load
+  // initial load - only run once on mount
   useEffect(() => {
-    (async () => {
-      await fetchInvoices(1, itemsPerPage);
-    })();
-  }, [fetchInvoices]);
+    fetchInvoices(1, itemsPerPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Extract unique categories from invoices (for filter dropdown)
   const categories = useMemo(() => {
@@ -337,9 +347,11 @@ const Invoices = () => {
 
   // Reset to page 1 when filters change and re-fetch
   useEffect(() => {
+    // Skip on initial mount (handled by initial load effect)
     setCurrentPage(1);
-    (async () => { await fetchInvoices(1, itemsPerPage); })();
-  }, [filters.invoiceNumber, filters.category, filters.month, filters.year, filters.dateFrom, filters.dateTo, fetchInvoices]);
+    fetchInvoices(1, itemsPerPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.invoiceNumber, filters.category, filters.month, filters.year, filters.dateFrom, filters.dateTo]);
 
   // Statistics (updated)
   const stats = useMemo(() => {
@@ -506,8 +518,9 @@ const Invoices = () => {
             currentPage={currentPage}
             totalPages={serverTotalPages}
             onPageChange={(p) => {
-               setCurrentPage(p);
-               (async () => { await fetchInvoices(p, itemsPerPage); })();
+               const clamped = Math.max(1, Math.min(p, serverTotalPages));
+               setCurrentPage(clamped);
+               fetchInvoices(clamped, itemsPerPage);
              }}
             onEdit={(inv) => {
               setEditingInvoice(inv);
