@@ -42,6 +42,7 @@ import {
   User,
   Phone,
   Clock,
+  Monitor,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Bill } from "@/types/pos";
@@ -62,6 +63,7 @@ const Bills = () => {
   const [dateTo, setDateTo] = useState("");
   const [filterToday, setFilterToday] = useState(false);
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
+  const [terminalIdFilter, setTerminalIdFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedBill, setSelectedBill] = useState<any | null>(null);
@@ -105,6 +107,7 @@ const Bills = () => {
     setDateTo("");
     setFilterToday(false);
     setPaymentMethodFilter('all');
+    setTerminalIdFilter('all');
     setSearchQuery("");
     setCurrentPage(1);
   };
@@ -476,6 +479,20 @@ const Bills = () => {
                   <SelectItem value="card">Card</SelectItem>
                   <SelectItem value="credit">Credit</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Terminal ID */}
+            <div className="space-y-2">
+              <Label className="text-xs md:text-sm">Terminal ID</Label>
+              <Select value={terminalIdFilter} onValueChange={setTerminalIdFilter}>
+                <SelectTrigger className="h-9 md:h-10">
+                  <SelectValue placeholder="All Terminals" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Terminals</SelectItem>
+                  {/* Terminal options will be populated from API later */}
                 </SelectContent>
               </Select>
             </div>

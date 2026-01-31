@@ -60,6 +60,8 @@ const Products = () => {
     // Controlled form state for minimal add form
     const [newName, setNewName] = useState("");
     const [newCategory, setNewCategory] = useState("");
+    const [newBarcode, setNewBarcode] = useState("");
+    const [newUnitType, setNewUnitType] = useState("");
     const [newLowStockAlert, setNewLowStockAlert] = useState<number | "">("");
     const [newCostPrice, setNewCostPrice] = useState<number | "">("");
     const [newForeignerPrice, setNewForeignerPrice] = useState<number | "">("");
@@ -116,6 +118,8 @@ const Products = () => {
     const resetForm = () => {
         setNewName("");
         setNewCategory("");
+        setNewBarcode("");
+        setNewUnitType("");
         setNewLowStockAlert("");
         setNewCostPrice("");
         setNewForeignerPrice("");
@@ -179,6 +183,8 @@ const Products = () => {
         try {
             await productService.create({
                 name: newName.trim(),
+                barcode: newBarcode.trim() || null,
+                unit_type: newUnitType.trim() || null,
                 cost_price: Number.isNaN(costPrice) ? "0.00" : costPrice.toFixed(2),
                 foreigner_price: Number.isNaN(foreignerPrice) ? "0.00" : foreignerPrice.toFixed(2),
                 local_price: Number.isNaN(localPrice) ? "0.00" : localPrice.toFixed(2),
@@ -238,6 +244,16 @@ const Products = () => {
                             </div>
 
                             <div className="space-y-2">
+                                <Label htmlFor="barcode">Barcode</Label>
+                                <Input
+                                    id="barcode"
+                                    placeholder="Enter barcode (optional)"
+                                    value={newBarcode}
+                                    onChange={(e) => setNewBarcode(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
                                 <Label htmlFor="costPrice">Product Price (Cost)</Label>
                                 <Input
                                     id="costPrice"
@@ -252,11 +268,11 @@ const Products = () => {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="foreignerPrice">Foreigner Price</Label>
+                                <Label htmlFor="foreignerPrice">Selling Price</Label>
                                 <Input
                                     id="foreignerPrice"
                                     type="number"
-                                    placeholder="Enter selling price for foreigners"
+                                    placeholder="Enter selling price"
                                     value={newForeignerPrice === "" ? "" : String(newForeignerPrice)}
                                     onChange={(e) => {
                                         const val = e.target.value;
@@ -266,17 +282,22 @@ const Products = () => {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="localPrice">Local Price</Label>
-                                <Input
-                                    id="localPrice"
-                                    type="number"
-                                    placeholder="Enter selling price for locals"
-                                    value={newLocalPrice === "" ? "" : String(newLocalPrice)}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setNewLocalPrice(val === "" ? "" : Number(val));
-                                    }}
-                                />
+                                <Label htmlFor="unitType">Unit Type</Label>
+                                <Select value={newUnitType} onValueChange={(val) => setNewUnitType(val)}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select unit type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="piece">Piece</SelectItem>
+                                        <SelectItem value="kg">Kilogram (kg)</SelectItem>
+                                        <SelectItem value="g">Gram (g)</SelectItem>
+                                        <SelectItem value="l">Liter (L)</SelectItem>
+                                        <SelectItem value="ml">Milliliter (ml)</SelectItem>
+                                        <SelectItem value="pack">Pack</SelectItem>
+                                        <SelectItem value="box">Box</SelectItem>
+                                        <SelectItem value="dozen">Dozen</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
 
                             <div className="space-y-2">
@@ -317,9 +338,10 @@ const Products = () => {
                             <TableRow>
                                 <TableHead>Name</TableHead>
                                 <TableHead>Category</TableHead>
+                                <TableHead>Barcode</TableHead>
+                                <TableHead>Unit Type</TableHead>
                                 <TableHead>Product Price</TableHead>
-                                <TableHead>Foreigner Price</TableHead>
-                                <TableHead>Local Price</TableHead>
+                                <TableHead>Selling Price</TableHead>
                                 <TableHead>Low Stock Alert</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
@@ -329,6 +351,8 @@ const Products = () => {
                                 <TableRow key={product.id}>
                                     <TableCell className="font-medium">{product.name}</TableCell>
                                     <TableCell>{categoryNameById[product.categoryId] ?? "-"}</TableCell>
+                                    <TableCell>{product.barcode ?? "-"}</TableCell>
+                                    <TableCell>{product.unit_type ?? "-"}</TableCell>
                                     <TableCell>
                                         {editingId === product.id ? (
                                             <Input
@@ -357,21 +381,6 @@ const Products = () => {
                                             />
                                         ) : (
                                             product.foreigner_price
-                                        )}
-                                    </TableCell>
-                                    <TableCell>
-                                        {editingId === product.id ? (
-                                            <Input
-                                                className="w-24"
-                                                type="number"
-                                                value={editingLocalPrice === "" ? "" : String(editingLocalPrice)}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setEditingLocalPrice(val === "" ? "" : Number(val));
-                                                }}
-                                            />
-                                        ) : (
-                                            product.local_price
                                         )}
                                     </TableCell>
                                     <TableCell>

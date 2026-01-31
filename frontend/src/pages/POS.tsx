@@ -1,19 +1,67 @@
 import { useState, useMemo, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { ProductSearch } from "@/components/pos/ProductSearch";
-import { BillCart } from "@/components/pos/BillCart";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import api from "@/api/client";
 import { Product, BillItem, Bill, StockWarning } from "@/types/pos";
 import { printBillNewWindow } from "@/lib/billPrinter";
 import { toast } from "sonner";
-import type { MyStockResponse, MyStockTableRow } from '@/types/mystock';
-import { Button } from "@/components/ui/button";
+import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
 import LocalLoader from "@/components/common/LocalLoader";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  User,
+  Phone,
+  UtensilsCrossed,
+  Package,
+  Minus,
+  Plus,
+  Trash2,
+  ShoppingCart,
+  Send,
+  Printer,
+  AlertTriangle,
+} from "lucide-react";
 
 const PAGE_SIZE = 50;
 
+// Table status for dine-in
+interface TableInfo {
+  number: number;
+  status: "free" | "occupied";
+  orderId?: string;
+}
+
+// Hardcoded tables (9 tables)
+const INITIAL_TABLES: TableInfo[] = [
+  { number: 1, status: "free" },
+  { number: 2, status: "free" },
+  { number: 3, status: "occupied", orderId: "ord1" },
+  { number: 4, status: "free" },
+  { number: 5, status: "free" },
+  { number: 6, status: "free" },
+  { number: 7, status: "occupied", orderId: "ord2" },
+  { number: 8, status: "free" },
+  { number: 9, status: "free" },
+];
+
 const POS = () => {
+  const navigate = useNavigate();
+  
+  // Customer Info State
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [orderType, setOrderType] = useState<"dine_in" | "take_away">("dine_in");
+  const [selectedTable, setSelectedTable] = useState<number | null>(null);
+  const [tables, setTables] = useState<TableInfo[]>(INITIAL_TABLES);
+  
+  // Products and Cart
   const [products, setProducts] = useState<Product[]>([]);
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [taxRate, setTaxRate] = useState(0);
@@ -22,6 +70,21 @@ const POS = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loadingProducts, setLoadingProducts] = useState(false);
+
+  // Get current user info
+  const currentUser = {
+    name: (() => {
+      try {
+        const raw = localStorage.getItem("authUser");
+        if (!raw) return "Cashier";
+        const user = JSON.parse(raw);
+        return user?.name ?? "Cashier";
+      } catch {
+        return "Cashier";
+      }
+    })(),
+    terminalId: "T-001", // Hardcoded terminal ID
+  };
 
   // Fetch products from /api/mystock and map to POS Product shape
   useEffect(() => {
@@ -104,6 +167,11 @@ const POS = () => {
     }
   }, [stockWarnings]);
 
+  // Free tables for selection
+  const freeTables = useMemo(() => {
+    return tables.filter((t) => t.status === "free");
+  }, [tables]);
+
   const handleAddProduct = (product: Product) => {
     if (product.stock === 0) {
       toast.error("Product is out of stock!");
@@ -127,7 +195,7 @@ const POS = () => {
         subtotal: product.foreignerPrice,
       };
       setBillItems([...billItems, newItem]);
-      toast.success(`${product.name} added to bill`);
+      toast.success(`${product.name} added to order`);
     }
   };
 
@@ -157,53 +225,94 @@ const POS = () => {
 
   const handleRemoveItem = (productId: string) => {
     setBillItems(billItems.filter((item) => item.product.id !== productId));
-    toast.info("Item removed from bill");
+    toast.info("Item removed from order");
   };
 
-  const handleClearBill = () => {
-    if (billItems.length === 0) return;
+  const handleClearOrder = () => {
     setBillItems([]);
+    setCustomerName("");
+    setCustomerPhone("");
+    setOrderType("dine_in");
+    setSelectedTable(null);
     setDiscountRate(0);
-    toast.info("Bill cleared");
+    toast.info("Order cleared");
   };
 
-  const handleCompleteBill = () => {
-    if (billItems.length === 0) {
-      toast.error("Add items to the bill first!");
-      return;
+  const validateOrder = () => {
+    if (!customerName.trim()) {
+      toast.error("Please enter customer name");
+      return false;
     }
+    if (!customerPhone.trim()) {
+      toast.error("Please enter customer phone");
+      return false;
+    }
+    if (billItems.length === 0) {
+      toast.error("Please add items to the order");
+      return false;
+    }
+    if (orderType === "dine_in" && !selectedTable) {
+      toast.error("Please select a table for dine-in order");
+      return false;
+    }
+    return true;
+  };
+
+  const handleCreateOrder = () => {
+    if (!validateOrder()) return;
+
+    // Create order and send to kitchen (for dine-in)
+    const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
+    
+    // Mark table as occupied
+    if (orderType === "dine_in" && selectedTable) {
+      setTables(
+        tables.map((t) =>
+          t.number === selectedTable ? { ...t, status: "occupied" as const, orderId: orderNumber } : t
+        )
+      );
+    }
+
+    toast.success(`Order ${orderNumber} created successfully!`, {
+      description: orderType === "dine_in" 
+        ? `Table ${selectedTable} - ${customerName}. Sent to kitchen.`
+        : `Take Away - ${customerName}. Sent to kitchen.`,
+    });
+
+    // Navigate to orders page
+    navigate("/orders");
+
+    // Clear the form
+    handleClearOrder();
+  };
+
+  const handleTakeAwayPayment = () => {
+    if (!validateOrder()) return;
     setIsPaymentDialogOpen(true);
   };
 
   const handleConfirmPayment = (
     paymentMethod: 'cash' | 'card' | 'credit' | 'other',
     amountPaid: number,
-    customerName?: string,
-    customerPhone?: string,
+    _customerNameArg?: string,
+    _customerPhoneArg?: string,
     creditDescription?: string
   ) => {
     const now = new Date();
     const change = paymentMethod === 'credit' ? 0 : amountPaid - total;
     const billNumber = `B-${Date.now()}`; // simple unique bill number
-    const cashierName = (() => {
-      try {
-        const raw = localStorage.getItem('authUser');
-        if (!raw) return 'Cashier';
-        const user = JSON.parse(raw);
-        return user?.name ?? 'Cashier';
-      } catch {
-        return 'Cashier';
-      }
-    })();
 
     // Build payload for backend as per API contract
     const payload = {
       bill_number: billNumber,
       date: now.toISOString(),
       payment_method: paymentMethod.toUpperCase(),
-      customer_name: customerName ?? null,
+      customer_name: customerName,
       total: Number(total.toFixed(2)),
-      cashier_name: cashierName,
+      cashier_name: currentUser.name,
+      terminal_id: currentUser.terminalId,
+      order_type: orderType,
+      table_number: orderType === "dine_in" ? selectedTable : null,
       item_count: billItems.length,
       credit_note: creditDescription ?? null,
       cash_given: Number(amountPaid.toFixed(2)),
@@ -218,22 +327,7 @@ const POS = () => {
     // Call backend to persist bill and create inventory movements
     api
       .post('/bills', payload)
-      .then((res) => {
-        // Update stock levels locally (reflect subtraction)
-        const updatedProducts = products.map((product) => {
-          const billItem = billItems.find((item) => item.product.id === product.id);
-          if (billItem) {
-            const newStock = product.stock - billItem.quantity;
-            return {
-              ...product,
-              stock: newStock,
-              updatedAt: now,
-            };
-          }
-          return product;
-        });
-        setProducts(updatedProducts);
-
+      .then(() => {
         // Prepare printable bill object
         const bill: Bill = {
           id: billNumber,
@@ -254,29 +348,13 @@ const POS = () => {
         };
         printBillNewWindow(bill);
 
-        // Clear bill & close dialog
-        setBillItems([]);
-        setDiscountRate(0);
+        // Clear order & close dialog
+        handleClearOrder();
         setIsPaymentDialogOpen(false);
 
         toast.success('Bill completed successfully!', {
           description: `Bill #${billNumber} - Total: Rs. ${total.toFixed(2)}`,
         });
-
-        // Show low stock warnings after completing bill
-        setTimeout(() => {
-          const lowStockProducts = updatedProducts.filter(
-            (p) => p.stock > 0 && p.stock <= p.minStock
-          );
-          if (lowStockProducts.length > 0) {
-            toast.warning(`${lowStockProducts.length} product(s) are now low in stock!`, {
-              description: lowStockProducts
-                .slice(0, 3)
-                .map((p) => `${p.name}: ${p.stock} units`)
-                .join(', '),
-            });
-          }
-        }, 1000);
       })
       .catch((err) => {
         console.error('Failed to complete bill', err);
@@ -290,52 +368,324 @@ const POS = () => {
       <div>
         <h1 className="text-2xl md:text-3xl font-bold text-foreground">POS System</h1>
         <p className="text-sm md:text-base text-muted-foreground">
-          Fast and efficient point of sale
+          Terminal: {currentUser.terminalId} • Cashier: {currentUser.name}
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Product Search - Takes 2 columns on large screens */}
-        <div className="lg:col-span-2">
+        {/* Left Section - Customer Info & Products */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Customer Information Card */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Customer Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <User className="h-4 w-4" /> Customer Name
+                  </Label>
+                  <Input
+                    placeholder="Enter customer name"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Phone className="h-4 w-4" /> Customer Phone
+                  </Label>
+                  <Input
+                    placeholder="Enter phone number"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Order Type Selection */}
+              <div className="space-y-2">
+                <Label>Order Type</Label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={orderType === "dine_in" ? "default" : "outline"}
+                    className="flex-1"
+                    onClick={() => setOrderType("dine_in")}
+                  >
+                    <UtensilsCrossed className="h-4 w-4 mr-2" />
+                    Dine In
+                  </Button>
+                  <Button
+                    variant={orderType === "take_away" ? "default" : "outline"}
+                    className="flex-1"
+                    onClick={() => {
+                      setOrderType("take_away");
+                      setSelectedTable(null);
+                    }}
+                  >
+                    <Package className="h-4 w-4 mr-2" />
+                    Take Away
+                  </Button>
+                </div>
+              </div>
+
+              {/* Table Selection (for Dine In) */}
+              {orderType === "dine_in" && (
+                <div className="space-y-2">
+                  <Label>Select Table</Label>
+                  <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+                    {tables.map((table) => (
+                      <Button
+                        key={table.number}
+                        variant={selectedTable === table.number ? "default" : "outline"}
+                        className={`h-16 ${
+                          table.status === "occupied"
+                            ? "opacity-50 cursor-not-allowed bg-red-50 border-red-200"
+                            : selectedTable === table.number
+                            ? ""
+                            : "hover:bg-green-50 hover:border-green-200"
+                        }`}
+                        disabled={table.status === "occupied"}
+                        onClick={() => setSelectedTable(table.number)}
+                      >
+                        <div className="text-center">
+                          <div className="font-bold">Table {table.number}</div>
+                          <div className="text-xs">
+                            {table.status === "occupied" ? (
+                              <Badge variant="destructive" className="text-xs">Occupied</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">Free</Badge>
+                            )}
+                          </div>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Product Search */}
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-3">
-                <div className="text-sm text-muted-foreground">Showing page {page} of {totalPages}</div>
+                <div className="text-sm text-muted-foreground">
+                  Showing page {page} of {totalPages}
+                </div>
                 <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Prev</Button>
-                  <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                  >
+                    Prev
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                  >
+                    Next
+                  </Button>
                 </div>
               </div>
               <LocalLoader loaderKey="pos-products">
                 <ProductSearch products={products} onAddProduct={handleAddProduct} />
               </LocalLoader>
-              {loadingProducts && <p className="text-xs text-muted-foreground mt-2">Loading products...</p>}
+              {loadingProducts && (
+                <p className="text-xs text-muted-foreground mt-2">Loading products...</p>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Bill Cart - Takes 1 column on large screens */}
+        {/* Right Section - Order Cart */}
         <div className="lg:col-span-1">
-          <BillCart
-            items={billItems}
-            subtotal={subtotal}
-            tax={tax}
-            taxRate={taxRate}
-            discount={discount}
-            discountRate={discountRate}
-            total={total}
-            onUpdateQuantity={handleUpdateQuantity}
-            onRemoveItem={handleRemoveItem}
-            onUpdateTaxRate={setTaxRate}
-            onUpdateDiscountRate={setDiscountRate}
-            onClearBill={handleClearBill}
-            onCompleteBill={handleCompleteBill}
-            stockWarnings={stockWarnings}
-          />
+          <Card className="h-full flex flex-col">
+            <CardHeader>
+              <CardTitle className="flex justify-between items-center">
+                <span className="flex items-center gap-2">
+                  <ShoppingCart className="h-5 w-5" />
+                  Current Order
+                </span>
+                {billItems.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={handleClearOrder}>
+                    Clear All
+                  </Button>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col">
+              {/* Stock Warnings */}
+              {stockWarnings.length > 0 && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Low Stock Warning:</strong>
+                    <ul className="mt-2 space-y-1">
+                      {stockWarnings.map((warning, index) => (
+                        <li key={index} className="text-sm">
+                          {warning.product.name}: Only {warning.currentStock} units
+                        </li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Order Items */}
+              <div className="flex-1 overflow-y-auto space-y-2 mb-4 max-h-[300px]">
+                {billItems.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    No items added yet
+                  </div>
+                ) : (
+                  billItems.map((item) => (
+                    <div
+                      key={item.product.id}
+                      className="border rounded-lg p-3 space-y-2"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-sm">{item.product.name}</h4>
+                          <p className="text-xs text-muted-foreground">
+                            Rs. {item.product.foreignerPrice.toFixed(2)} each
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveItem(item.product.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              handleUpdateQuantity(item.product.id, item.quantity - 1)
+                            }
+                            disabled={item.quantity <= 1}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="w-12 text-center font-medium">
+                            {item.quantity}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              handleUpdateQuantity(item.product.id, item.quantity + 1)
+                            }
+                            disabled={item.quantity >= item.product.stock}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <span className="font-bold">Rs. {item.subtotal.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Calculation Section */}
+              {billItems.length > 0 && (
+                <div className="space-y-4 border-t pt-4">
+                  {/* Tax Rate */}
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="taxRate" className="text-sm w-20">
+                      Tax %:
+                    </Label>
+                    <Input
+                      id="taxRate"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={taxRate}
+                      onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
+                      className="w-20"
+                    />
+                    <span className="text-sm text-muted-foreground flex-1 text-right">
+                      Rs. {tax.toFixed(2)}
+                    </span>
+                  </div>
+
+                  {/* Discount Rate */}
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="discountRate" className="text-sm w-20">
+                      Discount %:
+                    </Label>
+                    <Input
+                      id="discountRate"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={discountRate}
+                      onChange={(e) => setDiscountRate(parseFloat(e.target.value) || 0)}
+                      className="w-20"
+                    />
+                    <span className="text-sm text-muted-foreground flex-1 text-right">
+                      Rs. {discount.toFixed(2)}
+                    </span>
+                  </div>
+
+                  <Separator />
+
+                  {/* Totals */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal:</span>
+                      <span>Rs. {subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Tax:</span>
+                      <span>Rs. {tax.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Discount:</span>
+                      <span className="text-green-600">- Rs. {discount.toFixed(2)}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between font-bold text-lg">
+                      <span>Total:</span>
+                      <span>Rs. {total.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="space-y-2 pt-2">
+                    {orderType === "dine_in" ? (
+                      <Button className="w-full" size="lg" onClick={handleCreateOrder}>
+                        <Send className="h-4 w-4 mr-2" />
+                        Send to Kitchen
+                      </Button>
+                    ) : (
+                      <Button className="w-full" size="lg" onClick={handleTakeAwayPayment}>
+                        <Printer className="h-4 w-4 mr-2" />
+                        Print & Pay
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      {/* Payment Dialog */}
+      {/* Payment Dialog for Take Away */}
       <PaymentDialog
         open={isPaymentDialogOpen}
         onOpenChange={setIsPaymentDialogOpen}

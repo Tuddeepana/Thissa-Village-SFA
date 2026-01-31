@@ -12,6 +12,7 @@ import {
     Receipt,
     Users,
     TrendingUp,
+    ClipboardList,
 } from "lucide-react";
 import {
   Sidebar,
@@ -26,17 +27,17 @@ import {
 
 const sfaItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Categories", url: "/categories", icon: FolderTree },
-  { title: "Products", url: "/products", icon: Package },
-  { title: "My Stock", url: "/my-stock", icon: Warehouse },
-  { title: "Invoices", url: "/invoices", icon: FileText },
-  { title: "Bills", url: "/bills", icon: Receipt },
-  { title: "Sales Summary", url: "/sales-summary", icon: TrendingUp },
+  { title: "PNL", url: "/sales-summary", icon: TrendingUp },
+  { title: "Category", url: "/categories", icon: FolderTree },
+  { title: "Product", url: "/products", icon: Package },
+  { title: "Invoice", url: "/invoices", icon: FileText },
+  { title: "Bill", url: "/bills", icon: Receipt },
   { title: "Users", url: "/users", icon: Users },
 ];
 
 const posItems = [
   { title: "POS System", url: "/pos", icon: ShoppingCart },
+  { title: "Orders", url: "/orders", icon: ClipboardList },
   { title: "Bills", url: "/bills", icon: Receipt },
 ];
 

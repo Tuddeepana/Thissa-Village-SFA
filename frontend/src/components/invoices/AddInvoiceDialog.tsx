@@ -37,6 +37,7 @@ interface ProductItem {
   quantity: number;
   unitPrice: number;
   total: number;
+  unitType?: string;
 }
 
 interface AddInvoiceDialogProps {
@@ -171,6 +172,7 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
           quantity: quantity,
           unitPrice: price,
           total: quantity * price,
+          unitType: prod.unit_type || "Piece",
         };
         setItems([...items, newItem]);
       }
@@ -357,12 +359,20 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
                 </Select>
               </div>
               {effectiveSelectedProduct && (
-                <div className="grid grid-cols-3 gap-4 items-center">
+                <div className="grid grid-cols-4 gap-4 items-center">
                   <div className="grid gap-2">
                     <Label>Unit Price</Label>
                     <Input
                       value={String(unitPrice)}
                       readOnly
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Unit Type</Label>
+                    <Input
+                      value={effectiveSelectedProduct.unit_type || "Piece"}
+                      readOnly
+                      className="bg-muted"
                     />
                   </div>
                   <div className="grid gap-2">
@@ -392,6 +402,7 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
                   <tr>
                     <th className="px-4 py-2">Product</th>
                     <th className="px-4 py-2">Category</th>
+                    <th className="px-4 py-2">Unit Type</th>
                     <th className="px-4 py-2">Quantity</th>
                     <th className="px-4 py-2">Unit Price</th>
                     <th className="px-4 py-2">Total</th>
@@ -403,6 +414,7 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
                     <tr key={item.productId}>
                       <td className="border px-4 py-2">{item.productName}</td>
                       <td className="border px-4 py-2">{item.category}</td>
+                      <td className="border px-4 py-2">{item.unitType || "Piece"}</td>
                       <td className="border px-4 py-2">
                         <Input
                           type="number"
