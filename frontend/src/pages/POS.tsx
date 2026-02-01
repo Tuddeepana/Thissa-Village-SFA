@@ -9,10 +9,12 @@ import { Separator } from "@/components/ui/separator";
 import { ProductSearch } from "@/components/pos/ProductSearch";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import api from "@/api/client";
+import { tableService } from "@/api/services/tableService";
 import { Product, BillItem, Bill, StockWarning } from "@/types/pos";
 import { printBillNewWindow } from "@/lib/billPrinter";
 import { toast } from "sonner";
 import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
+import type { ExpandedTableItem } from "@/types/table.types";
 import LocalLoader from "@/components/common/LocalLoader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -27,29 +29,21 @@ import {
   Send,
   Printer,
   AlertTriangle,
+  Crown,
 } from "lucide-react";
 
 const PAGE_SIZE = 50;
 
 // Table status for dine-in
 interface TableInfo {
-  number: number;
+  id: string;
+  displayName: string;
+  baseName: string;
+  tableNumber: number;
+  table_type: 'VIP' | 'NORMAL';
   status: "free" | "occupied";
   orderId?: string;
 }
-
-// Hardcoded tables (9 tables)
-const INITIAL_TABLES: TableInfo[] = [
-  { number: 1, status: "free" },
-  { number: 2, status: "free" },
-  { number: 3, status: "occupied", orderId: "ord1" },
-  { number: 4, status: "free" },
-  { number: 5, status: "free" },
-  { number: 6, status: "free" },
-  { number: 7, status: "occupied", orderId: "ord2" },
-  { number: 8, status: "free" },
-  { number: 9, status: "free" },
-];
 
 const POS = () => {
   const navigate = useNavigate();
@@ -58,9 +52,9 @@ const POS = () => {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [orderType, setOrderType] = useState<"dine_in" | "take_away">("dine_in");
-  const [selectedTable, setSelectedTable] = useState<number | null>(null);
-  const [tables, setTables] = useState<TableInfo[]>(INITIAL_TABLES);
-  
+  const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  const [tables, setTables] = useState<TableInfo[]>([]);
+
   // Products and Cart
   const [products, setProducts] = useState<Product[]>([]);
   const [billItems, setBillItems] = useState<BillItem[]>([]);
@@ -85,6 +79,33 @@ const POS = () => {
     })(),
     terminalId: "T-001", // Hardcoded terminal ID
   };
+
+  // Fetch tables from API
+  useEffect(() => {
+    let cancelled = false;
+    const fetchTables = async () => {
+      try {
+        const response = await tableService.getExpanded();
+        if (cancelled) return;
+        const expandedTables: ExpandedTableItem[] = response.tables || [];
+        const mappedTables: TableInfo[] = expandedTables.map((t) => ({
+          id: t.id,
+          displayName: t.displayName,
+          baseName: t.baseName,
+          tableNumber: t.tableNumber,
+          table_type: t.table_type,
+          status: "free" as const,
+          orderId: undefined,
+        }));
+        setTables(mappedTables);
+      } catch (err) {
+        console.error("Failed to load tables", err);
+        toast.error("Failed to load tables");
+      }
+    };
+    fetchTables();
+    return () => { cancelled = true; };
+  }, []);
 
   // Fetch products from /api/mystock and map to POS Product shape
   useEffect(() => {
@@ -268,16 +289,19 @@ const POS = () => {
     if (orderType === "dine_in" && selectedTable) {
       setTables(
         tables.map((t) =>
-          t.number === selectedTable ? { ...t, status: "occupied" as const, orderId: orderNumber } : t
+          t.id === selectedTable ? { ...t, status: "occupied" as const, orderId: orderNumber } : t
         )
       );
-    }
 
-    toast.success(`Order ${orderNumber} created successfully!`, {
-      description: orderType === "dine_in" 
-        ? `Table ${selectedTable} - ${customerName}. Sent to kitchen.`
-        : `Take Away - ${customerName}. Sent to kitchen.`,
-    });
+      const selectedTableInfo = tables.find(t => t.id === selectedTable);
+      toast.success(`Order ${orderNumber} created successfully!`, {
+        description: `${selectedTableInfo?.displayName} - ${customerName}. Sent to kitchen.`,
+      });
+    } else {
+      toast.success(`Order ${orderNumber} created successfully!`, {
+        description: `Take Away - ${customerName}. Sent to kitchen.`,
+      });
+    }
 
     // Navigate to orders page
     navigate("/orders");
@@ -434,34 +458,48 @@ const POS = () => {
               {orderType === "dine_in" && (
                 <div className="space-y-2">
                   <Label>Select Table</Label>
-                  <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
-                    {tables.map((table) => (
-                      <Button
-                        key={table.number}
-                        variant={selectedTable === table.number ? "default" : "outline"}
-                        className={`h-16 ${
-                          table.status === "occupied"
-                            ? "opacity-50 cursor-not-allowed bg-red-50 border-red-200"
-                            : selectedTable === table.number
-                            ? ""
-                            : "hover:bg-green-50 hover:border-green-200"
-                        }`}
-                        disabled={table.status === "occupied"}
-                        onClick={() => setSelectedTable(table.number)}
-                      >
-                        <div className="text-center">
-                          <div className="font-bold">Table {table.number}</div>
-                          <div className="text-xs">
-                            {table.status === "occupied" ? (
-                              <Badge variant="destructive" className="text-xs">Occupied</Badge>
-                            ) : (
-                              <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">Free</Badge>
-                            )}
+                  {tables.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No tables available. Please create tables in Table Management.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                      {tables.map((table) => (
+                        <Button
+                          key={table.id}
+                          variant={selectedTable === table.id ? "default" : "outline"}
+                          className={`h-20 ${
+                            table.status === "occupied"
+                              ? "opacity-50 cursor-not-allowed bg-red-50 border-red-200"
+                              : selectedTable === table.id
+                              ? table.table_type === "VIP" 
+                                ? "bg-amber-600 hover:bg-amber-700"
+                                : ""
+                              : table.table_type === "VIP"
+                              ? "hover:bg-amber-50 hover:border-amber-300 border-amber-200"
+                              : "hover:bg-green-50 hover:border-green-200"
+                          }`}
+                          disabled={table.status === "occupied"}
+                          onClick={() => setSelectedTable(table.id)}
+                        >
+                          <div className="text-center">
+                            <div className="font-bold text-sm">{table.displayName}</div>
+                            <div className="flex flex-col gap-1 mt-1">
+                              {table.table_type === "VIP" && (
+                                <Badge className="text-xs bg-amber-100 text-amber-800 border-amber-300">
+                                  <Crown className="h-3 w-3 mr-1" />
+                                  VIP
+                                </Badge>
+                              )}
+                              {table.status === "occupied" ? (
+                                <Badge variant="destructive" className="text-xs">Occupied</Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">Free</Badge>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </Button>
-                    ))}
-                  </div>
+                        </Button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
