@@ -259,8 +259,8 @@ const Orders = () => {
       </head>
       <body>
         <div class="header">
-          <h1>TASTY CORNER</h1>
-          <p>Restaurant & Cafe</p>
+          <h1>Thissa Village</h1>
+          <p>Restaurant</p>
           <p>Tel: 011-1234567</p>
         </div>
         <div class="divider"></div>

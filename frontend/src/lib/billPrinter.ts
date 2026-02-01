@@ -1,7 +1,7 @@
 import { Bill } from '@/types/pos';
 import { format } from 'date-fns';
 
-export const printBill = (bill: Bill, storeName: string = "Tasty Corner") => {
+export const printBill = (bill: Bill, storeName: string = "Thissa Village") => {
   // Create a hidden iframe for printing
   const printFrame = document.createElement('iframe');
   printFrame.style.position = 'absolute';
@@ -241,7 +241,7 @@ export const printBill = (bill: Bill, storeName: string = "Tasty Corner") => {
 };
 
 // Alternative: Generate print-friendly content in new window
-export const printBillNewWindow = (bill: Bill, storeName: string = "Tasty Corner") => {
+export const printBillNewWindow = (bill: Bill, storeName: string = "Thissa Village") => {
   const printWindow = window.open('', '_blank', 'width=302,height=500');
   if (!printWindow) return;
 

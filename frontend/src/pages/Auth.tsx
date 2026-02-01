@@ -46,7 +46,7 @@ const Auth = () => {
               <ChefHat className="w-8 h-8 text-primary-foreground" />
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold text-primary">Tasty Corner</CardTitle>
+          <CardTitle className="text-3xl font-bold text-primary">Thissa Village</CardTitle>
           <CardDescription className="text-base">
             {isLogin ? "Welcome back to your restaurant management system" : "Create your account"}
           </CardDescription>

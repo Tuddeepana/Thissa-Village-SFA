@@ -67,7 +67,7 @@ export function AppSidebar() {
                             <ChefHat className="w-6 h-6 text-primary-foreground"/>
                         </div>
                         <div>
-                            <h1 className="font-bold text-base md:text-lg text-foreground">Tasty Corner</h1>
+                            <h1 className="font-bold text-base md:text-lg text-foreground">Thissa Village</h1>
                             <p className="text-xs text-muted-foreground">{moduleLabel}</p>
                         </div>
                     </div>
