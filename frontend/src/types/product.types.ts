@@ -4,6 +4,7 @@ export type Product = {
   description?: string | null;
   barcode?: string | null;
   unit_type?: string | null;
+  product_type?: 'HANDMADE' | 'PURCHASE';
   // Decimal fields are serialized as strings from backend; handle as string in UI and coerce as needed
   cost_price: string;
   foreigner_price: string;
@@ -20,6 +21,7 @@ export type CreateProductPayload = {
   description?: string | null;
   barcode?: string | null;
   unit_type?: string | null;
+  product_type?: 'HANDMADE' | 'PURCHASE';
   cost_price: string; // send as string
   foreigner_price: string; // send as string
   local_price: string; // send as string
@@ -32,6 +34,7 @@ export type UpdateProductPayload = Partial<{
   description?: string | null;
   barcode?: string | null;
   unit_type?: string | null;
+  product_type: 'HANDMADE' | 'PURCHASE';
   cost_price: string;
   foreigner_price: string;
   local_price: string;

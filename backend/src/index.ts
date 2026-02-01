@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import prisma from './lib/prisma';
 import userRoutes from './routes/user.routes';
 import categoryRoutes from './routes/category.routes';
+import unitRoutes from './routes/unit.routes';
+import tableRoutes from './routes/table.routes';
 import productRoutes from './routes/product.routes';
 import invoiceRoutes from './routes/invoice.routes';
 import inventoryRoutes from './routes/inventory.routes';
@@ -37,6 +39,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/units', unitRoutes);
+app.use('/api/tables', tableRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/bills', billRoutes);

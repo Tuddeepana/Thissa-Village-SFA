@@ -8,6 +8,8 @@ export type MyStockCardResponse = {
 export type MyStockTableRow = {
   productId: string;
   productName: string;
+  productType?: 'HANDMADE' | 'PURCHASE';
+  unitType?: string | null;
   category: { id: string; name: string } | null;
   availableQuantity: number;
   minStock: number;

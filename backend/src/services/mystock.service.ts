@@ -10,7 +10,7 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
   const pageSize = query.pageSize && query.pageSize > 0 ? query.pageSize : 10;
   const skip = (page - 1) * pageSize;
 
-  // Build product where filter
+  // Build product where filter - include all products (PURCHASE and HANDMADE)
   const productWhere: any = {
     AND: [
       query.productName ? { name: { contains: query.productName, mode: 'insensitive' } } : {},
@@ -43,7 +43,8 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
   // Build rows for all products
   const allRows: MyStockTableRow[] = products.map((p: any) => {
     const inv = latestMap[p.id];
-    const available = inv ? inv.available_quantity : 0;
+    // For HANDMADE products, always show quantity as 0 (they're not tracked in inventory)
+    const available = p.product_type === 'HANDMADE' ? 0 : (inv ? inv.available_quantity : 0);
     let status: 'InStock' | 'LowStock' | 'OutOfStock' = 'InStock';
     if (available <= 0) status = 'OutOfStock';
     else if (p.low_stock && available <= p.low_stock) status = 'LowStock';
@@ -51,6 +52,8 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
     return {
       productId: p.id,
       productName: p.name,
+      productType: p.product_type,
+      unitType: p.unit_type,
       category: p.category ? { id: p.category.id, name: p.category.name } : null,
       availableQuantity: available,
       minStock: p.low_stock ?? 0,

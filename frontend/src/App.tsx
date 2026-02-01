@@ -8,6 +8,8 @@ import ModuleSelection from "./pages/ModuleSelection";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Categories from "./pages/Categories";
+import Units from "./pages/Units";
+import Tables from "./pages/Tables";
 import Products from "./pages/Products";
 import Invoices from "./pages/Invoices";
 import LowStock from "./pages/LowStock";
@@ -70,6 +72,8 @@ const App = () => (
             <Route index element={<Navigate to="/modules" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="categories" element={<Categories />} />
+            <Route path="units" element={<Units />} />
+            <Route path="tables" element={<Tables />} />
             <Route path="products" element={<Products />} />
             <Route path="invoices" element={<Invoices />} />
             <Route path="low-stock" element={<LowStock />} />

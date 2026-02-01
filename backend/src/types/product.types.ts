@@ -2,6 +2,9 @@ export interface ProductDTO {
   id: string;
   name: string;
   description?: string | null;
+  barcode?: string | null;
+  unit_type?: string | null;
+  product_type: 'HANDMADE' | 'PURCHASE';
   cost_price: string; // Decimal
   foreigner_price: string; // Decimal
   local_price: string; // Decimal
@@ -15,6 +18,9 @@ export interface ProductDTO {
 export type ProductCreateInput = {
   name: string;
   description?: string | null;
+  barcode?: string | null;
+  unit_type?: string | null;
+  product_type?: 'HANDMADE' | 'PURCHASE';
   cost_price: number | string;
   foreigner_price: number | string;
   local_price: number | string;
@@ -25,6 +31,9 @@ export type ProductCreateInput = {
 export type ProductUpdateInput = Partial<{
   name: string;
   description: string | null;
+  barcode: string | null;
+  unit_type: string | null;
+  product_type: 'HANDMADE' | 'PURCHASE';
   cost_price: number | string;
   foreigner_price: number | string;
   local_price: number | string;

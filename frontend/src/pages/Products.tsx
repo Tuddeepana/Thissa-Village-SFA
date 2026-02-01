@@ -26,8 +26,10 @@ import LocalLoader from "@/components/common/LocalLoader";
 import { useQuery } from "@tanstack/react-query";
 import { productService } from "@/api/services/productService";
 import { categoryService } from "@/api/services/categoryService";
+import { unitService } from "@/api/services/unitService";
 import type { Product } from "@/types/product.types";
 import type { Category } from "@/types/category.types";
+import type { Unit } from "@/types/unit.types";
 
 // Result shape returned by productService.list
 type ProductListResult = {
@@ -42,6 +44,7 @@ const Products = () => {
     const { toast } = useToast();
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [units, setUnits] = useState<Unit[]>([]);
     const categoryNameById = useMemo(() => {
         const map: Record<string, string> = {};
         categories.forEach(c => { if (c.id) map[c.id] = c.name; });
@@ -60,6 +63,7 @@ const Products = () => {
     // Controlled form state for minimal add form
     const [newName, setNewName] = useState("");
     const [newCategory, setNewCategory] = useState("");
+    const [newProductType, setNewProductType] = useState<'HANDMADE' | 'PURCHASE'>('PURCHASE');
     const [newBarcode, setNewBarcode] = useState("");
     const [newUnitType, setNewUnitType] = useState("");
     const [newLowStockAlert, setNewLowStockAlert] = useState<number | "">("");
@@ -118,6 +122,7 @@ const Products = () => {
     const resetForm = () => {
         setNewName("");
         setNewCategory("");
+        setNewProductType('PURCHASE');
         setNewBarcode("");
         setNewUnitType("");
         setNewLowStockAlert("");
@@ -163,6 +168,20 @@ const Products = () => {
         if (categoryList) setCategories(categoryList);
     }, [categoryList]);
 
+    // Fetch units for unit type select
+    const { data: unitList } = useQuery({
+        queryKey: ["units-all"],
+        queryFn: async () => {
+            const response = await unitService.list();
+            return response.units;
+        },
+        staleTime: 30_000,
+    });
+
+    useEffect(() => {
+        if (unitList) setUnits(unitList);
+    }, [unitList]);
+
     const handleAddSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -183,6 +202,7 @@ const Products = () => {
         try {
             await productService.create({
                 name: newName.trim(),
+                product_type: newProductType,
                 barcode: newBarcode.trim() || null,
                 unit_type: newUnitType.trim() || null,
                 cost_price: Number.isNaN(costPrice) ? "0.00" : costPrice.toFixed(2),
@@ -234,6 +254,19 @@ const Products = () => {
                             </div>
 
                             <div className="space-y-2">
+                                <Label htmlFor="productType">Product Type</Label>
+                                <Select value={newProductType} onValueChange={(val) => setNewProductType(val as 'HANDMADE' | 'PURCHASE')}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select product type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="PURCHASE">Purchase</SelectItem>
+                                        <SelectItem value="HANDMADE">HandMade</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
                                 <Label htmlFor="productName">Product Name</Label>
                                 <Input
                                     id="productName"
@@ -267,18 +300,34 @@ const Products = () => {
                                 />
                             </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="foreignerPrice">Selling Price</Label>
-                                <Input
-                                    id="foreignerPrice"
-                                    type="number"
-                                    placeholder="Enter selling price"
-                                    value={newForeignerPrice === "" ? "" : String(newForeignerPrice)}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setNewForeignerPrice(val === "" ? "" : Number(val));
-                                    }}
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="foreignerPrice">Selling Price (Foreigner)</Label>
+                                    <Input
+                                        id="foreignerPrice"
+                                        type="number"
+                                        placeholder="Enter selling price for foreigners"
+                                        value={newForeignerPrice === "" ? "" : String(newForeignerPrice)}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setNewForeignerPrice(val === "" ? "" : Number(val));
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="localPrice">Selling Price (Local)</Label>
+                                    <Input
+                                        id="localPrice"
+                                        type="number"
+                                        placeholder="Enter selling price for locals"
+                                        value={newLocalPrice === "" ? "" : String(newLocalPrice)}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setNewLocalPrice(val === "" ? "" : Number(val));
+                                        }}
+                                    />
+                                </div>
                             </div>
 
                             <div className="space-y-2">
@@ -288,14 +337,11 @@ const Products = () => {
                                         <SelectValue placeholder="Select unit type" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="piece">Piece</SelectItem>
-                                        <SelectItem value="kg">Kilogram (kg)</SelectItem>
-                                        <SelectItem value="g">Gram (g)</SelectItem>
-                                        <SelectItem value="l">Liter (L)</SelectItem>
-                                        <SelectItem value="ml">Milliliter (ml)</SelectItem>
-                                        <SelectItem value="pack">Pack</SelectItem>
-                                        <SelectItem value="box">Box</SelectItem>
-                                        <SelectItem value="dozen">Dozen</SelectItem>
+                                        {units.map((unit) => (
+                                            <SelectItem key={unit.id} value={unit.name}>
+                                                {unit.name}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -338,10 +384,12 @@ const Products = () => {
                             <TableRow>
                                 <TableHead>Name</TableHead>
                                 <TableHead>Category</TableHead>
+                                <TableHead>Product Type</TableHead>
                                 <TableHead>Barcode</TableHead>
                                 <TableHead>Unit Type</TableHead>
                                 <TableHead>Product Price</TableHead>
-                                <TableHead>Selling Price</TableHead>
+                                <TableHead>Selling Price (Foreigner)</TableHead>
+                                <TableHead>Selling Price (Local)</TableHead>
                                 <TableHead>Low Stock Alert</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
@@ -351,6 +399,7 @@ const Products = () => {
                                 <TableRow key={product.id}>
                                     <TableCell className="font-medium">{product.name}</TableCell>
                                     <TableCell>{categoryNameById[product.categoryId] ?? "-"}</TableCell>
+                                    <TableCell>{product.product_type === 'HANDMADE' ? 'HandMade' : 'Purchase'}</TableCell>
                                     <TableCell>{product.barcode ?? "-"}</TableCell>
                                     <TableCell>{product.unit_type ?? "-"}</TableCell>
                                     <TableCell>
@@ -381,6 +430,21 @@ const Products = () => {
                                             />
                                         ) : (
                                             product.foreigner_price
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        {editingId === product.id ? (
+                                            <Input
+                                                className="w-24"
+                                                type="number"
+                                                value={editingLocalPrice === "" ? "" : String(editingLocalPrice)}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setEditingLocalPrice(val === "" ? "" : Number(val));
+                                                }}
+                                            />
+                                        ) : (
+                                            product.local_price ?? "-"
                                         )}
                                     </TableCell>
                                     <TableCell>

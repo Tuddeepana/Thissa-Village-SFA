@@ -12,6 +12,9 @@ export const createProduct = async (payload: ProductCreateInput): Promise<Produc
     data: {
       name: payload.name,
       description: payload.description ?? null,
+      barcode: payload.barcode ?? null,
+      unit_type: payload.unit_type ?? null,
+      product_type: payload.product_type ?? 'PURCHASE',
       cost_price: payload.cost_price,
       foreigner_price: payload.foreigner_price,
       local_price: payload.local_price,
@@ -68,6 +71,9 @@ export const updateProduct = async (id: string, payload: ProductUpdateInput): Pr
     data: {
       name: payload.name ?? undefined,
       description: payload.description ?? undefined,
+      barcode: payload.barcode ?? undefined,
+      unit_type: payload.unit_type ?? undefined,
+      product_type: payload.product_type ?? undefined,
       cost_price: payload.cost_price ?? undefined,
       foreigner_price: payload.foreigner_price ?? undefined,
       local_price: payload.local_price ?? undefined,

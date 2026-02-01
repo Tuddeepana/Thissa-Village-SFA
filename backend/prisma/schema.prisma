@@ -9,6 +9,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {
@@ -19,6 +20,16 @@ enum Role {
 enum PaidStatus {
   PAID
   PENDING
+}
+
+enum ProductType {
+  HANDMADE
+  PURCHASE
+}
+
+enum TableType {
+  VIP
+  NORMAL
 }
 
 model User {
@@ -49,13 +60,39 @@ model Category {
   @@map("categories")
 }
 
+model Unit {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@map("units")
+}
+
+model RestaurantTable {
+  id         String    @id @default(uuid())
+  name       String    @unique
+  table_type TableType @default(NORMAL)
+  quantity   Int       @default(1)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  @@map("restaurant_tables")
+}
+
 model Product {
-  id              String   @id @default(uuid())
+  id              String      @id @default(uuid())
   name            String
   description     String?
-  cost_price      Decimal  @db.Decimal(10, 2)
-  foreigner_price Decimal  @db.Decimal(10, 2)
-  local_price     Decimal  @db.Decimal(10, 2)
+  barcode         String?
+  unit_type       String?
+  product_type    ProductType @default(PURCHASE)
+  cost_price      Decimal     @db.Decimal(10, 2)
+  foreigner_price Decimal     @db.Decimal(10, 2)
+  local_price     Decimal     @db.Decimal(10, 2)
   low_stock       Int?
 
   categoryId String

@@ -6,6 +6,9 @@ const decimalNumber = z.coerce.number();
 export const createProductSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional().nullable(),
+  barcode: z.string().optional().nullable(),
+  unit_type: z.string().optional().nullable(),
+  product_type: z.enum(['HANDMADE', 'PURCHASE']).optional().default('PURCHASE'),
   cost_price: decimalNumber.min(0, 'Cost price must be >= 0'),
   foreigner_price: decimalNumber.min(0, 'Foreigner price must be >= 0'),
   local_price: decimalNumber.min(0, 'Local price must be >= 0'),
@@ -16,6 +19,9 @@ export const createProductSchema = z.object({
 export const updateProductSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional().nullable(),
+  barcode: z.string().optional().nullable(),
+  unit_type: z.string().optional().nullable(),
+  product_type: z.enum(['HANDMADE', 'PURCHASE']).optional(),
   cost_price: decimalNumber.min(0, 'Cost price must be >= 0').optional(),
   foreigner_price: decimalNumber.min(0, 'Foreigner price must be >= 0').optional(),
   local_price: decimalNumber.min(0, 'Local price must be >= 0').optional(),
