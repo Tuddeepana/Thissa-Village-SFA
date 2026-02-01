@@ -27,6 +27,11 @@ enum ProductType {
   PURCHASE
 }
 
+enum TableType {
+  VIP
+  NORMAL
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -64,6 +69,18 @@ model Unit {
   deletedAt   DateTime?
 
   @@map("units")
+}
+
+model RestaurantTable {
+  id         String    @id @default(uuid())
+  name       String    @unique
+  table_type TableType @default(NORMAL)
+  quantity   Int       @default(1)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  @@map("restaurant_tables")
 }
 
 model Product {

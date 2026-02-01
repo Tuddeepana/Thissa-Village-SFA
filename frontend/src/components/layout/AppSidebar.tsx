@@ -14,6 +14,7 @@ import {
     TrendingUp,
     ClipboardList,
     Ruler,
+    TableProperties,
 } from "lucide-react";
 import {
     Sidebar,
@@ -31,6 +32,7 @@ const sfaItems = [
     {title: "PNL", url: "/sales-summary", icon: TrendingUp},
     {title: "Category", url: "/categories", icon: FolderTree},
     {title: "Units", url: "/units", icon: Ruler},
+    {title: "Tables", url: "/tables", icon: TableProperties},
     {title: "My Stock", url: "/my-stock", icon: Warehouse},
     {title: "Product", url: "/products", icon: Package},
     {title: "Invoice", url: "/invoices", icon: FileText},
