@@ -267,18 +267,34 @@ const Products = () => {
                                 />
                             </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="foreignerPrice">Selling Price</Label>
-                                <Input
-                                    id="foreignerPrice"
-                                    type="number"
-                                    placeholder="Enter selling price"
-                                    value={newForeignerPrice === "" ? "" : String(newForeignerPrice)}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setNewForeignerPrice(val === "" ? "" : Number(val));
-                                    }}
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="foreignerPrice">Selling Price (Foreigner)</Label>
+                                    <Input
+                                        id="foreignerPrice"
+                                        type="number"
+                                        placeholder="Enter selling price for foreigners"
+                                        value={newForeignerPrice === "" ? "" : String(newForeignerPrice)}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setNewForeignerPrice(val === "" ? "" : Number(val));
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="localPrice">Selling Price (Local)</Label>
+                                    <Input
+                                        id="localPrice"
+                                        type="number"
+                                        placeholder="Enter selling price for locals"
+                                        value={newLocalPrice === "" ? "" : String(newLocalPrice)}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setNewLocalPrice(val === "" ? "" : Number(val));
+                                        }}
+                                    />
+                                </div>
                             </div>
 
                             <div className="space-y-2">
@@ -341,7 +357,8 @@ const Products = () => {
                                 <TableHead>Barcode</TableHead>
                                 <TableHead>Unit Type</TableHead>
                                 <TableHead>Product Price</TableHead>
-                                <TableHead>Selling Price</TableHead>
+                                <TableHead>Selling Price (Foreigner)</TableHead>
+                                <TableHead>Selling Price (Local)</TableHead>
                                 <TableHead>Low Stock Alert</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
@@ -381,6 +398,21 @@ const Products = () => {
                                             />
                                         ) : (
                                             product.foreigner_price
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        {editingId === product.id ? (
+                                            <Input
+                                                className="w-24"
+                                                type="number"
+                                                value={editingLocalPrice === "" ? "" : String(editingLocalPrice)}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setEditingLocalPrice(val === "" ? "" : Number(val));
+                                                }}
+                                            />
+                                        ) : (
+                                            product.local_price ?? "-"
                                         )}
                                     </TableCell>
                                     <TableCell>
