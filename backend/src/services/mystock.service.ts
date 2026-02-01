@@ -10,9 +10,10 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
   const pageSize = query.pageSize && query.pageSize > 0 ? query.pageSize : 10;
   const skip = (page - 1) * pageSize;
 
-  // Build product where filter
+  // Build product where filter - only show PURCHASE products
   const productWhere: any = {
     AND: [
+      { product_type: 'PURCHASE' }, // Only show Purchase items
       query.productName ? { name: { contains: query.productName, mode: 'insensitive' } } : {},
       query.categoryId ? { categoryId: query.categoryId } : {},
     ],

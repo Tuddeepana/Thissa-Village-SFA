@@ -60,6 +60,7 @@ const Products = () => {
     // Controlled form state for minimal add form
     const [newName, setNewName] = useState("");
     const [newCategory, setNewCategory] = useState("");
+    const [newProductType, setNewProductType] = useState<'HANDMADE' | 'PURCHASE'>('PURCHASE');
     const [newBarcode, setNewBarcode] = useState("");
     const [newUnitType, setNewUnitType] = useState("");
     const [newLowStockAlert, setNewLowStockAlert] = useState<number | "">("");
@@ -118,6 +119,7 @@ const Products = () => {
     const resetForm = () => {
         setNewName("");
         setNewCategory("");
+        setNewProductType('PURCHASE');
         setNewBarcode("");
         setNewUnitType("");
         setNewLowStockAlert("");
@@ -183,6 +185,7 @@ const Products = () => {
         try {
             await productService.create({
                 name: newName.trim(),
+                product_type: newProductType,
                 barcode: newBarcode.trim() || null,
                 unit_type: newUnitType.trim() || null,
                 cost_price: Number.isNaN(costPrice) ? "0.00" : costPrice.toFixed(2),
@@ -229,6 +232,19 @@ const Products = () => {
                                         {categories.map((c) => (
                                             <SelectItem key={c.id} value={c.id!}>{c.name}</SelectItem>
                                         ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="productType">Product Type</Label>
+                                <Select value={newProductType} onValueChange={(val) => setNewProductType(val as 'HANDMADE' | 'PURCHASE')}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select product type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="PURCHASE">Purchase</SelectItem>
+                                        <SelectItem value="HANDMADE">HandMade</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -354,6 +370,7 @@ const Products = () => {
                             <TableRow>
                                 <TableHead>Name</TableHead>
                                 <TableHead>Category</TableHead>
+                                <TableHead>Product Type</TableHead>
                                 <TableHead>Barcode</TableHead>
                                 <TableHead>Unit Type</TableHead>
                                 <TableHead>Product Price</TableHead>
@@ -368,6 +385,7 @@ const Products = () => {
                                 <TableRow key={product.id}>
                                     <TableCell className="font-medium">{product.name}</TableCell>
                                     <TableCell>{categoryNameById[product.categoryId] ?? "-"}</TableCell>
+                                    <TableCell>{product.product_type === 'HANDMADE' ? 'HandMade' : 'Purchase'}</TableCell>
                                     <TableCell>{product.barcode ?? "-"}</TableCell>
                                     <TableCell>{product.unit_type ?? "-"}</TableCell>
                                     <TableCell>

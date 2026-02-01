@@ -8,6 +8,7 @@ export const ENDPOINTS = {
 		permanentDelete: (id: string) => `/users/${id}/permanent`,
 	},
 	categories: '/categories',
+	units: '/units',
 	products: '/products',
 	salesSummary: '/sales-summary',
 };
