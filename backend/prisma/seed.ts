@@ -39,6 +39,33 @@ async function main() {
   });
   console.log('✅ Cashier user created:', cashierUser.email);
 
+  // Create restaurant tables (9 tables: 2 VIP + 7 Normal)
+  // Check and create tables 1-9 if they don't exist
+  const tableNames = ['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6', 'Table 7', 'Table 8', 'Table 9'];
+  
+  for (let i = 0; i < tableNames.length; i++) {
+    const tableName = tableNames[i];
+    const tableType = i < 2 ? 'VIP' : 'NORMAL'; // First 2 are VIP, rest are NORMAL
+    
+    const existingTable = await prisma.restaurantTable.findUnique({
+      where: { name: tableName },
+    });
+
+    if (!existingTable) {
+      await prisma.restaurantTable.create({
+        data: {
+          name: tableName,
+          table_type: tableType,
+          table_status: 'FREE',
+          quantity: 1,
+        },
+      });
+      console.log(`✅ Created ${tableName} (${tableType})`);
+    } else {
+      console.log(`ℹ️  ${tableName} already exists`);
+    }
+  }
+
   console.log('\n🎉 Database seeded successfully!');
   console.log('\n📝 Default credentials:');
   console.log('   Email: admin@vinopos.com');

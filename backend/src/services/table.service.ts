@@ -29,11 +29,28 @@ export const listRestaurantTables = async (): Promise<RestaurantTableListResult>
   const tables = await (prisma as any).restaurantTable.findMany({
     where: { deletedAt: null },
     orderBy: { createdAt: 'desc' },
+    include: {
+      orders: {
+        where: {
+          status: {
+            in: ['PENDING', 'PREPARING', 'READY'],
+          },
+        },
+        take: 1,
+      },
+    },
   });
 
+  // Map to include current status based on active orders
+  const tablesWithStatus = tables.map((table: any) => ({
+    ...table,
+    currentStatus: table.table_status || 'FREE',
+    hasActiveOrder: table.orders && table.orders.length > 0,
+  }));
+
   return {
-    tables,
-    total: tables.length,
+    tables: tablesWithStatus,
+    total: tablesWithStatus.length,
   };
 };
 

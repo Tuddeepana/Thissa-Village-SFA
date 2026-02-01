@@ -10,6 +10,7 @@ import { ProductSearch } from "@/components/pos/ProductSearch";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import api from "@/api/client";
 import { tableService } from "@/api/services/tableService";
+import { orderService } from "@/api/services/orderService";
 import { Product, BillItem, Bill, StockWarning } from "@/types/pos";
 import { printBillNewWindow } from "@/lib/billPrinter";
 import { toast } from "sonner";
@@ -43,6 +44,7 @@ interface TableInfo {
   table_type: 'VIP' | 'NORMAL';
   status: "free" | "occupied";
   orderId?: string;
+  parentId: string; // The actual DB table ID
 }
 
 const POS = () => {
@@ -96,6 +98,7 @@ const POS = () => {
           table_type: t.table_type,
           status: "free" as const,
           orderId: undefined,
+          parentId: t.parentId, // Store the actual DB table ID
         }));
         setTables(mappedTables);
       } catch (err) {
@@ -120,10 +123,12 @@ const POS = () => {
           id: r.productId,
           name: r.productName,
           category: r.category?.name ?? '',
+          productType: r.productType as 'HANDMADE' | 'PURCHASE',
           foreignerPrice: r.foreignerPrice ?? 0,
           localPrice: r.localPrice ?? 0,
-          cost: r.foreignerPrice ?? 0, // Use foreigner price as default for cost calculation
-          stock: r.availableQuantity,
+          cost: r.foreignerPrice ?? 0,
+          // For HANDMADE products, set stock to high number so they can be added
+          stock: r.productType === 'HANDMADE' ? 9999 : r.availableQuantity,
           minStock: r.minStock ?? 0,
           image: undefined,
           description: undefined,
@@ -279,35 +284,75 @@ const POS = () => {
     return true;
   };
 
-  const handleCreateOrder = () => {
+  const handleCreateOrder = async () => {
     if (!validateOrder()) return;
 
-    // Create order and send to kitchen (for dine-in)
-    const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
-    
-    // Mark table as occupied
-    if (orderType === "dine_in" && selectedTable) {
-      setTables(
-        tables.map((t) =>
-          t.id === selectedTable ? { ...t, status: "occupied" as const, orderId: orderNumber } : t
-        )
-      );
+    try {
+      // Generate order number
+      const orderNumber = `ORD-${Date.now().toString().slice(-8)}`;
 
-      const selectedTableInfo = tables.find(t => t.id === selectedTable);
-      toast.success(`Order ${orderNumber} created successfully!`, {
-        description: `${selectedTableInfo?.displayName} - ${customerName}. Sent to kitchen.`,
-      });
-    } else {
-      toast.success(`Order ${orderNumber} created successfully!`, {
-        description: `Take Away - ${customerName}. Sent to kitchen.`,
+      // Prepare order items
+      const items = billItems.map(item => ({
+        productId: item.product.id,
+        product_name: item.product.name,
+        quantity: item.quantity,
+        unit_price: item.subtotal / item.quantity, // Calculate unit price
+        total: item.subtotal,
+      }));
+
+      // Get the actual parent table ID (not the expanded composite ID)
+      let actualTableId: string | undefined = undefined;
+      if (orderType === "dine_in" && selectedTable) {
+        const selectedTableInfo = tables.find(t => t.id === selectedTable);
+        actualTableId = selectedTableInfo?.parentId;
+      }
+
+      // Create order via backend
+      const orderPayload = {
+        order_number: orderNumber,
+        customer_name: customerName,
+        customer_phone: customerPhone || '',
+        order_type: orderType.toUpperCase() as 'DINE_IN' | 'TAKE_AWAY',
+        tableId: actualTableId,
+        items,
+        subtotal: Number(subtotal.toFixed(2)),
+        tax: Number(tax.toFixed(2)),
+        discount: Number(discount.toFixed(2)),
+        total: Number(total.toFixed(2)),
+        terminal_id: currentUser.terminalId,
+        cashier_name: currentUser.name,
+      };
+
+      const createdOrder = await orderService.create(orderPayload);
+      
+      // Update local table status if dine-in
+      if (orderType === "dine_in" && selectedTable) {
+        setTables(
+          tables.map((t) =>
+            t.id === selectedTable ? { ...t, status: "occupied" as const, orderId: createdOrder.id } : t
+          )
+        );
+
+        const selectedTableInfo = tables.find(t => t.id === selectedTable);
+        toast.success(`Order ${createdOrder.order_number} created successfully!`, {
+          description: `${selectedTableInfo?.displayName} - ${customerName}. Sent to kitchen.`,
+        });
+      } else {
+        toast.success(`Order ${createdOrder.order_number} created successfully!`, {
+          description: `Take Away - ${customerName}. Sent to kitchen.`,
+        });
+      }
+
+      // Navigate to orders page
+      navigate("/orders");
+
+      // Clear the form
+      handleClearOrder();
+    } catch (error: any) {
+      toast.error("Failed to create order", {
+        description: error.response?.data?.error || error.message || "Unknown error occurred",
       });
     }
-
-    // Navigate to orders page
-    navigate("/orders");
-
-    // Clear the form
-    handleClearOrder();
   };
 
   const handleTakeAwayPayment = () => {

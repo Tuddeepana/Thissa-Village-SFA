@@ -2,6 +2,7 @@ export interface Product {
   id: string;
   name: string;
   category: string;
+  productType?: 'HANDMADE' | 'PURCHASE';
   foreignerPrice: number; // Selling price for foreigners
   localPrice: number; // Selling price for locals
   cost: number; // Cost price for profit calculation

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,9 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { orderService } from "@/api/services/orderService";
+import api from "@/api/client";
+import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
 
 // Types for restaurant orders
 interface OrderItem {
@@ -75,67 +78,17 @@ interface Order {
   updatedAt: Date;
 }
 
-// Hardcoded data for demo
-const MOCK_PRODUCTS = [
-  { id: "p1", name: "Chicken Fried Rice", price: 850 },
-  { id: "p2", name: "Egg Fried Rice", price: 650 },
-  { id: "p3", name: "Vegetable Noodles", price: 550 },
-  { id: "p4", name: "Chicken Kottu", price: 750 },
-  { id: "p5", name: "Cheese Kottu", price: 900 },
-  { id: "p6", name: "Fish Curry Rice", price: 700 },
-  { id: "p7", name: "Chicken Burger", price: 450 },
-  { id: "p8", name: "French Fries", price: 350 },
-  { id: "p9", name: "Soft Drink", price: 150 },
-  { id: "p10", name: "Fresh Juice", price: 250 },
-];
-
-const INITIAL_ORDERS: Order[] = [
-  {
-    id: "ord1",
-    orderNumber: "ORD-001",
-    customerName: "John Silva",
-    customerPhone: "0771234567",
-    orderType: "dine_in",
-    tableNumber: 3,
-    status: "preparing",
-    items: [
-      { id: "i1", productId: "p1", productName: "Chicken Fried Rice", quantity: 2, unitPrice: 850, total: 1700 },
-      { id: "i2", productId: "p9", productName: "Soft Drink", quantity: 2, unitPrice: 150, total: 300 },
-    ],
-    subtotal: 2000,
-    tax: 0,
-    discount: 0,
-    total: 2000,
-    terminalId: "T-001",
-    cashierName: "Admin User",
-    createdAt: new Date(Date.now() - 30 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 30 * 60 * 1000),
-  },
-  {
-    id: "ord2",
-    orderNumber: "ORD-002",
-    customerName: "Mary Fernando",
-    customerPhone: "0777654321",
-    orderType: "dine_in",
-    tableNumber: 7,
-    status: "pending",
-    items: [
-      { id: "i3", productId: "p4", productName: "Chicken Kottu", quantity: 1, unitPrice: 750, total: 750 },
-      { id: "i4", productId: "p10", productName: "Fresh Juice", quantity: 1, unitPrice: 250, total: 250 },
-    ],
-    subtotal: 1000,
-    tax: 0,
-    discount: 0,
-    total: 1000,
-    terminalId: "T-001",
-    cashierName: "Admin User",
-    createdAt: new Date(Date.now() - 15 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 15 * 60 * 1000),
-  },
-];
+// Product type for adding items
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+}
 
 const Orders = () => {
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -166,6 +119,79 @@ const Orders = () => {
     terminalId: "T-001",
   };
 
+  // Fetch orders from backend
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  // Fetch products for add item dialog
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const response = await orderService.list({});
+      
+      // Backend returns { success, data: [...orders], pagination }
+      const ordersData = response.data || [];
+      
+      // Map backend response to frontend Order type
+      const mappedOrders: Order[] = ordersData.map((order: any) => ({
+        id: order.id,
+        orderNumber: order.order_number,
+        customerName: order.customer_name,
+        customerPhone: order.customer_phone,
+        orderType: order.order_type.toLowerCase() as "dine_in" | "take_away",
+        tableNumber: order.table?.name ? parseInt(order.table.name.replace('Table ', '')) : null,
+        status: order.status.toLowerCase() as "pending" | "preparing" | "ready" | "completed" | "cancelled",
+        items: order.items.map((item: any) => ({
+          id: item.id,
+          productId: item.productId,
+          productName: item.product_name,
+          quantity: item.quantity,
+          unitPrice: parseFloat(item.unit_price),
+          total: parseFloat(item.total),
+        })),
+        subtotal: parseFloat(order.subtotal),
+        tax: parseFloat(order.tax),
+        discount: parseFloat(order.discount),
+        total: parseFloat(order.total),
+        terminalId: order.terminal_id || "T-001",
+        cashierName: order.cashier_name,
+        createdAt: new Date(order.createdAt),
+        updatedAt: new Date(order.updatedAt),
+      }));
+
+      setOrders(mappedOrders);
+    } catch (error: any) {
+      console.error("Failed to fetch orders:", error);
+      toast.error("Failed to load orders", {
+        description: error.response?.data?.error || error.message,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      const res = await api.get<MyStockResponse>('/mystock', { 
+        params: { page: 1, pageSize: 100 },
+      });
+      const rows: MyStockTableRow[] = res.data.tableResponse?.data ?? [];
+      const mappedProducts: Product[] = rows.map((r) => ({
+        id: r.productId,
+        name: r.productName,
+        price: r.foreignerPrice ?? 0,
+      }));
+      setProducts(mappedProducts);
+    } catch (error) {
+      console.error('Failed to load products', error);
+    }
+  };
+
   // Filter orders
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -192,47 +218,113 @@ const Orders = () => {
     setIsViewDialogOpen(true);
   };
 
-  const handleAddItemToOrder = () => {
+  const handleAddItemToOrder = async () => {
     if (!selectedOrder || !selectedProductId || quantity < 1) return;
 
-    const product = MOCK_PRODUCTS.find((p) => p.id === selectedProductId);
+    const product = products.find((p) => p.id === selectedProductId);
     if (!product) return;
 
-    const newItem: OrderItem = {
-      id: `item-${Date.now()}`,
-      productId: product.id,
-      productName: product.name,
-      quantity,
-      unitPrice: product.price,
-      total: product.price * quantity,
-    };
+    try {
+      // Add item via backend API
+      await orderService.addItem(selectedOrder.id, {
+        productId: product.id,
+        product_name: product.name,
+        quantity,
+        unit_price: product.price,
+        total: product.price * quantity,
+      });
 
-    const updatedOrder = {
-      ...selectedOrder,
-      items: [...selectedOrder.items, newItem],
-      subtotal: selectedOrder.subtotal + newItem.total,
-      total: selectedOrder.total + newItem.total,
-      updatedAt: new Date(),
-    };
+      toast.success(`Added ${product.name} to order`);
+      
+      // Refresh orders and selected order
+      await fetchOrders();
+      const response = await orderService.getById(selectedOrder.id);
+      const updatedOrder = response.data; // Extract data from response
+      setSelectedOrder({
+        id: updatedOrder.id,
+        orderNumber: updatedOrder.order_number,
+        customerName: updatedOrder.customer_name,
+        customerPhone: updatedOrder.customer_phone,
+        orderType: updatedOrder.order_type.toLowerCase() as "dine_in" | "take_away",
+        tableNumber: updatedOrder.table?.name ? parseInt(updatedOrder.table.name.replace('Table ', '')) : null,
+        status: updatedOrder.status.toLowerCase() as "pending" | "preparing" | "ready" | "completed" | "cancelled",
+        items: updatedOrder.items.map((item: any) => ({
+          id: item.id,
+          productId: item.productId,
+          productName: item.product_name,
+          quantity: item.quantity,
+          unitPrice: parseFloat(item.unit_price),
+          total: parseFloat(item.total),
+        })),
+        subtotal: parseFloat(updatedOrder.subtotal),
+        tax: parseFloat(updatedOrder.tax),
+        discount: parseFloat(updatedOrder.discount),
+        total: parseFloat(updatedOrder.total),
+        terminalId: updatedOrder.terminal_id || "T-001",
+        cashierName: updatedOrder.cashier_name,
+        createdAt: new Date(updatedOrder.createdAt),
+        updatedAt: new Date(updatedOrder.updatedAt),
+      });
 
-    setOrders(orders.map((o) => (o.id === selectedOrder.id ? updatedOrder : o)));
-    setSelectedOrder(updatedOrder);
-    setIsAddItemDialogOpen(false);
-    setSelectedProductId("");
-    setQuantity(1);
-    toast.success(`Added ${product.name} to order`);
+      setIsAddItemDialogOpen(false);
+      setSelectedProductId("");
+      setQuantity(1);
+    } catch (error: any) {
+      console.error("Failed to add item:", error);
+      toast.error("Failed to add item to order", {
+        description: error.response?.data?.error || error.message,
+      });
+    }
   };
 
-  const handleUpdateOrderStatus = (orderId: string, newStatus: Order["status"]) => {
-    setOrders(
-      orders.map((o) =>
-        o.id === orderId ? { ...o, status: newStatus, updatedAt: new Date() } : o
-      )
-    );
-    if (selectedOrder?.id === orderId) {
-      setSelectedOrder({ ...selectedOrder, status: newStatus, updatedAt: new Date() });
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: Order["status"]) => {
+    try {
+      // Update status via backend API
+      await orderService.update(orderId, {
+        status: newStatus.toUpperCase() as 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED',
+      });
+
+      toast.success(`Order status updated to ${newStatus}`);
+      
+      // Refresh orders
+      await fetchOrders();
+      
+      // Update selected order if it's the one being updated
+      if (selectedOrder?.id === orderId) {
+        const response = await orderService.getById(orderId);
+        const updatedOrder = response.data; // Extract data from response
+        setSelectedOrder({
+          id: updatedOrder.id,
+          orderNumber: updatedOrder.order_number,
+          customerName: updatedOrder.customer_name,
+          customerPhone: updatedOrder.customer_phone,
+          orderType: updatedOrder.order_type.toLowerCase() as "dine_in" | "take_away",
+          tableNumber: updatedOrder.table?.name ? parseInt(updatedOrder.table.name.replace('Table ', '')) : null,
+          status: updatedOrder.status.toLowerCase() as "pending" | "preparing" | "ready" | "completed" | "cancelled",
+          items: updatedOrder.items.map((item: any) => ({
+            id: item.id,
+            productId: item.productId,
+            productName: item.product_name,
+            quantity: item.quantity,
+            unitPrice: parseFloat(item.unit_price),
+            total: parseFloat(item.total),
+          })),
+          subtotal: parseFloat(updatedOrder.subtotal),
+          tax: parseFloat(updatedOrder.tax),
+          discount: parseFloat(updatedOrder.discount),
+          total: parseFloat(updatedOrder.total),
+          terminalId: updatedOrder.terminal_id || "T-001",
+          cashierName: updatedOrder.cashier_name,
+          createdAt: new Date(updatedOrder.createdAt),
+          updatedAt: new Date(updatedOrder.updatedAt),
+        });
+      }
+    } catch (error: any) {
+      console.error("Failed to update order status:", error);
+      toast.error("Failed to update order status", {
+        description: error.response?.data?.error || error.message,
+      });
     }
-    toast.success(`Order status updated to ${newStatus}`);
   };
 
   const handlePrintBill = (order: Order) => {
@@ -317,7 +409,7 @@ const Orders = () => {
     toast.success("Bill sent to printer");
   };
 
-  const handleCompletePayment = () => {
+  const handleCompletePayment = async () => {
     if (!selectedOrder) return;
 
     const change = amountPaid - selectedOrder.total;
@@ -326,13 +418,33 @@ const Orders = () => {
       return;
     }
 
-    handleUpdateOrderStatus(selectedOrder.id, "completed");
-    handlePrintBill(selectedOrder);
-    setIsPaymentDialogOpen(false);
-    setIsViewDialogOpen(false);
-    setPaymentMethod("cash");
-    setAmountPaid(0);
-    toast.success("Payment completed successfully!");
+    try {
+      // Complete order with payment via backend API
+      await orderService.complete(selectedOrder.id, {
+        payment_method: paymentMethod.toUpperCase(),
+        cash_given: amountPaid,
+        balance_given: change >= 0 ? change : 0,
+      });
+
+      toast.success("Payment completed successfully!");
+      
+      // Refresh orders list
+      await fetchOrders();
+      
+      // Print bill
+      handlePrintBill(selectedOrder);
+      
+      // Close dialogs and reset form
+      setIsPaymentDialogOpen(false);
+      setIsViewDialogOpen(false);
+      setPaymentMethod("cash");
+      setAmountPaid(0);
+    } catch (error: any) {
+      console.error("Failed to complete payment:", error);
+      toast.error("Failed to complete payment", {
+        description: error.response?.data?.error || error.message,
+      });
+    }
   };
 
   const getStatusBadge = (status: Order["status"]) => {
@@ -418,8 +530,11 @@ const Orders = () => {
                 <SelectItem value="completed">Completed</SelectItem>
               </SelectContent>
             </Select>
+            <Button variant="outline" onClick={fetchOrders} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
             <Button variant="outline" onClick={() => { setSearchQuery(""); setStatusFilter("all"); }}>
-              <RefreshCw className="h-4 w-4 mr-2" />
               Clear
             </Button>
           </div>
@@ -451,7 +566,14 @@ const Orders = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredOrders.length === 0 ? (
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8">
+                      <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
+                      <p className="text-muted-foreground">Loading orders...</p>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredOrders.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No orders found
@@ -672,7 +794,7 @@ const Orders = () => {
                   <SelectValue placeholder="Choose a product" />
                 </SelectTrigger>
                 <SelectContent>
-                  {MOCK_PRODUCTS.map((product) => (
+                  {products.map((product) => (
                     <SelectItem key={product.id} value={product.id}>
                       {product.name} - Rs.{product.price}
                     </SelectItem>
