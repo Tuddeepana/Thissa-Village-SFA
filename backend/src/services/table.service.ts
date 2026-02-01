@@ -59,21 +59,38 @@ export const getExpandedTableList = async (): Promise<ExpandedTableItem[]> => {
   const tables = await (prisma as any).restaurantTable.findMany({
     where: { deletedAt: null },
     orderBy: { createdAt: 'asc' },
+    include: {
+      orders: {
+        where: {
+          status: {
+            in: ['PENDING', 'PREPARING', 'READY'],
+          },
+        },
+      },
+    },
   });
 
   const expandedList: ExpandedTableItem[] = [];
 
   for (const table of tables) {
-    for (let i = 1; i <= table.quantity; i++) {
-      expandedList.push({
-        id: `${table.id}-${i}`,
-        displayName: `${table.name} ${i}`,
-        baseName: table.name,
-        tableNumber: i,
-        table_type: table.table_type,
-        parentId: table.id,
-      });
-    }
+    // Check if table has active orders
+    const hasActiveOrder = table.orders && table.orders.length > 0;
+    const tableStatus = hasActiveOrder ? 'OCCUPIED' : table.table_status;
+    
+    // Extract table number from name (e.g., "Table 1" -> 1)
+    const match = table.name.match(/\d+/);
+    const tableNumber = match ? parseInt(match[0]) : 1;
+    
+    // Each table is already individual (quantity is for inventory tracking, not duplication)
+    expandedList.push({
+      id: table.id, // Use actual table ID, not composite
+      displayName: table.name,
+      baseName: table.name,
+      tableNumber: tableNumber,
+      table_type: table.table_type,
+      table_status: tableStatus,
+      parentId: table.id,
+    });
   }
 
   return expandedList;

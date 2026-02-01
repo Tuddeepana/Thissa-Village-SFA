@@ -96,7 +96,7 @@ const POS = () => {
           baseName: t.baseName,
           tableNumber: t.tableNumber,
           table_type: t.table_type,
-          status: "free" as const,
+          status: t.table_status.toLowerCase() as "free" | "occupied", // Use actual status from backend
           orderId: undefined,
           parentId: t.parentId, // Store the actual DB table ID
         }));
@@ -300,12 +300,8 @@ const POS = () => {
         total: item.subtotal,
       }));
 
-      // Get the actual parent table ID (not the expanded composite ID)
-      let actualTableId: string | undefined = undefined;
-      if (orderType === "dine_in" && selectedTable) {
-        const selectedTableInfo = tables.find(t => t.id === selectedTable);
-        actualTableId = selectedTableInfo?.parentId;
-      }
+      // Use the selected table ID directly (no longer composite)
+      const tableId = orderType === "dine_in" && selectedTable ? selectedTable : undefined;
 
       // Create order via backend
       const orderPayload = {
@@ -313,7 +309,7 @@ const POS = () => {
         customer_name: customerName,
         customer_phone: customerPhone || '',
         order_type: orderType.toUpperCase() as 'DINE_IN' | 'TAKE_AWAY',
-        tableId: actualTableId,
+        tableId,
         items,
         subtotal: Number(subtotal.toFixed(2)),
         tax: Number(tax.toFixed(2)),

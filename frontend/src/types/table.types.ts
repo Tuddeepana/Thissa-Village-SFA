@@ -32,6 +32,7 @@ export type ExpandedTableItem = {
   baseName: string;
   tableNumber: number;
   table_type: 'VIP' | 'NORMAL';
+  table_status: 'FREE' | 'OCCUPIED';
   parentId: string;
 };
 

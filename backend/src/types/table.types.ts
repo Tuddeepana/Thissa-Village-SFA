@@ -32,6 +32,7 @@ export type ExpandedTableItem = {
   baseName: string;    // e.g., "Table"
   tableNumber: number; // e.g., 1, 2, 3
   table_type: 'VIP' | 'NORMAL';
+  table_status: 'FREE' | 'OCCUPIED';
   parentId: string;    // ID of the RestaurantTable record
 };
 

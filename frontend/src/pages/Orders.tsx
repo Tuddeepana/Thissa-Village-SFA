@@ -138,31 +138,40 @@ const Orders = () => {
       const ordersData = response.data || [];
       
       // Map backend response to frontend Order type
-      const mappedOrders: Order[] = ordersData.map((order: any) => ({
-        id: order.id,
-        orderNumber: order.order_number,
-        customerName: order.customer_name,
-        customerPhone: order.customer_phone,
-        orderType: order.order_type.toLowerCase() as "dine_in" | "take_away",
-        tableNumber: order.table?.name ? parseInt(order.table.name.replace('Table ', '')) : null,
-        status: order.status.toLowerCase() as "pending" | "preparing" | "ready" | "completed" | "cancelled",
-        items: order.items.map((item: any) => ({
-          id: item.id,
-          productId: item.productId,
-          productName: item.product_name,
-          quantity: item.quantity,
-          unitPrice: parseFloat(item.unit_price),
-          total: parseFloat(item.total),
-        })),
-        subtotal: parseFloat(order.subtotal),
-        tax: parseFloat(order.tax),
-        discount: parseFloat(order.discount),
-        total: parseFloat(order.total),
-        terminalId: order.terminal_id || "T-001",
-        cashierName: order.cashier_name,
-        createdAt: new Date(order.createdAt),
-        updatedAt: new Date(order.updatedAt),
-      }));
+      const mappedOrders: Order[] = ordersData.map((order: any) => {
+        // Extract table number from table name (handles "Table 1", "Table 2", or just "Table")
+        let tableNumber: number | null = null;
+        if (order.table?.name) {
+          const match = order.table.name.match(/\d+/);
+          tableNumber = match ? parseInt(match[0]) : null;
+        }
+        
+        return {
+          id: order.id,
+          orderNumber: order.order_number,
+          customerName: order.customer_name,
+          customerPhone: order.customer_phone,
+          orderType: order.order_type.toLowerCase() as "dine_in" | "take_away",
+          tableNumber,
+          status: order.status.toLowerCase() as "pending" | "preparing" | "ready" | "completed" | "cancelled",
+          items: order.items.map((item: any) => ({
+            id: item.id,
+            productId: item.productId,
+            productName: item.product_name,
+            quantity: item.quantity,
+            unitPrice: parseFloat(item.unit_price),
+            total: parseFloat(item.total),
+          })),
+          subtotal: parseFloat(order.subtotal),
+          tax: parseFloat(order.tax),
+          discount: parseFloat(order.discount),
+          total: parseFloat(order.total),
+          terminalId: order.terminal_id || "T-001",
+          cashierName: order.cashier_name,
+          createdAt: new Date(order.createdAt),
+          updatedAt: new Date(order.updatedAt),
+        };
+      });
 
       setOrders(mappedOrders);
     } catch (error: any) {
@@ -240,13 +249,21 @@ const Orders = () => {
       await fetchOrders();
       const response = await orderService.getById(selectedOrder.id);
       const updatedOrder = response.data; // Extract data from response
+      
+      // Extract table number from table name
+      let tableNumber: number | null = null;
+      if (updatedOrder.table?.name) {
+        const match = updatedOrder.table.name.match(/\d+/);
+        tableNumber = match ? parseInt(match[0]) : null;
+      }
+      
       setSelectedOrder({
         id: updatedOrder.id,
         orderNumber: updatedOrder.order_number,
         customerName: updatedOrder.customer_name,
         customerPhone: updatedOrder.customer_phone,
         orderType: updatedOrder.order_type.toLowerCase() as "dine_in" | "take_away",
-        tableNumber: updatedOrder.table?.name ? parseInt(updatedOrder.table.name.replace('Table ', '')) : null,
+        tableNumber,
         status: updatedOrder.status.toLowerCase() as "pending" | "preparing" | "ready" | "completed" | "cancelled",
         items: updatedOrder.items.map((item: any) => ({
           id: item.id,
@@ -293,13 +310,21 @@ const Orders = () => {
       if (selectedOrder?.id === orderId) {
         const response = await orderService.getById(orderId);
         const updatedOrder = response.data; // Extract data from response
+        
+        // Extract table number from table name
+        let tableNumber: number | null = null;
+        if (updatedOrder.table?.name) {
+          const match = updatedOrder.table.name.match(/\d+/);
+          tableNumber = match ? parseInt(match[0]) : null;
+        }
+        
         setSelectedOrder({
           id: updatedOrder.id,
           orderNumber: updatedOrder.order_number,
           customerName: updatedOrder.customer_name,
           customerPhone: updatedOrder.customer_phone,
           orderType: updatedOrder.order_type.toLowerCase() as "dine_in" | "take_away",
-          tableNumber: updatedOrder.table?.name ? parseInt(updatedOrder.table.name.replace('Table ', '')) : null,
+          tableNumber,
           status: updatedOrder.status.toLowerCase() as "pending" | "preparing" | "ready" | "completed" | "cancelled",
           items: updatedOrder.items.map((item: any) => ({
             id: item.id,

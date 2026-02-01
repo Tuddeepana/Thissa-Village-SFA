@@ -282,6 +282,14 @@ export class OrderService {
 
     // Create bill
     const billNumber = `B-${Date.now()}`;
+    
+    // Extract table number from table name
+    let tableNumber: number | null = null;
+    if (order.table?.name) {
+      const match = order.table.name.match(/\d+/);
+      tableNumber = match ? parseInt(match[0]) : null;
+    }
+    
     const bill = await prisma.bill.create({
       data: {
         bill_number: billNumber,
@@ -299,7 +307,7 @@ export class OrderService {
         tax: order.tax,
         discount: order.discount,
         order_type: order.order_type,
-        table_number: order.table ? parseInt(order.table.name.replace(/\D/g, '')) : null,
+        table_number: tableNumber,
         orderId: order.id,
       },
     });
