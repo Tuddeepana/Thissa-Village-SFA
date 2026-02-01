@@ -26,8 +26,10 @@ import LocalLoader from "@/components/common/LocalLoader";
 import { useQuery } from "@tanstack/react-query";
 import { productService } from "@/api/services/productService";
 import { categoryService } from "@/api/services/categoryService";
+import { unitService } from "@/api/services/unitService";
 import type { Product } from "@/types/product.types";
 import type { Category } from "@/types/category.types";
+import type { Unit } from "@/types/unit.types";
 
 // Result shape returned by productService.list
 type ProductListResult = {
@@ -42,6 +44,7 @@ const Products = () => {
     const { toast } = useToast();
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [units, setUnits] = useState<Unit[]>([]);
     const categoryNameById = useMemo(() => {
         const map: Record<string, string> = {};
         categories.forEach(c => { if (c.id) map[c.id] = c.name; });
@@ -164,6 +167,20 @@ const Products = () => {
     useEffect(() => {
         if (categoryList) setCategories(categoryList);
     }, [categoryList]);
+
+    // Fetch units for unit type select
+    const { data: unitList } = useQuery({
+        queryKey: ["units-all"],
+        queryFn: async () => {
+            const response = await unitService.list();
+            return response.units;
+        },
+        staleTime: 30_000,
+    });
+
+    useEffect(() => {
+        if (unitList) setUnits(unitList);
+    }, [unitList]);
 
     const handleAddSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -320,14 +337,11 @@ const Products = () => {
                                         <SelectValue placeholder="Select unit type" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="piece">Piece</SelectItem>
-                                        <SelectItem value="kg">Kilogram (kg)</SelectItem>
-                                        <SelectItem value="g">Gram (g)</SelectItem>
-                                        <SelectItem value="l">Liter (L)</SelectItem>
-                                        <SelectItem value="ml">Milliliter (ml)</SelectItem>
-                                        <SelectItem value="pack">Pack</SelectItem>
-                                        <SelectItem value="box">Box</SelectItem>
-                                        <SelectItem value="dozen">Dozen</SelectItem>
+                                        {units.map((unit) => (
+                                            <SelectItem key={unit.id} value={unit.name}>
+                                                {unit.name}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
