@@ -150,7 +150,7 @@ const MyStock = () => {
       const headers = [
       "Item ID",
       "Product Name",
-      "Bottle Size",
+      "Unit Type",
       "Category",
       "Available Quantity",
       "Min Stock",
@@ -161,7 +161,7 @@ const MyStock = () => {
     const csvData = exportRows.map((item) => [
       item.productId,
       item.productName,
-      item ?? '',
+      item.productType === 'HANDMADE' ? '-' : (item.unitType || '-'),
       item.category?.name ?? '',
       item.availableQuantity.toString(),
       item.minStock?.toString() ?? '',
@@ -400,7 +400,9 @@ const MyStock = () => {
                       <TableCell className="font-medium">
                         {item.productName}
                       </TableCell>
-                      {/*<TableCell>{item?? ''}</TableCell>*/}
+                      <TableCell>
+                        {item.productType === 'HANDMADE' ? '-' : (item.unitType || '-')}
+                      </TableCell>
                       <TableCell>{item.category?.name ?? ''}</TableCell>
                       <TableCell className="text-center">
                         <span
@@ -452,9 +454,9 @@ const MyStock = () => {
                     <div>
                       <h3 className="font-medium text-sm">{item.productName}</h3>
                       <p className="text-xs text-muted-foreground">{item.category?.name ?? ''}</p>
-                      {/*{item.bottle_size && (*/}
-                      {/*  <p className="text-xs text-muted-foreground">{item.bottle_size}</p>*/}
-                      {/*)}*/}
+                      {item.productType !== 'HANDMADE' && item.unitType && (
+                        <p className="text-xs text-muted-foreground">Unit: {item.unitType}</p>
+                      )}
                     </div>
                     {getStockStatus(item.availableQuantity, item.minStock)}
                   </div>

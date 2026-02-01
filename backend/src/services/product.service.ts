@@ -38,7 +38,6 @@ export const listProducts = async (query: PaginationQuery): Promise<PaginatedRes
 
   const where: any = {
     AND: [
-      { product_type: 'PURCHASE' }, // Only show Purchase products
       query.search ? { name: { contains: query.search, mode: 'insensitive' } } : {},
       query.categoryId ? { categoryId: query.categoryId } : {},
     ],
