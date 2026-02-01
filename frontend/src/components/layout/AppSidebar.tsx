@@ -29,14 +29,14 @@ import {
 
 const sfaItems = [
     {title: "Dashboard", url: "/dashboard", icon: LayoutDashboard},
-    {title: "PNL", url: "/sales-summary", icon: TrendingUp},
-    {title: "Category", url: "/categories", icon: FolderTree},
+    {title: "P&L (Profit & Loss)", url: "/sales-summary", icon: TrendingUp},
+    {title: "Categories", url: "/categories", icon: FolderTree},
     {title: "Units", url: "/units", icon: Ruler},
+    {title: "Products", url: "/products", icon: Package},
     {title: "Tables", url: "/tables", icon: TableProperties},
-    {title: "My Stock", url: "/my-stock", icon: Warehouse},
-    {title: "Product", url: "/products", icon: Package},
-    {title: "Invoice", url: "/invoices", icon: FileText},
-    {title: "Bill", url: "/bills", icon: Receipt},
+    {title: "Stock", url: "/my-stock", icon: Warehouse},
+    {title: "Invoices", url: "/invoices", icon: FileText},
+    {title: "Bills", url: "/bills", icon: Receipt},
     {title: "Users", url: "/users", icon: Users},
 ];
 
