@@ -1,11 +1,15 @@
 -- CreateEnum
 CREATE TYPE "TableType" AS ENUM ('VIP', 'NORMAL');
 
+-- CreateEnum
+CREATE TYPE "TableStatus" AS ENUM ('FREE', 'OCCUPIED');
+
 -- CreateTable
 CREATE TABLE "restaurant_tables" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "table_type" "TableType" NOT NULL DEFAULT 'NORMAL',
+    "table_status" "TableStatus" NOT NULL DEFAULT 'FREE',
     "quantity" INTEGER NOT NULL DEFAULT 1,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,

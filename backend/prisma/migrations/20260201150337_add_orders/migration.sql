@@ -5,9 +5,6 @@
 
 */
 -- CreateEnum
-CREATE TYPE "TableStatus" AS ENUM ('FREE', 'OCCUPIED');
-
--- CreateEnum
 CREATE TYPE "OrderStatus" AS ENUM ('PENDING', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED');
 
 -- CreateEnum
@@ -21,9 +18,6 @@ ADD COLUMN     "order_type" "OrderType" NOT NULL DEFAULT 'TAKE_AWAY',
 ADD COLUMN     "subtotal" DECIMAL(10,2) NOT NULL DEFAULT 0,
 ADD COLUMN     "table_number" INTEGER,
 ADD COLUMN     "terminal_id" TEXT;
-
--- AlterTable
-ALTER TABLE "restaurant_tables" ADD COLUMN     "table_status" "TableStatus" NOT NULL DEFAULT 'FREE';
 
 -- CreateTable
 CREATE TABLE "orders" (
@@ -76,3 +70,4 @@ ALTER TABLE "orders" ADD CONSTRAINT "orders_tableId_fkey" FOREIGN KEY ("tableId"
 
 -- AddForeignKey
 ALTER TABLE "order_items" ADD CONSTRAINT "order_items_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
