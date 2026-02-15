@@ -3,10 +3,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Minus, Plus, AlertTriangle } from "lucide-react";
+import { Minus, Plus, AlertTriangle, Wine, UtensilsCrossed } from "lucide-react";
 import { BillItem, StockWarning } from "@/types/pos";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DeleteButton } from "@/components/common";
+import { Badge } from "@/components/ui/badge";
 
 interface BillCartProps {
   items: BillItem[];
@@ -86,7 +87,21 @@ export function BillCart({
               >
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <h4 className="font-medium text-sm">{item.product.name}</h4>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="font-medium text-sm">{item.product.name}</h4>
+                      {item.product.source && (
+                        <Badge
+                          variant={item.product.source === 'bar' ? 'default' : 'secondary'}
+                          className="text-xs px-1.5 py-0.5 h-5"
+                        >
+                          {item.product.source === 'bar' ? (
+                            <><Wine className="h-3 w-3 mr-1" /> Bar</>
+                          ) : (
+                            <><UtensilsCrossed className="h-3 w-3 mr-1" /> Restaurant</>
+                          )}
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       Rs. {item.product.price.toFixed(2)} each
                     </p>
@@ -118,7 +133,7 @@ export function BillCart({
                       onClick={() =>
                         onUpdateQuantity(item.product.id, item.quantity + 1)
                       }
-                      disabled={item.quantity >= item.product.stock}
+                      disabled={item.product.source === 'bar' && item.quantity >= item.product.stock}
                     >
                       <Plus className="h-3 w-3" />
                     </Button>
@@ -128,7 +143,7 @@ export function BillCart({
                   </span>
                 </div>
 
-                {item.quantity >= item.product.stock && (
+                {item.product.source === 'bar' && item.quantity >= item.product.stock && (
                   <p className="text-xs text-red-500">Max stock reached</p>
                 )}
               </div>
