@@ -42,9 +42,11 @@ export const ProductSearch = forwardRef<HTMLInputElement, ProductSearchProps>(
       } else if (width < 1024) {
         setGridColumns(2); // md
       } else if (width < 1280) {
-        setGridColumns(3); // lg
+        setGridColumns(2); // lg - optimized for 17-inch monitors
+      } else if (width < 1600) {
+        setGridColumns(3); // xl
       } else {
-        setGridColumns(4); // xl
+        setGridColumns(4); // 2xl
       }
     };
 
@@ -80,8 +82,8 @@ export const ProductSearch = forwardRef<HTMLInputElement, ProductSearchProps>(
     const handleKeyDown = (e: KeyboardEvent) => {
       // Only handle arrow keys and enter when search input is focused
       const target = e.target as HTMLElement;
-      const isSearchInput = target === (ref as any)?.current;
-      
+      const isSearchInput = typeof ref !== 'function' && ref?.current && target === ref.current;
+
       if (!isSearchInput || filteredProducts.length === 0) return;
 
       const totalProducts = filteredProducts.length;
@@ -233,26 +235,26 @@ export const ProductSearch = forwardRef<HTMLInputElement, ProductSearchProps>(
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2 md:space-y-4">
       {/* Search and Filter */}
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-2 md:left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           <Input
             ref={ref}
             placeholder="Search by name, barcode, or description..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-8 md:pl-10 text-xs md:text-sm h-8 md:h-10"
           />
         </div>
         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-          <SelectTrigger className="w-full sm:w-[200px]">
+          <SelectTrigger className="w-full sm:w-[180px] md:w-[200px] text-xs md:text-sm h-8 md:h-10">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
             {categories.map((category) => (
-              <SelectItem key={category} value={category}>
+              <SelectItem key={category} value={category} className="text-xs md:text-sm">
                 {category === "all" ? "All Categories" : category}
               </SelectItem>
             ))}
@@ -261,9 +263,9 @@ export const ProductSearch = forwardRef<HTMLInputElement, ProductSearchProps>(
       </div>
 
       {/* Product Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 md:gap-3 max-h-[calc(100vh-280px)] md:max-h-[calc(100vh-300px)] overflow-y-auto pr-1 md:pr-2">
         {filteredProducts.length === 0 ? (
-          <div className="col-span-full text-center py-8 text-muted-foreground">
+          <div className="col-span-full text-center py-8 text-muted-foreground text-sm">
             No products found
           </div>
         ) : (
@@ -279,15 +281,15 @@ export const ProductSearch = forwardRef<HTMLInputElement, ProductSearchProps>(
                   : ""
               }`}
             >
-              <CardContent className="p-4">
-                <div className="space-y-2">
+              <CardContent className="p-2 md:p-4">
+                <div className="space-y-1.5 md:space-y-2">
                   <div className="flex justify-between items-start">
-                    <h3 className="font-semibold text-sm line-clamp-2">
+                    <h3 className="font-semibold text-xs md:text-sm line-clamp-2">
                       {product.name}
                     </h3>
                     {isLowStock(product) && (
                       <AlertTriangle
-                        className={`h-4 w-4 flex-shrink-0 ml-1 ${
+                        className={`h-3 w-3 md:h-4 md:w-4 flex-shrink-0 ml-1 ${
                           isOutOfStock(product)
                             ? "text-red-500"
                             : "text-yellow-500"
@@ -296,18 +298,18 @@ export const ProductSearch = forwardRef<HTMLInputElement, ProductSearchProps>(
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="text-xs">
+                  <div className="flex items-center gap-1.5 md:gap-2">
+                    <Badge variant="secondary" className="text-[10px] md:text-xs px-1 md:px-2 py-0 md:py-0.5">
                       {product.category}
                     </Badge>
                     {product.bottleVolume && (
-                      <Badge variant="outline" className="text-[10px]">
+                      <Badge variant="outline" className="text-[9px] md:text-[10px] px-1 py-0">
                         {String(product.bottleVolume).replace(/\s+/g, '').toUpperCase()}
                       </Badge>
                     )}
                   </div>
 
-                  <div className="flex justify-between items-center text-sm">
+                  <div className="flex justify-between items-center text-xs md:text-sm">
                     <span className="text-muted-foreground">Stock:</span>
                     <span
                       className={`font-medium ${
@@ -322,27 +324,28 @@ export const ProductSearch = forwardRef<HTMLInputElement, ProductSearchProps>(
                     </span>
                   </div>
 
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-bold text-primary">
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-base md:text-lg font-bold text-primary">
                       Rs. {product.price.toFixed(2)}
                     </span>
                     <Button
                       size="sm"
                       onClick={() => onAddProduct(product)}
                       disabled={isOutOfStock(product)}
+                      className="h-7 md:h-8 text-xs md:text-sm px-2 md:px-3"
                     >
-                      <Plus className="h-4 w-4 mr-1" />
+                      <Plus className="h-3 w-3 md:h-4 md:w-4 mr-0.5 md:mr-1" />
                       Add
                     </Button>
                   </div>
 
                   {isOutOfStock(product) && (
-                    <p className="text-xs text-red-500 font-medium">
+                    <p className="text-[10px] md:text-xs text-red-500 font-medium">
                       Out of Stock
                     </p>
                   )}
                   {isLowStock(product) && !isOutOfStock(product) && (
-                    <p className="text-xs text-yellow-600 font-medium">
+                    <p className="text-[10px] md:text-xs text-yellow-600 font-medium">
                       Low Stock Warning!
                     </p>
                   )}

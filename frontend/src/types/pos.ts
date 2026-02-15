@@ -13,6 +13,7 @@ export interface Product {
   description?: string;
   createdAt: Date;
   updatedAt: Date;
+  source?: 'bar' | 'restaurant'; // Source of the product
 }
 
 export interface BillItem {
