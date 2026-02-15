@@ -1,5 +1,11 @@
 import { Invoice } from '@/types/invoice';
 
+// ====================================================================
+// DEPRECATED: This file contains dummy/mock data and is NO LONGER USED
+// The invoice page now fetches real data from the API only
+// This file is kept for reference but should not be imported
+// ====================================================================
+
 // Generate sample invoices for demonstration
 export const generateSampleInvoices = (): Invoice[] => {
   const invoices: Invoice[] = [];

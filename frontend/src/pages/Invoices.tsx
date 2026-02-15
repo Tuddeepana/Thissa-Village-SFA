@@ -316,14 +316,12 @@ const Invoices = () => {
       // Update currentPage to match what we requested (the `page` argument)
       setCurrentPage(page);
     } catch (err) {
-      // fallback to mock data if available
-      try {
-        const { mockInvoices } = await import('@/lib/invoiceData');
-        setInvoices(mockInvoices);
-        setServerTotalPages(1);
-      } catch (e) {
-        // ignore
-      }
+      // Show error and clear invoices
+      console.error('Failed to fetch invoices:', err);
+      toast.error('Failed to load invoices. Please try again.');
+      setInvoices([]);
+      setServerStats(null);
+      setServerTotalPages(1);
     }
   }, [itemsPerPage, filters.invoiceNumber, filters.category, filters.month, filters.year, filters.dateFrom, filters.dateTo]);
 
