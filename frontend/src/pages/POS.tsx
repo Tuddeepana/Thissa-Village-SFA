@@ -455,18 +455,18 @@ const POS = () => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2 md:space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">POS System</h1>
-          <p className="text-sm md:text-base text-muted-foreground">
+          <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground">POS System</h1>
+          <p className="text-xs md:text-sm lg:text-base text-muted-foreground">
             Fast and efficient point of sale
           </p>
         </div>
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Keyboard className="h-4 w-4 mr-2" />
+            <Button variant="outline" size="sm" className="text-xs md:text-sm">
+              <Keyboard className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
               Shortcuts
             </Button>
           </DialogTrigger>
@@ -523,18 +523,18 @@ const POS = () => {
 
       {/* Tabs for switching between Bar and Restaurant items */}
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-2 md:p-4">
           <Tabs value={itemSource} onValueChange={(value) => {
             setItemSource(value as 'bar' | 'restaurant');
             setPage(1); // Reset to first page when switching
           }}>
-            <TabsList className="grid w-full max-w-md grid-cols-2">
-              <TabsTrigger value="bar" className="flex items-center gap-2">
-                <Wine className="h-4 w-4" />
+            <TabsList className="grid w-full max-w-md grid-cols-2 h-8 md:h-10">
+              <TabsTrigger value="bar" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+                <Wine className="h-3 w-3 md:h-4 md:w-4" />
                 Bar Items
               </TabsTrigger>
-              <TabsTrigger value="restaurant" className="flex items-center gap-2">
-                <UtensilsCrossed className="h-4 w-4" />
+              <TabsTrigger value="restaurant" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+                <UtensilsCrossed className="h-3 w-3 md:h-4 md:w-4" />
                 Restaurant Items
               </TabsTrigger>
             </TabsList>
@@ -542,18 +542,18 @@ const POS = () => {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 md:gap-4">
         {/* Product Search - Takes 2 columns on large screens */}
         <div className="lg:col-span-2">
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-sm text-muted-foreground">
+            <CardContent className="p-2 md:p-4">
+              <div className="flex items-center justify-between mb-2 md:mb-3">
+                <div className="text-xs md:text-sm text-muted-foreground">
                   Showing {itemSource === 'bar' ? 'Bar' : 'Restaurant'} items - Page {page} of {totalPages}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Prev</Button>
-                  <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
+                <div className="flex items-center gap-1 md:gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="text-xs md:text-sm h-7 md:h-9 px-2 md:px-4">Prev</Button>
+                  <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="text-xs md:text-sm h-7 md:h-9 px-2 md:px-4">Next</Button>
                 </div>
               </div>
               <LocalLoader loaderKey="pos-products">
