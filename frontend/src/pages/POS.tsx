@@ -5,13 +5,15 @@ import { ProductSearch } from "@/components/pos/ProductSearch";
 import { BillCart } from "@/components/pos/BillCart";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import api from "@/api/client";
+import restaurantApi from "@/api/restaurantClient";
 import { Product, BillItem, Bill, StockWarning } from "@/types/pos";
 import { printBillNewWindow } from "@/lib/billPrinter";
 import { toast } from "sonner";
 import type { MyStockResponse, MyStockTableRow } from '@/types/mystock';
+import type { RestaurantItemsResponse, RestaurantItem } from '@/types/restaurant';
 import { Button } from "@/components/ui/button";
 import LocalLoader from "@/components/common/LocalLoader";
-import { Keyboard } from "lucide-react";
+import { Keyboard, Wine, UtensilsCrossed } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const PAGE_SIZE = 50;
 
@@ -29,6 +32,8 @@ const POS = () => {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [restaurantProducts, setRestaurantProducts] = useState<Product[]>([]);
+  const [itemSource, setItemSource] = useState<'bar' | 'restaurant'>('bar');
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [taxRate, setTaxRate] = useState(0);
   const [discountRate, setDiscountRate] = useState(0);
@@ -43,38 +48,75 @@ const POS = () => {
     const fetchProducts = async () => {
       setLoadingProducts(true);
       try {
-  const res = await api.get<MyStockResponse>('/mystock', { params: { page, pageSize: PAGE_SIZE }, meta: { showLoader: 'local', loaderKey: 'pos-products' } });
-        if (cancelled) return;
-        const rows: MyStockTableRow[] = res.data.tableResponse?.data ?? [];
-        const mapped: Product[] = rows.map((r) => ({
-          id: r.productId,
-          name: r.productName,
-          category: r.category?.name ?? '',
-          // Use sellingPrice returned by mystock if present (fallback to 0)
-          price: r.sellingPrice ?? 0,
-          cost: r.sellingPrice ?? 0,
-          stock: r.availableQuantity,
-          minStock: r.minStock ?? 0,
-          bottleVolume: r.bottle_size ?? undefined,
-          barcode: undefined,
-          image: undefined,
-          description: undefined,
-          createdAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
-          updatedAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
-        }));
-        setProducts(mapped);
-        const pagination = res.data.tableResponse?.pagination;
-        setTotalPages(pagination?.totalPages ?? 1);
+        if (itemSource === 'bar') {
+          const res = await api.get<MyStockResponse>('/mystock', {
+            params: { page, pageSize: PAGE_SIZE },
+            meta: { showLoader: 'local', loaderKey: 'pos-products' }
+          });
+          if (cancelled) return;
+          const rows: MyStockTableRow[] = res.data.tableResponse?.data ?? [];
+          const mapped: Product[] = rows.map((r) => ({
+            id: r.productId,
+            name: r.productName,
+            category: r.category?.name ?? '',
+            price: r.sellingPrice ?? 0,
+            cost: r.sellingPrice ?? 0,
+            stock: r.availableQuantity,
+            minStock: r.minStock ?? 0,
+            bottleVolume: r.bottle_size ?? undefined,
+            barcode: undefined,
+            image: undefined,
+            description: undefined,
+            createdAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
+            updatedAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
+            source: 'bar',
+          }));
+          setProducts(mapped);
+          const pagination = res.data.tableResponse?.pagination;
+          setTotalPages(pagination?.totalPages ?? 1);
+        } else {
+          // Fetch restaurant items
+          const res = await restaurantApi.get<RestaurantItemsResponse>('/items', {
+            params: { page, pageSize: PAGE_SIZE },
+            meta: { showLoader: 'local', loaderKey: 'pos-products' }
+          });
+          if (cancelled) return;
+          const items: RestaurantItem[] = res.data.items ?? [];
+          const mapped: Product[] = items.map((item) => ({
+            id: item.id,
+            name: item.name,
+            category: item.category,
+            price: item.price,
+            cost: item.price,
+            stock: item.available ? 999 : 0, // Restaurant items don't have stock tracking
+            minStock: 0,
+            bottleVolume: undefined,
+            barcode: undefined,
+            image: item.image,
+            description: item.description,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            source: 'restaurant',
+          }));
+          setRestaurantProducts(mapped);
+          const pagination = res.data.pagination;
+          setTotalPages(pagination?.totalPages ?? 1);
+        }
       } catch (err) {
         console.error('Failed to load products for POS', err);
-        toast.error('Failed to load products');
+        toast.error(`Failed to load ${itemSource} items`);
       } finally {
         if (!cancelled) setLoadingProducts(false);
       }
     };
     fetchProducts();
     return () => { cancelled = true; };
-  }, [page]);
+  }, [page, itemSource]);
+
+  // Get the current list of products to display based on item source
+  const displayProducts = useMemo(() => {
+    return itemSource === 'bar' ? products : restaurantProducts;
+  }, [itemSource, products, restaurantProducts]);
 
   // Calculate totals
   const subtotal = useMemo(() => {
@@ -189,6 +231,20 @@ const POS = () => {
           }
           break;
 
+        case 'r':
+        case 'w':
+          // Toggle between bar and restaurant items
+          e.preventDefault();
+          setItemSource((prev) => {
+            const newSource = prev === 'bar' ? 'restaurant' : 'bar';
+            setPage(1); // Reset to first page
+            toast.success(`Switched to ${newSource === 'bar' ? '🍷 Bar' : '🍴 Restaurant'} items`, {
+              description: `Now viewing ${newSource} products`
+            });
+            return newSource;
+          });
+          break;
+
         default:
           break;
       }
@@ -199,7 +255,8 @@ const POS = () => {
   }, [navigate, isPaymentDialogOpen, billItems.length, handleCompleteBill]);
 
   const handleAddProduct = (product: Product) => {
-    if (product.stock === 0) {
+    // Restaurant items don't have stock checking
+    if (product.source === 'bar' && product.stock === 0) {
       toast.error("Product is out of stock!");
       return;
     }
@@ -207,8 +264,8 @@ const POS = () => {
     const existingItem = billItems.find((item) => item.product.id === product.id);
 
     if (existingItem) {
-      // Check if we can add more
-      if (existingItem.quantity >= product.stock) {
+      // Check if we can add more (only for bar items)
+      if (product.source === 'bar' && existingItem.quantity >= product.stock) {
         toast.error("Cannot add more than available stock!");
         return;
       }
@@ -231,7 +288,8 @@ const POS = () => {
     const item = billItems.find((item) => item.product.id === productId);
     if (!item) return;
 
-    if (newQuantity > item.product.stock) {
+    // Only check stock for bar items
+    if (item.product.source === 'bar' && newQuantity > item.product.stock) {
       toast.error("Cannot exceed available stock!");
       return;
     }
@@ -282,108 +340,133 @@ const POS = () => {
       }
     })();
 
-    // Build payload for backend as per API contract
-    const payload = {
-      bill_number: billNumber,
-      date: now.toISOString(),
-      payment_method: paymentMethod.toUpperCase(),
-      customer_name: customerName ?? null,
-      total: Number(total.toFixed(2)),
-      cashier_name: cashierName,
-      item_count: billItems.length,
-      credit_note: creditDescription ?? null,
-      cash_given: Number(amountPaid.toFixed(2)),
-      balance_given: Number(change.toFixed(2)),
-      tax: Number(tax.toFixed(2)),
-      items: billItems.map((bi) => ({
-        productId: bi.product.id,
-        quantityMoved: bi.quantity,
-      })),
+    // Separate bar and restaurant items
+    const barItems = billItems.filter(item => item.product.source === 'bar');
+    // Restaurant items are handled separately - no backend call needed for them
+
+    // Build payload for backend - only bar items go to our backend
+    if (barItems.length > 0) {
+      const payload = {
+        bill_number: billNumber,
+        date: now.toISOString(),
+        payment_method: paymentMethod.toUpperCase(),
+        customer_name: customerName ?? null,
+        total: Number(total.toFixed(2)),
+        cashier_name: cashierName,
+        item_count: billItems.length,
+        credit_note: creditDescription ?? null,
+        cash_given: Number(amountPaid.toFixed(2)),
+        balance_given: Number(change.toFixed(2)),
+        tax: Number(tax.toFixed(2)),
+        items: barItems.map((bi) => ({
+          productId: bi.product.id,
+          quantityMoved: bi.quantity,
+        })),
+      };
+
+      // Call backend to persist bill and create inventory movements
+      api
+        .post('/bills', payload)
+        .then(() => {
+          // Update stock levels locally for bar items only
+          const updatedProducts = products.map((product) => {
+            const billItem = barItems.find((item) => item.product.id === product.id);
+            if (billItem) {
+              const newStock = product.stock - billItem.quantity;
+              return {
+                ...product,
+                stock: newStock,
+                updatedAt: now,
+              };
+            }
+            return product;
+          });
+          setProducts(updatedProducts);
+
+          completeBillProcess(billNumber, now, paymentMethod, amountPaid, change, customerName, customerPhone, creditDescription, updatedProducts);
+        })
+        .catch((err) => {
+          console.error('Failed to complete bill', err);
+          const msg = err?.response?.data?.message ?? 'Failed to complete bill';
+          toast.error(msg);
+        });
+    } else {
+      // Only restaurant items, no backend call needed for bar system
+      completeBillProcess(billNumber, now, paymentMethod, amountPaid, change, customerName, customerPhone, creditDescription, products);
+    }
+  };
+
+  const completeBillProcess = (
+    billNumber: string,
+    now: Date,
+    paymentMethod: 'cash' | 'card' | 'credit' | 'other',
+    amountPaid: number,
+    change: number,
+    customerName?: string,
+    customerPhone?: string,
+    creditDescription?: string,
+    updatedProducts?: Product[]
+  ) => {
+    // Prepare printable bill object
+    const bill: Bill = {
+      id: billNumber,
+      items: billItems,
+      subtotal,
+      tax,
+      taxRate,
+      discount,
+      discountRate,
+      total,
+      customerName,
+      customerPhone,
+      paymentMethod,
+      amountPaid,
+      change,
+      creditDescription,
+      createdAt: now,
     };
+    printBillNewWindow(bill);
 
-    // Call backend to persist bill and create inventory movements
-    api
-      .post('/bills', payload)
-      .then((res) => {
-        // Update stock levels locally (reflect subtraction)
-        const updatedProducts = products.map((product) => {
-          const billItem = billItems.find((item) => item.product.id === product.id);
-          if (billItem) {
-            const newStock = product.stock - billItem.quantity;
-            return {
-              ...product,
-              stock: newStock,
-              updatedAt: now,
-            };
-          }
-          return product;
-        });
-        setProducts(updatedProducts);
+    // Clear bill & close dialog
+    setBillItems([]);
+    setDiscountRate(0);
+    setIsPaymentDialogOpen(false);
 
-        // Prepare printable bill object
-        const bill: Bill = {
-          id: billNumber,
-          items: billItems,
-          subtotal,
-          tax,
-          taxRate,
-          discount,
-          discountRate,
-          total,
-          customerName,
-          customerPhone,
-          paymentMethod,
-          amountPaid,
-          change,
-          creditDescription,
-          createdAt: now,
-        };
-        printBillNewWindow(bill);
+    toast.success('Bill completed successfully!', {
+      description: `Bill #${billNumber} - Total: Rs. ${total.toFixed(2)}`,
+    });
 
-        // Clear bill & close dialog
-        setBillItems([]);
-        setDiscountRate(0);
-        setIsPaymentDialogOpen(false);
-
-        toast.success('Bill completed successfully!', {
-          description: `Bill #${billNumber} - Total: Rs. ${total.toFixed(2)}`,
-        });
-
-        // Show low stock warnings after completing bill
-        setTimeout(() => {
-          const lowStockProducts = updatedProducts.filter(
-            (p) => p.stock > 0 && p.stock <= p.minStock
-          );
-          if (lowStockProducts.length > 0) {
-            toast.warning(`${lowStockProducts.length} product(s) are now low in stock!`, {
-              description: lowStockProducts
-                .slice(0, 3)
-                .map((p) => `${p.name}: ${p.stock} units`)
-                .join(', '),
-            });
-          }
-        }, 1000);
-      })
-      .catch((err) => {
-        console.error('Failed to complete bill', err);
-        const msg = err?.response?.data?.message ?? 'Failed to complete bill';
-        toast.error(msg);
-      });
+    // Show low stock warnings after completing bill (only for bar items)
+    if (updatedProducts) {
+      setTimeout(() => {
+        const lowStockProducts = updatedProducts.filter(
+          (p) => p.stock > 0 && p.stock <= p.minStock && p.source === 'bar'
+        );
+        if (lowStockProducts.length > 0) {
+          toast.warning(`${lowStockProducts.length} product(s) are now low in stock!`, {
+            description: lowStockProducts
+              .slice(0, 3)
+              .map((p) => `${p.name}: ${p.stock} units`)
+              .join(', '),
+          });
+        }
+      }, 1000);
+    }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2 md:space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">POS System</h1>
-          <p className="text-sm md:text-base text-muted-foreground">
+          <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground">POS System</h1>
+          <p className="text-xs md:text-sm lg:text-base text-muted-foreground">
             Fast and efficient point of sale
           </p>
         </div>
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Keyboard className="h-4 w-4 mr-2" />
+            <Button variant="outline" size="sm" className="text-xs md:text-sm">
+              <Keyboard className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
               Shortcuts
             </Button>
           </DialogTrigger>
@@ -423,6 +506,13 @@ const POS = () => {
                 <Badge variant="secondary" className="justify-center text-lg font-mono">M</Badge>
                 <p className="text-sm">Open payment <strong>Method</strong> selection dialog</p>
               </div>
+              <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                <div className="flex gap-1">
+                  <Badge variant="secondary" className="justify-center text-lg font-mono flex-1">R</Badge>
+                  <Badge variant="secondary" className="justify-center text-lg font-mono flex-1">W</Badge>
+                </div>
+                <p className="text-sm">S<strong>w</strong>itch between <strong>Restaurant</strong> and Bar items</p>
+              </div>
             </div>
             <div className="text-xs text-muted-foreground pt-2 border-t">
               <p>💡 Tip: Use arrow keys (↑↓←→) after focusing search bar (press S) to navigate products like a 2D grid. Press Enter to add highlighted product to cart.</p>
@@ -431,20 +521,43 @@ const POS = () => {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* Tabs for switching between Bar and Restaurant items */}
+      <Card>
+        <CardContent className="p-2 md:p-4">
+          <Tabs value={itemSource} onValueChange={(value) => {
+            setItemSource(value as 'bar' | 'restaurant');
+            setPage(1); // Reset to first page when switching
+          }}>
+            <TabsList className="grid w-full max-w-md grid-cols-2 h-8 md:h-10">
+              <TabsTrigger value="bar" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+                <Wine className="h-3 w-3 md:h-4 md:w-4" />
+                Bar Items
+              </TabsTrigger>
+              <TabsTrigger value="restaurant" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+                <UtensilsCrossed className="h-3 w-3 md:h-4 md:w-4" />
+                Restaurant Items
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 md:gap-4">
         {/* Product Search - Takes 2 columns on large screens */}
         <div className="lg:col-span-2">
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-sm text-muted-foreground">Showing page {page} of {totalPages}</div>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Prev</Button>
-                  <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
+            <CardContent className="p-2 md:p-4">
+              <div className="flex items-center justify-between mb-2 md:mb-3">
+                <div className="text-xs md:text-sm text-muted-foreground">
+                  Showing {itemSource === 'bar' ? 'Bar' : 'Restaurant'} items - Page {page} of {totalPages}
+                </div>
+                <div className="flex items-center gap-1 md:gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="text-xs md:text-sm h-7 md:h-9 px-2 md:px-4">Prev</Button>
+                  <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="text-xs md:text-sm h-7 md:h-9 px-2 md:px-4">Next</Button>
                 </div>
               </div>
               <LocalLoader loaderKey="pos-products">
-                <ProductSearch ref={searchInputRef} products={products} onAddProduct={handleAddProduct} />
+                <ProductSearch ref={searchInputRef} products={displayProducts} onAddProduct={handleAddProduct} />
               </LocalLoader>
               {loadingProducts && <p className="text-xs text-muted-foreground mt-2">Loading products...</p>}
             </CardContent>

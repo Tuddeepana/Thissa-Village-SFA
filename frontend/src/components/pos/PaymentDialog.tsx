@@ -75,77 +75,80 @@ export function PaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Complete Payment</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-base md:text-lg">Complete Payment</DialogTitle>
+          <DialogDescription className="text-xs md:text-sm">
             Enter payment details to complete the transaction
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-3 md:space-y-4 py-2 md:py-4">
           {/* Customer Information (Optional) */}
-          <div className="space-y-2">
-            <Label htmlFor="customerName">Customer Name (Optional)</Label>
+          <div className="space-y-1.5 md:space-y-2">
+            <Label htmlFor="customerName" className="text-xs md:text-sm">Customer Name (Optional)</Label>
             <Input
               id="customerName"
               placeholder="Enter customer name"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
+              className="text-xs md:text-sm h-8 md:h-9"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="customerPhone">Customer Phone (Optional)</Label>
+          <div className="space-y-1.5 md:space-y-2">
+            <Label htmlFor="customerPhone" className="text-xs md:text-sm">Customer Phone (Optional)</Label>
             <Input
               id="customerPhone"
               placeholder="Enter customer phone"
               value={customerPhone}
               onChange={(e) => setCustomerPhone(e.target.value)}
+              className="text-xs md:text-sm h-8 md:h-9"
             />
           </div>
 
           <Separator />
 
           {/* Payment Method */}
-          <div className="space-y-2">
-            <Label htmlFor="paymentMethod">Payment Method</Label>
+          <div className="space-y-1.5 md:space-y-2">
+            <Label htmlFor="paymentMethod" className="text-xs md:text-sm">Payment Method</Label>
             <Select
               value={paymentMethod}
               onValueChange={(value) => setPaymentMethod(value as 'cash' | 'card' | 'credit' | 'other')}
             >
-              <SelectTrigger id="paymentMethod">
+              <SelectTrigger id="paymentMethod" className="text-xs md:text-sm h-8 md:h-9">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="cash">Cash</SelectItem>
-                <SelectItem value="card">Card</SelectItem>
-                <SelectItem value="credit">Credit</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+                <SelectItem value="cash" className="text-xs md:text-sm">Cash</SelectItem>
+                <SelectItem value="card" className="text-xs md:text-sm">Card</SelectItem>
+                <SelectItem value="credit" className="text-xs md:text-sm">Credit</SelectItem>
+                <SelectItem value="other" className="text-xs md:text-sm">Other</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {/* Credit Description - Only show when Credit is selected */}
           {isCredit && (
-            <div className="space-y-2">
-              <Label htmlFor="creditDescription">Credit Description</Label>
+            <div className="space-y-1.5 md:space-y-2">
+              <Label htmlFor="creditDescription" className="text-xs md:text-sm">Credit Description</Label>
               <Textarea
                 id="creditDescription"
                 placeholder="Enter credit details (e.g., customer account, due date, terms...)"
                 value={creditDescription}
                 onChange={(e) => setCreditDescription(e.target.value)}
                 rows={3}
+                className="text-xs md:text-sm"
               />
               {creditMissing && (
-                <p className="text-sm text-red-500">Credit note is required for credit payments</p>
+                <p className="text-xs md:text-sm text-red-500">Credit note is required for credit payments</p>
               )}
             </div>
           )}
 
           {/* Total Amount */}
-          <div className="bg-muted p-4 rounded-lg">
-            <div className="flex justify-between items-center text-lg font-bold">
+          <div className="bg-muted p-3 md:p-4 rounded-lg">
+            <div className="flex justify-between items-center text-base md:text-lg font-bold">
               <span>Total Amount:</span>
               <span className="text-primary">Rs. {total.toFixed(2)}</span>
             </div>
@@ -153,8 +156,8 @@ export function PaymentDialog({
 
           {/* Amount Paid - Hide for Credit */}
           {!isCredit && (
-            <div className="space-y-2">
-              <Label htmlFor="amountPaid">Amount Paid</Label>
+            <div className="space-y-1.5 md:space-y-2">
+              <Label htmlFor="amountPaid" className="text-xs md:text-sm">Amount Paid</Label>
               <Input
                 id="amountPaid"
                 type="number"
@@ -162,16 +165,16 @@ export function PaymentDialog({
                 step="0.01"
                 value={amountPaid}
                 onChange={(e) => setAmountPaid(e.target.value)}
-                className="text-lg font-semibold"
+                className="text-base md:text-lg font-semibold h-9 md:h-10"
               />
             </div>
           )}
 
           {/* Quick Amount Buttons */}
           {paymentMethod === 'cash' && (
-            <div className="space-y-2">
-              <Label>Quick Amount</Label>
-              <div className="grid grid-cols-4 gap-2">
+            <div className="space-y-1.5 md:space-y-2">
+              <Label className="text-xs md:text-sm">Quick Amount</Label>
+              <div className="grid grid-cols-4 gap-1.5 md:gap-2">
                 {[100, 500, 1000, 2000, 5000].map((amount) => (
                   <Button
                     key={amount}
@@ -179,6 +182,7 @@ export function PaymentDialog({
                     size="sm"
                     onClick={() => handleQuickAmount(amount)}
                     disabled={amount < total}
+                    className="text-xs md:text-sm h-7 md:h-8 px-1 md:px-3"
                   >
                     Rs. {amount}
                   </Button>
@@ -187,6 +191,7 @@ export function PaymentDialog({
                   variant="outline"
                   size="sm"
                   onClick={() => handleQuickAmount(total)}
+                  className="text-xs md:text-sm h-7 md:h-8 px-1 md:px-3"
                 >
                   Exact
                 </Button>
@@ -196,10 +201,10 @@ export function PaymentDialog({
 
           {/* Change */}
           {paymentMethod === 'cash' && (
-            <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg">
+            <div className="bg-green-50 dark:bg-green-950 p-3 md:p-4 rounded-lg">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Change to Return:</span>
-                <span className="text-xl font-bold text-green-600 dark:text-green-400">
+                <span className="text-xs md:text-sm font-medium">Change to Return:</span>
+                <span className="text-lg md:text-xl font-bold text-green-600 dark:text-green-400">
                   Rs. {change.toFixed(2)}
                 </span>
               </div>
@@ -208,15 +213,15 @@ export function PaymentDialog({
 
           {/* Validation Message */}
           {!isCredit && amountPaidNum < total && (
-            <p className="text-sm text-red-500">
+            <p className="text-xs md:text-sm text-red-500">
               Amount paid must be at least Rs. {total.toFixed(2)}
             </p>
           )}
 
           {/* Credit Info Message */}
           {isCredit && (
-            <div className="bg-yellow-50 dark:bg-yellow-950 p-4 rounded-lg">
-              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+            <div className="bg-yellow-50 dark:bg-yellow-950 p-3 md:p-4 rounded-lg">
+              <p className="text-xs md:text-sm text-yellow-700 dark:text-yellow-300">
                 <strong>Credit Sale:</strong> This transaction will be recorded as credit.
                 No payment is required at this time.
               </p>
@@ -225,13 +230,14 @@ export function PaymentDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="text-xs md:text-sm h-8 md:h-9">
             Cancel
           </Button>
           <Button
             onClick={handleConfirm}
             disabled={(!isCredit && amountPaidNum < total) || creditMissing}
             aria-disabled={(!isCredit && amountPaidNum < total) || creditMissing}
+            className="text-xs md:text-sm h-8 md:h-9"
           >
             {isCredit ? "Confirm Credit Sale" : "Confirm & Print Bill"}
           </Button>
