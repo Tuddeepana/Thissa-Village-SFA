@@ -10,6 +10,7 @@ export const ENDPOINTS = {
 	categories: '/categories',
 	units: '/units',
 	tables: '/tables',
+	rooms: '/rooms',
 	products: '/products',
 	salesSummary: '/sales-summary',
 };

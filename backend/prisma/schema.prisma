@@ -32,6 +32,11 @@ enum TableType {
   NORMAL
 }
 
+enum RoomType {
+  VIP
+  NORMAL
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -81,6 +86,18 @@ model RestaurantTable {
   deletedAt  DateTime?
 
   @@map("restaurant_tables")
+}
+
+model Room {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  room_type RoomType  @default(NORMAL)
+  quantity  Int       @default(1)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("rooms")
 }
 
 model Product {

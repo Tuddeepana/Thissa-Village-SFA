@@ -15,6 +15,7 @@ import {
     ClipboardList,
     Ruler,
     TableProperties,
+    Hotel,
 } from "lucide-react";
 import {
     Sidebar,
@@ -34,6 +35,7 @@ const sfaItems = [
     {title: "Units", url: "/units", icon: Ruler},
     {title: "Products", url: "/products", icon: Package},
     {title: "Tables", url: "/tables", icon: TableProperties},
+    {title: "Rooms", url: "/rooms", icon: Hotel},
     {title: "Stock", url: "/my-stock", icon: Warehouse},
     {title: "Invoices", url: "/invoices", icon: FileText},
     {title: "Bills", url: "/bills", icon: Receipt},
