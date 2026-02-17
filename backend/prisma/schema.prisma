@@ -97,7 +97,45 @@ model Room {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
+  // Relations
+  bookedRooms BookedRoom[]
+
   @@map("rooms")
+}
+
+model RoomBooking {
+  id              String   @id @default(uuid())
+  customerName    String
+  customerNic     String?
+  customerPhone   String
+  customerAddress String?
+  checkInDate     DateTime
+  checkOutDate    DateTime
+  totalAmount     Decimal  @db.Decimal(10, 2)
+  status          String   @default("ACTIVE") // ACTIVE, CHECKED_OUT, CANCELLED
+  cashierName     String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  bookedRooms BookedRoom[]
+
+  @@map("room_bookings")
+}
+
+model BookedRoom {
+  id            String   @id @default(uuid())
+  bookingId     String
+  roomId        String
+  roomName      String // Store room display name like "Room 1"
+  pricePerNight Decimal  @db.Decimal(10, 2)
+  createdAt     DateTime @default(now())
+
+  // Relations
+  booking RoomBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  room    Room        @relation(fields: [roomId], references: [id])
+
+  @@map("booked_rooms")
 }
 
 model Product {

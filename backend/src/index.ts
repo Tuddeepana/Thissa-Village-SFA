@@ -43,6 +43,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/units', unitRoutes);
 app.use('/api/tables', tableRoutes);
 app.use('/api/rooms', roomRoutes);
+app.use('/api/room-bookings', roomBookingRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/bills', billRoutes);

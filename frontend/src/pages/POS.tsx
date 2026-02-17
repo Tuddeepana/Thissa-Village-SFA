@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ProductSearch } from "@/components/pos/ProductSearch";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
+import { RoomBookingDialog } from "@/components/pos/RoomBookingDialog";
 import api from "@/api/client";
 import { tableService } from "@/api/services/tableService";
 import { Product, BillItem, Bill, StockWarning } from "@/types/pos";
@@ -22,6 +23,7 @@ import {
   Phone,
   UtensilsCrossed,
   Package,
+  Hotel,
   Minus,
   Plus,
   Trash2,
@@ -61,6 +63,7 @@ const POS = () => {
   const [taxRate, setTaxRate] = useState(0);
   const [discountRate, setDiscountRate] = useState(0);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [isRoomBookingDialogOpen, setIsRoomBookingDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -431,7 +434,7 @@ const POS = () => {
               {/* Order Type Selection */}
               <div className="space-y-2">
                 <Label>Order Type</Label>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <Button
                     variant={orderType === "dine_in" ? "default" : "outline"}
                     className="flex-1"
@@ -450,6 +453,14 @@ const POS = () => {
                   >
                     <Package className="h-4 w-4 mr-2" />
                     Take Away
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setIsRoomBookingDialogOpen(true)}
+                  >
+                    <Hotel className="h-4 w-4 mr-2" />
+                    Room
                   </Button>
                 </div>
               </div>
@@ -729,6 +740,16 @@ const POS = () => {
         onOpenChange={setIsPaymentDialogOpen}
         total={total}
         onConfirmPayment={handleConfirmPayment}
+      />
+
+      {/* Room Booking Dialog */}
+      <RoomBookingDialog
+        open={isRoomBookingDialogOpen}
+        onOpenChange={setIsRoomBookingDialogOpen}
+        cashierName={currentUser.name}
+        onBookingSuccess={() => {
+          toast.success("Room booking completed successfully!");
+        }}
       />
     </div>
   );
