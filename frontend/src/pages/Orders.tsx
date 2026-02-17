@@ -259,7 +259,7 @@ const Orders = () => {
       </head>
       <body>
         <div class="header">
-          <h1>Thissa Village</h1>
+          <h1>Tissa Village</h1>
           <p>Restaurant</p>
           <p>Tel: 011-1234567</p>
         </div>
