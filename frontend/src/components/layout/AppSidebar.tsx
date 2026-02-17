@@ -36,6 +36,7 @@ const sfaItems = [
     {title: "Products", url: "/products", icon: Package},
     {title: "Tables", url: "/tables", icon: TableProperties},
     {title: "Rooms", url: "/rooms", icon: Hotel},
+    {title: "Room Status", url: "/room-status", icon: Hotel},
     {title: "Stock", url: "/my-stock", icon: Warehouse},
     {title: "Invoices", url: "/invoices", icon: FileText},
     {title: "Bills", url: "/bills", icon: Receipt},
@@ -45,6 +46,7 @@ const sfaItems = [
 const posItems = [
     {title: "POS System", url: "/pos", icon: ShoppingCart},
     {title: "Orders", url: "/orders", icon: ClipboardList},
+    {title: "Room Status", url: "/room-status", icon: Hotel},
     {title: "Bills", url: "/bills", icon: Receipt},
 ];
 
