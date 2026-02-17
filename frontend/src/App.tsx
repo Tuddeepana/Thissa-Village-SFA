@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Categories from "./pages/Categories";
 import Units from "./pages/Units";
 import Tables from "./pages/Tables";
+import Rooms from "./pages/Rooms";
 import Products from "./pages/Products";
 import Invoices from "./pages/Invoices";
 import LowStock from "./pages/LowStock";
@@ -17,6 +18,7 @@ import MyStock from "./pages/MyStock";
 import POS from "./pages/POS";
 import Orders from "./pages/Orders";
 import Bills from "./pages/Bills";
+import RoomStatus from "./pages/RoomStatus";
 import SalesSummary from "./pages/SalesSummary";
 import Users from "./pages/Users";
 import Profile from "./pages/Profile";
@@ -74,6 +76,7 @@ const App = () => (
             <Route path="categories" element={<Categories />} />
             <Route path="units" element={<Units />} />
             <Route path="tables" element={<Tables />} />
+            <Route path="rooms" element={<Rooms />} />
             <Route path="products" element={<Products />} />
             <Route path="invoices" element={<Invoices />} />
             <Route path="low-stock" element={<LowStock />} />
@@ -81,6 +84,7 @@ const App = () => (
             <Route path="pos" element={<POS />} />
             <Route path="orders" element={<Orders />} />
             <Route path="bills" element={<Bills />} />
+            <Route path="room-status" element={<RoomStatus />} />
             <Route path="sales-summary" element={<SalesSummary />} />
             <Route path="users" element={<Users />} />
             <Route path="profile" element={<Profile />} />

@@ -3,11 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { ChefHat } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/api/services/authService";
 import { STORAGE_KEYS } from "@/utils/constants";
+import logoSvg from "@/img/logo.svg";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -43,10 +43,10 @@ const Auth = () => {
         <CardHeader className="space-y-2 text-center">
           <div className="flex justify-center mb-4">
             <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center">
-              <ChefHat className="w-8 h-8 text-primary-foreground" />
+              <img src={logoSvg} alt="Tissa Village Logo" className="w-8 h-8" />
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold text-primary">Thissa Village</CardTitle>
+          <CardTitle className="text-3xl font-bold text-primary">Tissa Village</CardTitle>
           <CardDescription className="text-base">
             {isLogin ? "Welcome back to your restaurant management system" : "Create your account"}
           </CardDescription>

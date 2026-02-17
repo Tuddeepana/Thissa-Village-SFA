@@ -3,7 +3,6 @@ import {useLocation} from "react-router-dom";
 import {useEffect, useState} from "react";
 import {
     LayoutDashboard,
-    ChefHat,
     Package,
     FileText,
     ShoppingCart,
@@ -15,6 +14,7 @@ import {
     ClipboardList,
     Ruler,
     TableProperties,
+    Hotel,
 } from "lucide-react";
 import {
     Sidebar,
@@ -26,6 +26,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import logoSvg from "@/img/logo.svg";
 
 const sfaItems = [
     {title: "Dashboard", url: "/dashboard", icon: LayoutDashboard},
@@ -34,6 +35,8 @@ const sfaItems = [
     {title: "Units", url: "/units", icon: Ruler},
     {title: "Products", url: "/products", icon: Package},
     {title: "Tables", url: "/tables", icon: TableProperties},
+    {title: "Rooms", url: "/rooms", icon: Hotel},
+    {title: "Room Status", url: "/room-status", icon: Hotel},
     {title: "Stock", url: "/my-stock", icon: Warehouse},
     {title: "Invoices", url: "/invoices", icon: FileText},
     {title: "Bills", url: "/bills", icon: Receipt},
@@ -43,6 +46,7 @@ const sfaItems = [
 const posItems = [
     {title: "POS System", url: "/pos", icon: ShoppingCart},
     {title: "Orders", url: "/orders", icon: ClipboardList},
+    {title: "Room Status", url: "/room-status", icon: Hotel},
     {title: "Bills", url: "/bills", icon: Receipt},
 ];
 
@@ -64,10 +68,10 @@ export function AppSidebar() {
                 <div className="p-4 md:p-6 border-b">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-                            <ChefHat className="w-6 h-6 text-primary-foreground"/>
+                            <img src={logoSvg} alt="Tissa Village Logo" className="w-6 h-6" />
                         </div>
                         <div>
-                            <h1 className="font-bold text-base md:text-lg text-foreground">Thissa Village</h1>
+                            <h1 className="font-bold text-base md:text-lg text-foreground">Tissa Village</h1>
                             <p className="text-xs text-muted-foreground">{moduleLabel}</p>
                         </div>
                     </div>
