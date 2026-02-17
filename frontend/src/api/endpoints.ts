@@ -14,5 +14,14 @@ export const ENDPOINTS = {
 	roomBookings: '/room-bookings',
 	products: '/products',
 	salesSummary: '/sales-summary',
+	expenses: {
+		base: '/expenses',
+		types: '/expenses/types',
+		bulk: '/expenses/bulk',
+		pnl: '/expenses/pnl',
+		byId: (id: string) => `/expenses/${id}`,
+		typeById: (id: string) => `/expenses/types/${id}`,
+		restoreType: (id: string) => `/expenses/types/${id}/restore`,
+	},
 };
 
