@@ -220,3 +220,31 @@ model Bill {
 
   @@map("bills")
 }
+
+model ExpenseType {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  expenses Expense[]
+
+  @@map("expense_types")
+}
+
+model Expense {
+  id            String   @id @default(uuid())
+  amount        Decimal  @db.Decimal(10, 2)
+  description   String?
+  date          DateTime
+  expenseTypeId String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  expenseType ExpenseType @relation(fields: [expenseTypeId], references: [id])
+
+  @@map("expenses")
+}

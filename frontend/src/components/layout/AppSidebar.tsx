@@ -30,7 +30,7 @@ import logoSvg from "@/img/logo.svg";
 
 const sfaItems = [
     {title: "Dashboard", url: "/dashboard", icon: LayoutDashboard},
-    {title: "P&L (Profit & Loss)", url: "/sales-summary", icon: TrendingUp},
+    {title: "P&L (Profit & Loss)", url: "/profit-and-loss", icon: TrendingUp},
     {title: "Categories", url: "/categories", icon: FolderTree},
     {title: "Units", url: "/units", icon: Ruler},
     {title: "Products", url: "/products", icon: Package},
