@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +35,6 @@ import {
   Eye,
   User,
   Phone,
-  MapPin,
   Clock,
   UtensilsCrossed,
   Package,
@@ -45,103 +44,31 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-
-// Types for restaurant orders
-interface OrderItem {
-  id: string;
-  productId: string;
-  productName: string;
-  quantity: number;
-  unitPrice: number;
-  total: number;
-}
-
-interface Order {
-  id: string;
-  orderNumber: string;
-  customerName: string;
-  customerPhone: string;
-  orderType: "dine_in" | "take_away";
-  tableNumber: number | null;
-  status: "pending" | "preparing" | "ready" | "completed" | "cancelled";
-  items: OrderItem[];
-  subtotal: number;
-  tax: number;
-  discount: number;
-  total: number;
-  terminalId: string;
-  cashierName: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Hardcoded data for demo
-const MOCK_PRODUCTS = [
-  { id: "p1", name: "Chicken Fried Rice", price: 850 },
-  { id: "p2", name: "Egg Fried Rice", price: 650 },
-  { id: "p3", name: "Vegetable Noodles", price: 550 },
-  { id: "p4", name: "Chicken Kottu", price: 750 },
-  { id: "p5", name: "Cheese Kottu", price: 900 },
-  { id: "p6", name: "Fish Curry Rice", price: 700 },
-  { id: "p7", name: "Chicken Burger", price: 450 },
-  { id: "p8", name: "French Fries", price: 350 },
-  { id: "p9", name: "Soft Drink", price: 150 },
-  { id: "p10", name: "Fresh Juice", price: 250 },
-];
-
-const INITIAL_ORDERS: Order[] = [
-  {
-    id: "ord1",
-    orderNumber: "ORD-001",
-    customerName: "John Silva",
-    customerPhone: "0771234567",
-    orderType: "dine_in",
-    tableNumber: 3,
-    status: "preparing",
-    items: [
-      { id: "i1", productId: "p1", productName: "Chicken Fried Rice", quantity: 2, unitPrice: 850, total: 1700 },
-      { id: "i2", productId: "p9", productName: "Soft Drink", quantity: 2, unitPrice: 150, total: 300 },
-    ],
-    subtotal: 2000,
-    tax: 0,
-    discount: 0,
-    total: 2000,
-    terminalId: "T-001",
-    cashierName: "Admin User",
-    createdAt: new Date(Date.now() - 30 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 30 * 60 * 1000),
-  },
-  {
-    id: "ord2",
-    orderNumber: "ORD-002",
-    customerName: "Mary Fernando",
-    customerPhone: "0777654321",
-    orderType: "dine_in",
-    tableNumber: 7,
-    status: "pending",
-    items: [
-      { id: "i3", productId: "p4", productName: "Chicken Kottu", quantity: 1, unitPrice: 750, total: 750 },
-      { id: "i4", productId: "p10", productName: "Fresh Juice", quantity: 1, unitPrice: 250, total: 250 },
-    ],
-    subtotal: 1000,
-    tax: 0,
-    discount: 0,
-    total: 1000,
-    terminalId: "T-001",
-    cashierName: "Admin User",
-    createdAt: new Date(Date.now() - 15 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 15 * 60 * 1000),
-  },
-];
+import { orderService } from "@/api/services/orderService";
+import api from "@/api/client";
+import type { Order, OrderStatus as OrderStatusType, OrderStats, OrderStatus } from "@/types/order.types";
+import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
 
 const Orders = () => {
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isAddItemDialogOpen, setIsAddItemDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [stats, setStats] = useState<OrderStats>({
+    pending: 0,
+    preparing: 0,
+    ready: 0,
+    completed: 0,
+    cancelled: 0,
+    total: 0,
+  });
+
+  // Products for adding items
+  const [products, setProducts] = useState<MyStockTableRow[]>([]);
 
   // Add item form state
   const [selectedProductId, setSelectedProductId] = useState("");
@@ -151,7 +78,7 @@ const Orders = () => {
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "credit">("cash");
   const [amountPaid, setAmountPaid] = useState(0);
 
-  // Get current user info (hardcoded)
+  // Get current user info
   const currentUser = {
     name: (() => {
       try {
@@ -166,73 +93,117 @@ const Orders = () => {
     terminalId: "T-001",
   };
 
-  // Filter orders
+  // Fetch orders
+  const fetchOrders = async () => {
+    setLoading(true);
+    try {
+      const result = await orderService.listOrders({
+        status: statusFilter !== "all" ? (statusFilter as OrderStatusType) : undefined,
+        pageSize: 100,
+      });
+      setOrders(result.orders);
+    } catch (error) {
+      console.error("Failed to fetch orders", error);
+      toast.error("Failed to load orders");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch stats
+  const fetchStats = async () => {
+    try {
+      const data = await orderService.getOrderStats();
+      setStats(data);
+    } catch (error) {
+      console.error("Failed to fetch stats", error);
+    }
+  };
+
+  // Fetch products for adding items
+  const fetchProducts = async () => {
+    try {
+      const res = await api.get<MyStockResponse>('/mystock', { params: { page: 1, pageSize: 100 } });
+      setProducts(res.data.tableResponse?.data ?? []);
+    } catch (error) {
+      console.error("Failed to fetch products", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+    fetchStats();
+    fetchProducts();
+  }, [statusFilter]);
+
+  // Filter orders (client-side for search)
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       const matchesSearch =
-        order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.customerPhone.includes(searchQuery);
-      const matchesStatus = statusFilter === "all" || order.status === statusFilter;
-      return matchesSearch && matchesStatus;
+        order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.customer_phone.includes(searchQuery);
+      return matchesSearch;
     });
-  }, [orders, searchQuery, statusFilter]);
+  }, [orders, searchQuery]);
 
-  // Calculate stats
-  const stats = useMemo(() => {
-    const pending = orders.filter((o) => o.status === "pending").length;
-    const preparing = orders.filter((o) => o.status === "preparing").length;
-    const ready = orders.filter((o) => o.status === "ready").length;
-    const completed = orders.filter((o) => o.status === "completed").length;
-    return { pending, preparing, ready, completed };
-  }, [orders]);
-
-  const handleViewOrder = (order: Order) => {
-    setSelectedOrder(order);
-    setIsViewDialogOpen(true);
+  const handleViewOrder = async (order: Order) => {
+    try {
+      // Fetch full order details
+      const fullOrder = await orderService.getOrderById(order.id);
+      setSelectedOrder(fullOrder);
+      setIsViewDialogOpen(true);
+    } catch (error) {
+      console.error("Failed to fetch order details", error);
+      toast.error("Failed to load order details");
+    }
   };
 
-  const handleAddItemToOrder = () => {
+  const handleAddItemToOrder = async () => {
     if (!selectedOrder || !selectedProductId || quantity < 1) return;
 
-    const product = MOCK_PRODUCTS.find((p) => p.id === selectedProductId);
+    const product = products.find((p) => p.productId === selectedProductId);
     if (!product) return;
 
-    const newItem: OrderItem = {
-      id: `item-${Date.now()}`,
-      productId: product.id,
-      productName: product.name,
-      quantity,
-      unitPrice: product.price,
-      total: product.price * quantity,
-    };
+    try {
+      const updatedOrder = await orderService.addItemsToOrder(selectedOrder.id, {
+        items: [
+          {
+            productId: product.productId,
+            product_name: product.productName,
+            quantity,
+            unit_price: product.foreignerPrice ?? 0,
+          },
+        ],
+      });
 
-    const updatedOrder = {
-      ...selectedOrder,
-      items: [...selectedOrder.items, newItem],
-      subtotal: selectedOrder.subtotal + newItem.total,
-      total: selectedOrder.total + newItem.total,
-      updatedAt: new Date(),
-    };
-
-    setOrders(orders.map((o) => (o.id === selectedOrder.id ? updatedOrder : o)));
-    setSelectedOrder(updatedOrder);
-    setIsAddItemDialogOpen(false);
-    setSelectedProductId("");
-    setQuantity(1);
-    toast.success(`Added ${product.name} to order`);
+      setOrders(orders.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)));
+      setSelectedOrder(updatedOrder);
+      setIsAddItemDialogOpen(false);
+      setSelectedProductId("");
+      setQuantity(1);
+      toast.success(`Added ${product.productName} to order`);
+    } catch (error: any) {
+      console.error("Failed to add item", error);
+      const msg = error?.response?.data?.message ?? "Failed to add item";
+      toast.error(msg);
+    }
   };
 
-  const handleUpdateOrderStatus = (orderId: string, newStatus: Order["status"]) => {
-    setOrders(
-      orders.map((o) =>
-        o.id === orderId ? { ...o, status: newStatus, updatedAt: new Date() } : o
-      )
-    );
-    if (selectedOrder?.id === orderId) {
-      setSelectedOrder({ ...selectedOrder, status: newStatus, updatedAt: new Date() });
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatusType) => {
+    try {
+      const updatedOrder = await orderService.updateOrderStatus(orderId, { status: newStatus });
+      setOrders(orders.map((o) => (o.id === orderId ? updatedOrder : o)));
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder(updatedOrder);
+      }
+      toast.success(`Order status updated to ${newStatus}`);
+      fetchStats(); // Refresh stats
+    } catch (error: any) {
+      console.error("Failed to update status", error);
+      const msg = error?.response?.data?.message ?? "Failed to update status";
+      toast.error(msg);
     }
-    toast.success(`Order status updated to ${newStatus}`);
   };
 
   const handlePrintBill = (order: Order) => {
@@ -241,7 +212,7 @@ const Orders = () => {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Bill - ${order.orderNumber}</title>
+        <title>Bill - ${order.order_number}</title>
         <style>
           body { font-family: 'Courier New', monospace; padding: 20px; max-width: 300px; margin: 0 auto; }
           .header { text-align: center; margin-bottom: 20px; }
@@ -265,13 +236,13 @@ const Orders = () => {
         </div>
         <div class="divider"></div>
         <div class="info">
-          <p><strong>Order:</strong> ${order.orderNumber}</p>
-          <p><strong>Date:</strong> ${format(order.createdAt, "dd/MM/yyyy HH:mm")}</p>
-          <p><strong>Customer:</strong> ${order.customerName}</p>
-          <p><strong>Phone:</strong> ${order.customerPhone}</p>
-          <p><strong>Type:</strong> ${order.orderType === "dine_in" ? `Dine In - Table ${order.tableNumber}` : "Take Away"}</p>
-          <p><strong>Terminal:</strong> ${order.terminalId}</p>
-          <p><strong>Cashier:</strong> ${order.cashierName}</p>
+          <p><strong>Order:</strong> ${order.order_number}</p>
+          <p><strong>Date:</strong> ${format(new Date(order.createdAt), "dd/MM/yyyy HH:mm")}</p>
+          <p><strong>Customer:</strong> ${order.customer_name}</p>
+          <p><strong>Phone:</strong> ${order.customer_phone}</p>
+          <p><strong>Type:</strong> ${order.order_type === "DINE_IN" ? `Dine In - Table ${order.table_number}` : "Take Away"}</p>
+          <p><strong>Terminal:</strong> ${order.terminal_id}</p>
+          <p><strong>Cashier:</strong> ${order.cashier_name}</p>
         </div>
         <div class="divider"></div>
         <table class="items">
@@ -285,7 +256,7 @@ const Orders = () => {
               (item) => `
             <tr>
               <td class="qty">${item.quantity}</td>
-              <td>${item.productName}</td>
+              <td>${item.product_name}</td>
               <td class="price">Rs.${item.total.toFixed(0)}</td>
             </tr>
           `
@@ -317,7 +288,7 @@ const Orders = () => {
     toast.success("Bill sent to printer");
   };
 
-  const handleCompletePayment = () => {
+  const handleCompletePayment = async () => {
     if (!selectedOrder) return;
 
     const change = amountPaid - selectedOrder.total;
@@ -326,7 +297,8 @@ const Orders = () => {
       return;
     }
 
-    handleUpdateOrderStatus(selectedOrder.id, "completed");
+    // Update order status to completed
+    await handleUpdateOrderStatus(selectedOrder.id, OrderStatus.COMPLETED);
     handlePrintBill(selectedOrder);
     setIsPaymentDialogOpen(false);
     setIsViewDialogOpen(false);
@@ -335,15 +307,15 @@ const Orders = () => {
     toast.success("Payment completed successfully!");
   };
 
-  const getStatusBadge = (status: Order["status"]) => {
-    const styles: Record<Order["status"], string> = {
-      pending: "bg-yellow-100 text-yellow-800",
-      preparing: "bg-blue-100 text-blue-800",
-      ready: "bg-green-100 text-green-800",
-      completed: "bg-gray-100 text-gray-800",
-      cancelled: "bg-red-100 text-red-800",
+  const getStatusBadge = (status: OrderStatusType) => {
+    const styles: Record<OrderStatusType, string> = {
+      PENDING: "bg-yellow-100 text-yellow-800",
+      PREPARING: "bg-blue-100 text-blue-800",
+      READY: "bg-green-100 text-green-800",
+      COMPLETED: "bg-gray-100 text-gray-800",
+      CANCELLED: "bg-red-100 text-red-800",
     };
-    return <Badge className={styles[status]}>{status.toUpperCase()}</Badge>;
+    return <Badge className={styles[status]}>{status}</Badge>;
   };
 
   return (
@@ -356,7 +328,7 @@ const Orders = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-sm font-medium text-yellow-600">Pending</CardTitle>
@@ -389,6 +361,14 @@ const Orders = () => {
             <div className="text-2xl font-bold">{stats.completed}</div>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-sm font-medium text-red-600">Cancelled</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="text-2xl font-bold">{stats.cancelled}</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
@@ -412,15 +392,16 @@ const Orders = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="preparing">Preparing</SelectItem>
-                <SelectItem value="ready">Ready</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="PREPARING">Preparing</SelectItem>
+                <SelectItem value="READY">Ready</SelectItem>
+                <SelectItem value="COMPLETED">Completed</SelectItem>
+                <SelectItem value="CANCELLED">Cancelled</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" onClick={() => { setSearchQuery(""); setStatusFilter("all"); }}>
+            <Button variant="outline" onClick={() => { setSearchQuery(""); setStatusFilter("all"); fetchOrders(); }}>
               <RefreshCw className="h-4 w-4 mr-2" />
-              Clear
+              Refresh
             </Button>
           </div>
         </CardContent>
@@ -435,8 +416,11 @@ const Orders = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <Table>
+          {loading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading orders...</div>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Order #</TableHead>
@@ -460,16 +444,16 @@ const Orders = () => {
                 ) : (
                   filteredOrders.map((order) => (
                     <TableRow key={order.id}>
-                      <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                      <TableCell className="font-medium">{order.order_number}</TableCell>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{order.customerName}</div>
-                          <div className="text-xs text-muted-foreground">{order.customerPhone}</div>
+                          <div className="font-medium">{order.customer_name}</div>
+                          <div className="text-xs text-muted-foreground">{order.customer_phone}</div>
                         </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {order.orderType === "dine_in" ? (
+                          {order.order_type === "DINE_IN" ? (
                             <><UtensilsCrossed className="h-3 w-3 mr-1" /> Dine In</>
                           ) : (
                             <><Package className="h-3 w-3 mr-1" /> Take Away</>
@@ -477,7 +461,7 @@ const Orders = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {order.tableNumber ? `Table ${order.tableNumber}` : "-"}
+                        {order.table_number ? `Table ${order.table_number}` : "-"}
                       </TableCell>
                       <TableCell>{order.items.length} items</TableCell>
                       <TableCell className="font-medium">Rs.{order.total.toFixed(0)}</TableCell>
@@ -485,7 +469,7 @@ const Orders = () => {
                       <TableCell>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Clock className="h-3 w-3" />
-                          {format(order.createdAt, "HH:mm")}
+                          {format(new Date(order.createdAt), "HH:mm")}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -509,19 +493,18 @@ const Orders = () => {
                     </TableRow>
                   ))
                 )}
-              </TableBody>
-            </Table>
-          </div>
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
-      </Card>
-
-      {/* View Order Dialog */}
+      </Card>      {/* View Order Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ClipboardList className="h-5 w-5" />
-              Order Details - {selectedOrder?.orderNumber}
+              Order Details - {selectedOrder?.order_number}
             </DialogTitle>
             <DialogDescription>
               View and manage order details
@@ -534,22 +517,22 @@ const Orders = () => {
               <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-muted-foreground" />
-                  <span>{selectedOrder.customerName}</span>
+                  <span>{selectedOrder.customer_name}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>{selectedOrder.customerPhone}</span>
+                  <span>{selectedOrder.customer_phone}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {selectedOrder.orderType === "dine_in" ? (
-                    <><UtensilsCrossed className="h-4 w-4 text-muted-foreground" /> Dine In - Table {selectedOrder.tableNumber}</>
+                  {selectedOrder.order_type === "DINE_IN" ? (
+                    <><UtensilsCrossed className="h-4 w-4 text-muted-foreground" /> Dine In - Table {selectedOrder.table_number}</>
                   ) : (
                     <><Package className="h-4 w-4 text-muted-foreground" /> Take Away</>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span>{format(selectedOrder.createdAt, "dd/MM/yyyy HH:mm")}</span>
+                  <span>{format(new Date(selectedOrder.createdAt), "dd/MM/yyyy HH:mm")}</span>
                 </div>
               </div>
 
@@ -557,15 +540,15 @@ const Orders = () => {
               <div className="flex items-center gap-4">
                 <Label>Status:</Label>
                 {getStatusBadge(selectedOrder.status)}
-                {selectedOrder.status !== "completed" && selectedOrder.status !== "cancelled" && (
+                {selectedOrder.status !== "COMPLETED" && selectedOrder.status !== "CANCELLED" && (
                   <div className="flex gap-2 ml-auto">
-                    {selectedOrder.status === "pending" && (
-                      <Button size="sm" onClick={() => handleUpdateOrderStatus(selectedOrder.id, "preparing")}>
+                    {selectedOrder.status === "PENDING" && (
+                      <Button size="sm" onClick={() => handleUpdateOrderStatus(selectedOrder.id, OrderStatus.PREPARING)}>
                         Start Preparing
                       </Button>
                     )}
-                    {selectedOrder.status === "preparing" && (
-                      <Button size="sm" onClick={() => handleUpdateOrderStatus(selectedOrder.id, "ready")}>
+                    {selectedOrder.status === "PREPARING" && (
+                      <Button size="sm" onClick={() => handleUpdateOrderStatus(selectedOrder.id, OrderStatus.READY)}>
                         Mark Ready
                       </Button>
                     )}
@@ -579,7 +562,7 @@ const Orders = () => {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <Label className="text-base font-semibold">Order Items</Label>
-                  {selectedOrder.status !== "completed" && selectedOrder.status !== "cancelled" && (
+                  {selectedOrder.status !== "COMPLETED" && selectedOrder.status !== "CANCELLED" && (
                     <Button size="sm" variant="outline" onClick={() => setIsAddItemDialogOpen(true)}>
                       <Plus className="h-4 w-4 mr-1" /> Add Item
                     </Button>
@@ -598,9 +581,9 @@ const Orders = () => {
                     <TableBody>
                       {selectedOrder.items.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell>{item.productName}</TableCell>
+                          <TableCell>{item.product_name}</TableCell>
                           <TableCell className="text-center">{item.quantity}</TableCell>
-                          <TableCell className="text-right">Rs.{item.unitPrice.toFixed(0)}</TableCell>
+                          <TableCell className="text-right">Rs.{item.unit_price.toFixed(0)}</TableCell>
                           <TableCell className="text-right">Rs.{item.total.toFixed(0)}</TableCell>
                         </TableRow>
                       ))}
@@ -636,7 +619,7 @@ const Orders = () => {
 
               {/* Terminal Info */}
               <div className="text-xs text-muted-foreground">
-                <p>Terminal ID: {selectedOrder.terminalId} | Cashier: {selectedOrder.cashierName}</p>
+                <p>Terminal ID: {selectedOrder.terminal_id} | Cashier: {selectedOrder.cashier_name}</p>
               </div>
             </div>
           )}
@@ -645,7 +628,7 @@ const Orders = () => {
             <Button variant="outline" onClick={() => handlePrintBill(selectedOrder!)}>
               <Printer className="h-4 w-4 mr-2" /> Print Bill
             </Button>
-            {selectedOrder?.status === "ready" && (
+            {selectedOrder?.status === "READY" && (
               <Button onClick={() => { setAmountPaid(selectedOrder.total); setIsPaymentDialogOpen(true); }}>
                 <CreditCard className="h-4 w-4 mr-2" /> Complete Payment
               </Button>
@@ -672,9 +655,9 @@ const Orders = () => {
                   <SelectValue placeholder="Choose a product" />
                 </SelectTrigger>
                 <SelectContent>
-                  {MOCK_PRODUCTS.map((product) => (
-                    <SelectItem key={product.id} value={product.id}>
-                      {product.name} - Rs.{product.price}
+                  {products.map((product) => (
+                    <SelectItem key={product.productId} value={product.productId}>
+                      {product.productName} - Rs.{product.foreignerPrice?.toFixed(0) ?? 0}
                     </SelectItem>
                   ))}
                 </SelectContent>
