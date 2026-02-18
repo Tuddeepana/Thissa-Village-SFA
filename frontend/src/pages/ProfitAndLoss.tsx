@@ -40,8 +40,10 @@ import {
   Receipt,
   Tags,
   X,
+  Download,
+  Calendar,
 } from "lucide-react";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import LocalLoader from "@/components/common/LocalLoader";
 import { expenseService } from "@/api/services/expenseService";
@@ -236,6 +238,87 @@ const ProfitAndLoss = () => {
     }
   };
 
+  // ── Set filter to Today ──
+  const handleSetToday = () => {
+    const today = format(new Date(), "yyyy-MM-dd");
+    setFilterFrom(today);
+    setFilterTo(today);
+  };
+
+  // ── Export P&L to Excel (CSV format) ──
+  const handleExportToExcel = () => {
+    if (!pnlData) {
+      toast({ title: "No Data", description: "Please generate P&L report first" });
+      return;
+    }
+
+    try {
+      // Prepare CSV content
+      const csvRows: string[] = [];
+
+      // Header
+      csvRows.push("Profit & Loss Report");
+      csvRows.push(`Period: ${format(new Date(pnlData.dateFrom), "MMM d, yyyy")} - ${format(new Date(pnlData.dateTo), "MMM d, yyyy")}`);
+      csvRows.push(""); // Empty row
+
+      // Summary
+      csvRows.push("Summary");
+      csvRows.push(`Total Revenue,${pnlData.totalRevenue}`);
+      csvRows.push(`Total Expenses,${pnlData.totalExpenses}`);
+      csvRows.push(`Net ${parseFloat(pnlData.netProfitOrLoss) >= 0 ? "Profit" : "Loss"},${pnlData.netProfitOrLoss}`);
+      csvRows.push(""); // Empty row
+
+      // Revenue Breakdown
+      csvRows.push("Revenue Breakdown");
+      csvRows.push(`Bill Count,${pnlData.revenueBreakdown.billCount}`);
+      csvRows.push(`Total Bill Amount,${pnlData.revenueBreakdown.totalBillAmount}`);
+      csvRows.push(""); // Empty row
+
+      // Expense Breakdown
+      csvRows.push("Expense Breakdown");
+      csvRows.push(`Total Expense Count,${pnlData.expenseBreakdown.expenseCount}`);
+      csvRows.push(""); // Empty row
+
+      if (pnlData.expenseBreakdown.byType.length > 0) {
+        csvRows.push("Expense Type,Count,Total Amount");
+        pnlData.expenseBreakdown.byType.forEach((bt) => {
+          csvRows.push(`${bt.expenseTypeName},${bt.count},${bt.total}`);
+        });
+        csvRows.push(""); // Empty row
+      }
+
+      // Detailed Expenses
+      if (savedExpenses.length > 0) {
+        csvRows.push("Detailed Expenses");
+        csvRows.push("Date,Type,Description,Amount");
+        savedExpenses.forEach((exp) => {
+          const date = format(new Date(exp.date), "yyyy-MM-dd");
+          const type = exp.expenseType?.name || "-";
+          const desc = (exp.description || "-").replace(/,/g, ";"); // Replace commas in description
+          csvRows.push(`${date},${type},${desc},${exp.amount}`);
+        });
+      }
+
+      // Create CSV content
+      const csvContent = csvRows.join("\n");
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `PnL_Report_${format(new Date(), "yyyy-MM-dd_HHmmss")}.csv`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({ title: "Success", description: "P&L report exported successfully" });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to export report" });
+    }
+  };
+
   // ── Pending total ──
   const pendingTotal = useMemo(
     () => pendingExpenses.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0),
@@ -245,11 +328,18 @@ const ProfitAndLoss = () => {
   return (
     <div className="space-y-6">
       {/* ═══════ Page Header ═══════ */}
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Profit & Loss</h1>
-        <p className="text-sm text-muted-foreground">
-          Track revenue, manage expenses, and generate P&L reports
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Profit & Loss</h1>
+          <p className="text-sm text-muted-foreground">
+            Track revenue, manage expenses, and generate P&L reports
+          </p>
+        </div>
+        {pnlGenerated && pnlData && (
+          <Button onClick={handleExportToExcel} variant="default" className="gap-2">
+            <Download className="h-4 w-4" /> Export to Excel
+          </Button>
+        )}
       </div>
 
       {/* ═══════ Filters Section ═══════ */}
@@ -295,7 +385,10 @@ const ProfitAndLoss = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <Button onClick={handleSetToday} variant="secondary" size="default">
+                <Calendar className="mr-2 h-4 w-4" /> Today
+              </Button>
               <Button onClick={handleApplyFilters} variant="outline">
                 <Filter className="mr-2 h-4 w-4" /> Apply
               </Button>
