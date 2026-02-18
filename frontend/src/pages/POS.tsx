@@ -123,6 +123,7 @@ const POS = () => {
           id: r.productId,
           name: r.productName,
           category: r.category?.name ?? '',
+          product_type: r.productType,
           foreignerPrice: r.foreignerPrice ?? 0,
           localPrice: r.localPrice ?? 0,
           cost: r.foreignerPrice ?? 0, // Use foreigner price as default for cost calculation
@@ -164,10 +165,13 @@ const POS = () => {
     return subtotal + tax - discount;
   }, [subtotal, tax, discount]);
 
-  // Check for stock warnings
+  // Check for stock warnings (exclude HANDMADE products)
   const stockWarnings = useMemo(() => {
     const warnings: StockWarning[] = [];
     for (const item of billItems) {
+      // Skip handmade products from stock warnings
+      if (item.product.product_type === 'HANDMADE') continue;
+      
       if (item.product.stock <= item.product.minStock) {
         warnings.push({
           product: item.product,
@@ -197,7 +201,10 @@ const POS = () => {
   }, [tables]);
 
   const handleAddProduct = (product: Product) => {
-    if (product.stock === 0) {
+    // Skip stock validation for HANDMADE products
+    const isHandmade = product.product_type === 'HANDMADE';
+    
+    if (!isHandmade && product.stock === 0) {
       toast.error("Product is out of stock!");
       return;
     }
@@ -205,8 +212,8 @@ const POS = () => {
     const existingItem = billItems.find((item) => item.product.id === product.id);
 
     if (existingItem) {
-      // Check if we can add more
-      if (existingItem.quantity >= product.stock) {
+      // Check if we can add more (skip check for handmade products)
+      if (!isHandmade && existingItem.quantity >= product.stock) {
         toast.error("Cannot add more than available stock!");
         return;
       }
@@ -229,7 +236,10 @@ const POS = () => {
     const item = billItems.find((item) => item.product.id === productId);
     if (!item) return;
 
-    if (newQuantity > item.product.stock) {
+    // Skip stock validation for HANDMADE products
+    const isHandmade = item.product.product_type === 'HANDMADE';
+    
+    if (!isHandmade && newQuantity > item.product.stock) {
       toast.error("Cannot exceed available stock!");
       return;
     }

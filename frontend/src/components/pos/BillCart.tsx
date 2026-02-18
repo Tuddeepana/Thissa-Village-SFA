@@ -118,7 +118,10 @@ export function BillCart({
                       onClick={() =>
                         onUpdateQuantity(item.product.id, item.quantity + 1)
                       }
-                      disabled={item.quantity >= item.product.stock}
+                      disabled={
+                        item.product.product_type !== 'HANDMADE' && 
+                        item.quantity >= item.product.stock
+                      }
                     >
                       <Plus className="h-3 w-3" />
                     </Button>
@@ -128,7 +131,7 @@ export function BillCart({
                   </span>
                 </div>
 
-                {item.quantity >= item.product.stock && (
+                {item.product.product_type !== 'HANDMADE' && item.quantity >= item.product.stock && (
                   <p className="text-xs text-red-500">Max stock reached</p>
                 )}
               </div>

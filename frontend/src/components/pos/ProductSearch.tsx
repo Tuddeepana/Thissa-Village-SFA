@@ -44,10 +44,14 @@ export function ProductSearch({ products, onAddProduct }: ProductSearchProps) {
   }, [products, searchQuery, selectedCategory]);
 
   const isLowStock = (product: Product) => {
+    // Handmade products don't have stock tracking
+    if (product.product_type === 'HANDMADE') return false;
     return product.stock <= product.minStock;
   };
 
   const isOutOfStock = (product: Product) => {
+    // Handmade products are never out of stock
+    if (product.product_type === 'HANDMADE') return false;
     return product.stock === 0;
   };
 
@@ -113,22 +117,38 @@ export function ProductSearch({ products, onAddProduct }: ProductSearchProps) {
                     <Badge variant="secondary" className="text-xs">
                       {product.category}
                     </Badge>
+                    {product.product_type === 'HANDMADE' && (
+                      <Badge variant="outline" className="text-xs border-purple-500 text-purple-700">
+                        Handmade
+                      </Badge>
+                    )}
                   </div>
 
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Stock:</span>
-                    <span
-                      className={`font-medium ${
-                        isOutOfStock(product)
-                          ? "text-red-500"
-                          : isLowStock(product)
-                          ? "text-yellow-500"
-                          : "text-green-600"
-                      }`}
-                    >
-                      {product.stock} units
-                    </span>
-                  </div>
+                  {product.product_type !== 'HANDMADE' && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">Stock:</span>
+                      <span
+                        className={`font-medium ${
+                          isOutOfStock(product)
+                            ? "text-red-500"
+                            : isLowStock(product)
+                            ? "text-yellow-500"
+                            : "text-green-600"
+                        }`}
+                      >
+                        {product.stock} units
+                      </span>
+                    </div>
+                  )}
+
+                  {product.product_type === 'HANDMADE' && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">Stock:</span>
+                      <span className="font-medium text-purple-600">
+                        Made to Order
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex flex-col gap-1 text-sm">
                     <div className="flex justify-between">
@@ -152,15 +172,19 @@ export function ProductSearch({ products, onAddProduct }: ProductSearchProps) {
                     </Button>
                   </div>
 
-                  {isOutOfStock(product) && (
-                    <p className="text-xs text-red-500 font-medium">
-                      Out of Stock
-                    </p>
-                  )}
-                  {isLowStock(product) && !isOutOfStock(product) && (
-                    <p className="text-xs text-yellow-600 font-medium">
-                      Low Stock Warning!
-                    </p>
+                  {product.product_type !== 'HANDMADE' && (
+                    <>
+                      {isOutOfStock(product) && (
+                        <p className="text-xs text-red-500 font-medium">
+                          Out of Stock
+                        </p>
+                      )}
+                      {isLowStock(product) && !isOutOfStock(product) && (
+                        <p className="text-xs text-yellow-600 font-medium">
+                          Low Stock Warning!
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               </CardContent>
