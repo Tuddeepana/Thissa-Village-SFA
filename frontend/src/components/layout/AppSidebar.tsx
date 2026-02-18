@@ -14,7 +14,7 @@ import {
     ClipboardList,
     Ruler,
     TableProperties,
-    Hotel,
+    Hotel, Settings,
 } from "lucide-react";
 import {
     Sidebar,
@@ -41,6 +41,7 @@ const sfaItems = [
     {title: "Invoices", url: "/invoices", icon: FileText},
     {title: "Bills", url: "/bills", icon: Receipt},
     {title: "Users", url: "/users", icon: Users},
+    {title: "Config Service Fees", url: "/settings", icon: Settings},
 ];
 
 const posItems = [
