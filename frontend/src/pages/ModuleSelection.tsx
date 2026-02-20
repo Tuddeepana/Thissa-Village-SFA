@@ -41,7 +41,7 @@ const ModuleSelection = () => {
               <Wine className="w-8 h-8 text-primary-foreground" />
             </div>
           </div>
-          <h1 className="text-4xl font-bold text-primary">Welcome to Thissa Village</h1>
+          <h1 className="text-4xl font-bold text-primary">Welcome to Tissa Village</h1>
           <p className="text-muted-foreground text-lg">Select a module to continue</p>
         </div>
 
