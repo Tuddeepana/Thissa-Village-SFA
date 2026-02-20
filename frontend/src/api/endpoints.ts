@@ -23,5 +23,12 @@ export const ENDPOINTS = {
 		typeById: (id: string) => `/expenses/types/${id}`,
 		restoreType: (id: string) => `/expenses/types/${id}/restore`,
 	},
+	orders: {
+		base: '/orders',
+		stats: '/orders/stats',
+		byId: (id: string) => `/orders/${id}`,
+		status: (id: string) => `/orders/${id}/status`,
+		addItems: (id: string) => `/orders/${id}/items`,
+	},
 };
 

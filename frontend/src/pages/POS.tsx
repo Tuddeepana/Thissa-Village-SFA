@@ -11,7 +11,9 @@ import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import { RoomBookingDialog } from "@/components/pos/RoomBookingDialog";
 import api from "@/api/client";
 import { tableService } from "@/api/services/tableService";
+import { orderService } from "@/api/services/orderService";
 import { Product, BillItem, Bill, StockWarning } from "@/types/pos";
+import { OrderType } from "@/types/order.types";
 import { printBillNewWindow } from "@/lib/billPrinter";
 import { toast } from "sonner";
 import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
@@ -126,6 +128,7 @@ const POS = () => {
           id: r.productId,
           name: r.productName,
           category: r.category?.name ?? '',
+          product_type: r.productType,
           foreignerPrice: r.foreignerPrice ?? 0,
           localPrice: r.localPrice ?? 0,
           cost: r.foreignerPrice ?? 0, // Use foreigner price as default for cost calculation
@@ -167,10 +170,13 @@ const POS = () => {
     return subtotal + tax - discount;
   }, [subtotal, tax, discount]);
 
-  // Check for stock warnings
+  // Check for stock warnings (exclude HANDMADE products)
   const stockWarnings = useMemo(() => {
     const warnings: StockWarning[] = [];
     for (const item of billItems) {
+      // Skip handmade products from stock warnings
+      if (item.product.product_type === 'HANDMADE') continue;
+      
       if (item.product.stock <= item.product.minStock) {
         warnings.push({
           product: item.product,
@@ -215,7 +221,10 @@ const POS = () => {
   }, [customerType]);
 
   const handleAddProduct = (product: Product) => {
-    if (product.stock === 0) {
+    // Skip stock validation for HANDMADE products
+    const isHandmade = product.product_type === 'HANDMADE';
+    
+    if (!isHandmade && product.stock === 0) {
       toast.error("Product is out of stock!");
       return;
     }
@@ -224,8 +233,8 @@ const POS = () => {
     const priceToUse = customerType === "local" ? product.localPrice : product.foreignerPrice;
 
     if (existingItem) {
-      // Check if we can add more
-      if (existingItem.quantity >= product.stock) {
+      // Check if we can add more (skip check for handmade products)
+      if (!isHandmade && existingItem.quantity >= product.stock) {
         toast.error("Cannot add more than available stock!");
         return;
       }
@@ -248,7 +257,10 @@ const POS = () => {
     const item = billItems.find((item) => item.product.id === productId);
     if (!item) return;
 
-    if (newQuantity > item.product.stock) {
+    // Skip stock validation for HANDMADE products
+    const isHandmade = item.product.product_type === 'HANDMADE';
+    
+    if (!isHandmade && newQuantity > item.product.stock) {
       toast.error("Cannot exceed available stock!");
       return;
     }
@@ -304,35 +316,62 @@ const POS = () => {
     return true;
   };
 
-  const handleCreateOrder = () => {
+  const handleCreateOrder = async () => {
     if (!validateOrder()) return;
 
-    // Create order and send to kitchen (for dine-in)
-    const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
-    
-    // Mark table as occupied
-    if (orderType === "dine_in" && selectedTable) {
-      setTables(
-        tables.map((t) =>
-          t.id === selectedTable ? { ...t, status: "occupied" as const, orderId: orderNumber } : t
-        )
-      );
+    try {
+      // Get table info for dine-in
+      const selectedTableInfo = orderType === "dine_in" 
+        ? tables.find(t => t.id === selectedTable)
+        : null;
 
-      const selectedTableInfo = tables.find(t => t.id === selectedTable);
-      toast.success(`Order ${orderNumber} created successfully!`, {
-        description: `${selectedTableInfo?.displayName} - ${customerName}. Sent to kitchen.`,
+      // Create order via API
+      const order = await orderService.createOrder({
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        order_type: orderType === "dine_in" ? OrderType.DINE_IN : OrderType.TAKE_AWAY,
+        table_id: selectedTableInfo?.id ?? null,
+        table_name: selectedTableInfo?.displayName ?? null,
+        table_number: selectedTableInfo?.tableNumber ?? null,
+        tax: taxRate,
+        discount: discountRate,
+        terminal_id: currentUser.terminalId,
+        cashier_name: currentUser.name,
+        items: billItems.map(item => ({
+          productId: item.product.id,
+          product_name: item.product.name,
+          quantity: item.quantity,
+          unit_price: item.product.foreignerPrice,
+        })),
       });
-    } else {
-      toast.success(`Order ${orderNumber} created successfully!`, {
-        description: `Take Away - ${customerName}. Sent to kitchen.`,
-      });
+
+      // Mark table as occupied (local state only)
+      if (orderType === "dine_in" && selectedTable && selectedTableInfo) {
+        setTables(
+          tables.map((t) =>
+            t.id === selectedTable ? { ...t, status: "occupied" as const, orderId: order.order_number } : t
+          )
+        );
+
+        toast.success(`Order ${order.order_number} created successfully!`, {
+          description: `${selectedTableInfo.displayName} - ${customerName}. Sent to kitchen.`,
+        });
+      } else {
+        toast.success(`Order ${order.order_number} created successfully!`, {
+          description: `Take Away - ${customerName}. Sent to kitchen.`,
+        });
+      }
+
+      // Navigate to orders page
+      navigate("/orders");
+
+      // Clear the form
+      handleClearOrder();
+    } catch (error: any) {
+      console.error('Failed to create order', error);
+      const msg = error?.response?.data?.message ?? 'Failed to create order';
+      toast.error(msg);
     }
-
-    // Navigate to orders page
-    navigate("/orders");
-
-    // Clear the form
-    handleClearOrder();
   };
 
   const handleTakeAwayPayment = () => {
@@ -438,12 +477,12 @@ const POS = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Left Section - Customer Info & Products */}
+        {/* Left Section - Order Type Selection & Products */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Customer Information Card */}
+          {/* Order Type Selection Card */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Customer Information</CardTitle>
+              <CardTitle className="text-lg">Order Type & Table Selection</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -633,7 +672,38 @@ const POS = () => {
                 )}
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 flex flex-col">
+            <CardContent className="flex-1 flex flex-col overflow-y-auto">
+              {/* Customer Information */}
+              <div className="space-y-3 border-b pb-4 mb-4">
+                <h3 className="font-semibold text-sm">Customer Information</h3>
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="customer-name" className="flex items-center gap-2 text-xs">
+                      <User className="h-3 w-3" /> Name *
+                    </Label>
+                    <Input
+                      id="customer-name"
+                      placeholder="Enter customer name"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="customer-phone" className="flex items-center gap-2 text-xs">
+                      <Phone className="h-3 w-3" /> Phone *
+                    </Label>
+                    <Input
+                      id="customer-phone"
+                      placeholder="Enter phone number"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="h-8"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Stock Warnings */}
               {stockWarnings.length > 0 && (
                 <Alert variant="destructive" className="mb-4">
