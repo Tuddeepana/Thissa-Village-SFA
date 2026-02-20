@@ -13,6 +13,7 @@ export type MyStockTableRow = {
   minStock: number;
   sellingPrice: number | undefined;
   bottle_size?: string | null;
+  barcode?: string | null;
   status: 'InStock' | 'LowStock' | 'OutOfStock';
   lastUpdatedAt: string | null;
 };
