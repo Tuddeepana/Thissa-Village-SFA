@@ -4,10 +4,11 @@ import { format } from 'date-fns';
 /* ─────────────────────────────────────────────────────────────────
    Shared CSS for both print functions
    Key thermal-printer considerations:
-   • font-weight: 500 on body  → slightly heavier strokes so thin
-     characters don't "wash out" on thermal heads, without making
-     everything look bold
-   • letter-spacing on non-bold text → slightly wider strokes read better
+   • font-weight: 600 on body  → semi-bold base; heavier strokes so
+     every character prints solid on thermal heads, while still being
+     clearly lighter than bold (700/900) labels — preserves hierarchy
+   • -webkit-text-stroke trick not used (not supported in print engines)
+   • letter-spacing on body → slightly wider strokes improve readability
    • @page size: 80mm auto   → height follows content, no blank tail
    • All margins/padding kept tight so the paper cut lands right after
      the last line
@@ -26,10 +27,10 @@ const BILL_CSS = `
 
   body {
     font-family: 'Courier New', Courier, monospace;
-    font-size: 11.5px;
-    font-weight: 500;          /* medium weight → better thermal visibility */
+    font-size: 12px;
+    font-weight: 600;          /* semi-bold base → solid strokes on thermal */
     line-height: 1.45;
-    letter-spacing: 0.01em;
+    letter-spacing: 0.015em;
     width: 80mm;
     max-width: 80mm;
     margin: 0 auto;
@@ -55,7 +56,7 @@ const BILL_CSS = `
     font-size: 9.5px;
     letter-spacing: 0.18em;
     text-transform: uppercase;
-    font-weight: 500;
+    font-weight: 600;
     margin-bottom: 1px;
   }
   .divider-thick  { border: none; border-top: 2px solid #000; margin: 4px 0; }
@@ -89,8 +90,8 @@ const BILL_CSS = `
   }
   .items-table th.r { text-align: right; }
   .items-table td {
-    font-size: 11px;
-    font-weight: 500;
+    font-size: 11.5px;
+    font-weight: 600;
     padding: 2px 2px;
     vertical-align: top;
   }
@@ -155,14 +156,14 @@ const BILL_CSS = `
     letter-spacing: 0.06em;
   }
   .footer-sub {
-    font-size: 10px;
-    font-weight: 500;
+    font-size: 10.5px;
+    font-weight: 600;
     margin-top: 1px;
     letter-spacing: 0.04em;
   }
   .footer-powered {
-    font-size: 9px;
-    font-weight: 500;
+    font-size: 9.5px;
+    font-weight: 600;
     letter-spacing: 0.08em;
     margin-top: 5px;
     text-transform: uppercase;
