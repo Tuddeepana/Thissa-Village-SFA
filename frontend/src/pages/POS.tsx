@@ -60,11 +60,18 @@ const POS = () => {
       setLoadingProducts(true);
       try {
         if (itemSource === 'bar') {
+          // Detect if search query looks like a barcode (numeric, >= 8 digits)
+          const isBarcode = debouncedSearchQuery && /^\d{8,}$/.test(debouncedSearchQuery.trim());
+
           const res = await api.get<MyStockResponse>('/mystock', {
             params: {
               page,
               pageSize: PAGE_SIZE,
-              productName: debouncedSearchQuery || undefined
+              // Use barcode param if it looks like a barcode, otherwise use productName
+              ...(isBarcode
+                ? { barcode: debouncedSearchQuery }
+                : { productName: debouncedSearchQuery || undefined }
+              )
             },
             meta: { showLoader: 'local', loaderKey: 'pos-products' }
           });
