@@ -17,11 +17,16 @@ import { toast } from "sonner";
 interface ProductSearchProps {
   products: Product[];
   onAddProduct: (product: Product) => void;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
 }
 
 export const ProductSearch = forwardRef<HTMLInputElement, ProductSearchProps>(
-  ({ products, onAddProduct }, ref) => {
-  const [searchQuery, setSearchQuery] = useState("");
+  ({ products, onAddProduct, searchQuery: externalSearchQuery, onSearchChange }, ref) => {
+  const [internalSearchQuery, setInternalSearchQuery] = useState("");
+  const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery;
+  const setSearchQuery = onSearchChange || setInternalSearchQuery;
+
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedProductIndex, setSelectedProductIndex] = useState<number>(-1);
   const productRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -55,21 +60,11 @@ export const ProductSearch = forwardRef<HTMLInputElement, ProductSearchProps>(
     return () => window.removeEventListener('resize', updateGridColumns);
   }, []);
 
-  // Filter products based on search and category
+  // Filter products based on category (search is handled server-side)
   const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.barcode?.includes(searchQuery) ||
-        product.description?.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesCategory =
-        selectedCategory === "all" || product.category === selectedCategory;
-
-      return matchesSearch && matchesCategory;
-    });
-  }, [products, searchQuery, selectedCategory]);
+    if (selectedCategory === "all") return products;
+    return products.filter((product) => product.category === selectedCategory);
+  }, [products, selectedCategory]);
 
   // Reset selected index when filtered products change
   useEffect(() => {

@@ -7,6 +7,7 @@ export const getMyStockController = async (req: Request, res: Response) => {
     page: req.query.page ? Number(req.query.page) : undefined,
     pageSize: req.query.pageSize ? Number(req.query.pageSize) : undefined,
     productName: typeof req.query.productName === 'string' ? req.query.productName : undefined,
+    barcode: typeof req.query.barcode === 'string' ? req.query.barcode : undefined,
     categoryId: typeof req.query.categoryId === 'string' ? req.query.categoryId : undefined,
     status: typeof req.query.status === 'string' ? req.query.status : undefined,
     noPagination: typeof req.query.noPagination === 'string' ? req.query.noPagination === 'true' : undefined,

@@ -41,6 +41,17 @@ const POS = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setPage(1); // Reset to first page when searching
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Fetch products from /api/mystock and map to POS Product shape
   useEffect(() => {
@@ -50,7 +61,11 @@ const POS = () => {
       try {
         if (itemSource === 'bar') {
           const res = await api.get<MyStockResponse>('/mystock', {
-            params: { page, pageSize: PAGE_SIZE },
+            params: {
+              page,
+              pageSize: PAGE_SIZE,
+              productName: debouncedSearchQuery || undefined
+            },
             meta: { showLoader: 'local', loaderKey: 'pos-products' }
           });
           if (cancelled) return;
@@ -64,7 +79,7 @@ const POS = () => {
             stock: r.availableQuantity,
             minStock: r.minStock ?? 0,
             bottleVolume: r.bottle_size ?? undefined,
-            barcode: undefined,
+            barcode: r.barcode ?? undefined,
             image: undefined,
             description: undefined,
             createdAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
@@ -111,7 +126,7 @@ const POS = () => {
     };
     fetchProducts();
     return () => { cancelled = true; };
-  }, [page, itemSource]);
+  }, [page, itemSource, debouncedSearchQuery]);
 
   // Get the current list of products to display based on item source
   const displayProducts = useMemo(() => {
@@ -557,7 +572,13 @@ const POS = () => {
                 </div>
               </div>
               <LocalLoader loaderKey="pos-products">
-                <ProductSearch ref={searchInputRef} products={displayProducts} onAddProduct={handleAddProduct} />
+                <ProductSearch
+                  ref={searchInputRef}
+                  products={displayProducts}
+                  onAddProduct={handleAddProduct}
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                />
               </LocalLoader>
               {loadingProducts && <p className="text-xs text-muted-foreground mt-2">Loading products...</p>}
             </CardContent>
