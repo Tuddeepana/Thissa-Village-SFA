@@ -196,17 +196,6 @@ const Settings = () => {
         </CardContent>
       </Card>
 
-      {/* Additional Settings Placeholder */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base md:text-lg">Additional Settings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm md:text-base text-muted-foreground">
-            More configuration options coming soon.
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 };
