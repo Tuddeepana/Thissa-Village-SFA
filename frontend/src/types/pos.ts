@@ -34,6 +34,7 @@ export interface Bill {
   total: number;
   customerName?: string;
   customerPhone?: string;
+  customerType?: 'local' | 'foreign'; // Customer type for restaurant bills
   paymentMethod: 'cash' | 'card' | 'credit' | 'other';
   amountPaid: number;
   change: number;

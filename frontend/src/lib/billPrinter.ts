@@ -276,7 +276,8 @@ const buildBillBody = (bill: Bill, billNo: string | number, storeName: string) =
   </div>
 `;
 
-export const printBill = (bill: Bill, storeName: string = "Thissa Village") => {
+export const printBill = (bill: Bill, storeName: string = "Tissa Village") => {
+  // Create a hidden iframe for printing
   const printFrame = document.createElement('iframe');
   printFrame.style.position = 'absolute';
   printFrame.style.width = '0';
