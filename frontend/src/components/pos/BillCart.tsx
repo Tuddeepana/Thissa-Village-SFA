@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Minus, Plus, AlertTriangle } from "lucide-react";
+import { Minus, Plus, AlertTriangle, User, Phone } from "lucide-react";
 import { BillItem, StockWarning } from "@/types/pos";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DeleteButton } from "@/components/common";
@@ -16,10 +16,14 @@ interface BillCartProps {
   discount: number;
   discountRate: number;
   total: number;
+  customerName: string;
+  customerPhone: string;
   onUpdateQuantity: (itemId: string, newQuantity: number) => void;
   onRemoveItem: (itemId: string) => void;
   onUpdateTaxRate: (rate: number) => void;
   onUpdateDiscountRate: (rate: number) => void;
+  onUpdateCustomerName: (name: string) => void;
+  onUpdateCustomerPhone: (phone: string) => void;
   onClearBill: () => void;
   onCompleteBill: () => void;
   stockWarnings: StockWarning[];
@@ -33,10 +37,14 @@ export function BillCart({
   discount,
   discountRate,
   total,
+  customerName,
+  customerPhone,
   onUpdateQuantity,
   onRemoveItem,
   onUpdateTaxRate,
   onUpdateDiscountRate,
+  onUpdateCustomerName,
+  onUpdateCustomerPhone,
   onClearBill,
   onCompleteBill,
   stockWarnings,
@@ -53,7 +61,38 @@ export function BillCart({
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 flex flex-col">
+      <CardContent className="flex-1 overflow-y-auto space-y-4">
+        {/* Customer Information */}
+        <div className="space-y-3 border-b pb-4">
+          <h3 className="font-semibold text-sm">Customer Information</h3>
+          <div className="space-y-2">
+            <div className="space-y-1">
+              <Label htmlFor="customer-name" className="flex items-center gap-2 text-xs">
+                <User className="h-3 w-3" /> Name *
+              </Label>
+              <Input
+                id="customer-name"
+                placeholder="Enter customer name"
+                value={customerName}
+                onChange={(e) => onUpdateCustomerName(e.target.value)}
+                className="h-8"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="customer-phone" className="flex items-center gap-2 text-xs">
+                <Phone className="h-3 w-3" /> Phone *
+              </Label>
+              <Input
+                id="customer-phone"
+                placeholder="Enter phone number"
+                value={customerPhone}
+                onChange={(e) => onUpdateCustomerPhone(e.target.value)}
+                className="h-8"
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Stock Warnings */}
         {stockWarnings.length > 0 && (
           <Alert variant="destructive" className="mb-4">
@@ -118,7 +157,10 @@ export function BillCart({
                       onClick={() =>
                         onUpdateQuantity(item.product.id, item.quantity + 1)
                       }
-                      disabled={item.quantity >= item.product.stock}
+                      disabled={
+                        item.product.product_type !== 'HANDMADE' && 
+                        item.quantity >= item.product.stock
+                      }
                     >
                       <Plus className="h-3 w-3" />
                     </Button>
@@ -128,7 +170,7 @@ export function BillCart({
                   </span>
                 </div>
 
-                {item.quantity >= item.product.stock && (
+                {item.product.product_type !== 'HANDMADE' && item.quantity >= item.product.stock && (
                   <p className="text-xs text-red-500">Max stock reached</p>
                 )}
               </div>

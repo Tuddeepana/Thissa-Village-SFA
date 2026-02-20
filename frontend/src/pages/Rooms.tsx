@@ -24,111 +24,114 @@ import { useToast } from "@/hooks/use-toast";
 import { DeleteButton } from "@/components/common";
 import LocalLoader from "@/components/common/LocalLoader";
 import { useQuery } from "@tanstack/react-query";
-import { tableService } from "@/api/services/tableService";
-import type { RestaurantTable, ExpandedTableItem } from "@/types/table.types";
+import { roomService } from "@/api/services/roomService";
+import type { Room, ExpandedRoomItem } from "@/types/room.types";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 
-const Tables = () => {
+const Rooms = () => {
   const { toast } = useToast();
-  const [tables, setTables] = useState<RestaurantTable[]>([]);
-  const [expandedTables, setExpandedTables] = useState<ExpandedTableItem[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [expandedRooms, setExpandedRooms] = useState<ExpandedRoomItem[]>([]);
 
   const [formData, setFormData] = useState({
     name: "",
-    table_type: "NORMAL" as 'VIP' | 'NORMAL',
+    room_type: "NORMAL" as 'VIP' | 'NORMAL',
     quantity: 1
   });
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [selectedTable, setSelectedTable] = useState<RestaurantTable | null>(null);
+  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [editForm, setEditForm] = useState({
     name: "",
-    table_type: "NORMAL" as 'VIP' | 'NORMAL',
+    room_type: "NORMAL" as 'VIP' | 'NORMAL',
     quantity: 1
   });
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["tables"],
+  const { data, refetch } = useQuery({
+    queryKey: ["rooms"],
     queryFn: async () => {
-      const response = await tableService.list();
-      return response.tables;
+      const response = await roomService.list();
+      return response.rooms;
     },
     staleTime: 10_000,
   });
 
   const { data: expandedData, refetch: refetchExpanded } = useQuery({
-    queryKey: ["tables-expanded"],
+    queryKey: ["rooms-expanded"],
     queryFn: async () => {
-      const response = await tableService.getExpanded();
-      return response.tables;
+      const response = await roomService.getExpanded();
+      return response.rooms;
     },
     staleTime: 10_000,
   });
 
   useEffect(() => {
-    if (data) setTables(data);
+    if (data) setRooms(data);
   }, [data]);
 
   useEffect(() => {
-    if (expandedData) setExpandedTables(expandedData);
+    if (expandedData) setExpandedRooms(expandedData);
   }, [expandedData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await tableService.create({
+      await roomService.create({
         name: formData.name,
-        table_type: formData.table_type,
+        room_type: formData.room_type,
         quantity: formData.quantity
       });
-      toast({ title: "Success", description: "Table added successfully" });
-      setFormData({ name: "", table_type: "NORMAL", quantity: 1 });
+      toast({ title: "Success", description: "Room added successfully" });
+      setFormData({ name: "", room_type: "NORMAL", quantity: 1 });
       setOpen(false);
       refetch();
       refetchExpanded();
-    } catch (err: any) {
-      toast({ title: "Error", description: err?.response?.data?.message ?? "Failed to add table" });
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      toast({ title: "Error", description: error?.response?.data?.message ?? "Failed to add room" });
     }
   };
 
   const handleDelete = async (id: string) => {
     try {
-      await tableService.delete(id);
-      toast({ title: "Deleted", description: "Table removed successfully" });
+      await roomService.delete(id);
+      toast({ title: "Deleted", description: "Room removed successfully" });
       refetch();
       refetchExpanded();
-    } catch (err: any) {
-      toast({ title: "Error", description: err?.response?.data?.message ?? "Failed to remove table" });
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      toast({ title: "Error", description: error?.response?.data?.message ?? "Failed to remove room" });
     }
   };
 
-  const openEditDialog = (table: RestaurantTable) => {
-    setSelectedTable(table);
+  const openEditDialog = (room: Room) => {
+    setSelectedRoom(room);
     setEditForm({
-      name: table.name,
-      table_type: table.table_type,
-      quantity: table.quantity
+      name: room.name,
+      room_type: room.room_type,
+      quantity: room.quantity
     });
     setEditOpen(true);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTable) return;
+    if (!selectedRoom) return;
     try {
-      await tableService.update(selectedTable.id, {
+      await roomService.update(selectedRoom.id, {
         name: editForm.name,
-        table_type: editForm.table_type,
+        room_type: editForm.room_type,
         quantity: editForm.quantity,
       });
-      toast({ title: "Updated", description: "Table updated successfully" });
+      toast({ title: "Updated", description: "Room updated successfully" });
       setEditOpen(false);
-      setSelectedTable(null);
+      setSelectedRoom(null);
       refetch();
       refetchExpanded();
-    } catch (err: any) {
-      toast({ title: "Error", description: err?.response?.data?.message ?? "Failed to update table" });
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      toast({ title: "Error", description: error?.response?.data?.message ?? "Failed to update room" });
     }
   };
 
@@ -136,36 +139,36 @@ const Tables = () => {
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Table Management</h1>
-          <p className="text-sm md:text-base text-muted-foreground">Manage restaurant tables and seating</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Room Management</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Manage hotel rooms and accommodations</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              Add Table
+              Add Room
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Table</DialogTitle>
+              <DialogTitle>Add New Room</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Table Name</Label>
+                <Label htmlFor="name">Room Name</Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
-                  placeholder="e.g., Table, VIP Table, Garden Table"
+                  placeholder="e.g., Room, VIP Room, Deluxe Room"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="table_type">Table Type</Label>
+                <Label htmlFor="room_type">Room Type</Label>
                 <Select
-                  value={formData.table_type}
-                  onValueChange={(val: 'VIP' | 'NORMAL') => setFormData({ ...formData, table_type: val })}
+                  value={formData.room_type}
+                  onValueChange={(val: 'VIP' | 'NORMAL') => setFormData({ ...formData, room_type: val })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select type" />
@@ -176,7 +179,7 @@ const Tables = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <Button type="submit" className="w-full">Add Table</Button>
+              <Button type="submit" className="w-full">Add Room</Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -185,10 +188,10 @@ const Tables = () => {
       {/* Configuration Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base md:text-lg">Table Configuration ({tables.length})</CardTitle>
+          <CardTitle className="text-base md:text-lg">Room Configuration ({rooms.length})</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
-          <LocalLoader loaderKey="tables">
+          <LocalLoader loaderKey="rooms">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -199,11 +202,11 @@ const Tables = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tables.map((table) => (
-                  <TableRow key={table.id}>
-                    <TableCell className="font-medium">{table.name}</TableCell>
+                {rooms.map((room) => (
+                  <TableRow key={room.id}>
+                    <TableCell className="font-medium">{room.name}</TableCell>
                     <TableCell>
-                      {table.table_type === 'VIP' ? (
+                      {room.room_type === 'VIP' ? (
                         <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200">
                           <Crown className="h-3 w-3 mr-1" />
                           VIP
@@ -213,20 +216,20 @@ const Tables = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      {table.createdAt ? format(new Date(table.createdAt), "PP") : "-"}
+                      {room.createdAt ? format(new Date(room.createdAt), "PP") : "-"}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => openEditDialog(table)}
+                          onClick={() => openEditDialog(room)}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <DeleteButton
-                          onDelete={() => handleDelete(table.id)}
-                          itemName={table.name}
+                          onDelete={() => handleDelete(room.id)}
+                          itemName={room.name}
                         />
                       </div>
                     </TableCell>
@@ -238,37 +241,37 @@ const Tables = () => {
         </CardContent>
       </Card>
 
-      {/* Expanded Table List */}
+      {/* Expanded Room List */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base md:text-lg">All Tables ({expandedTables.length})</CardTitle>
+          <CardTitle className="text-base md:text-lg">All Rooms ({expandedRooms.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {expandedTables.map((table) => (
+            {expandedRooms.map((room) => (
               <Card
-                key={table.id}
+                key={room.id}
                 className={`${
-                  table.table_type === 'VIP' 
+                  room.room_type === 'VIP' 
                     ? 'border-amber-200 bg-amber-50/50' 
                     : 'border-gray-200'
                 }`}
               >
                 <CardContent className="p-4 text-center">
-                  {table.table_type === 'VIP' && (
+                  {room.room_type === 'VIP' && (
                     <Crown className="h-4 w-4 text-amber-600 mx-auto mb-1" />
                   )}
-                  <p className="font-semibold text-sm">{table.displayName}</p>
-                  {table.table_type === 'VIP' && (
+                  <p className="font-semibold text-sm">{room.displayName}</p>
+                  {room.room_type === 'VIP' && (
                     <p className="text-xs text-amber-600 mt-1">VIP</p>
                   )}
                 </CardContent>
               </Card>
             ))}
           </div>
-          {expandedTables.length === 0 && (
+          {expandedRooms.length === 0 && (
             <p className="text-center text-muted-foreground py-8">
-              No tables created yet. Add a table to get started.
+              No rooms created yet. Add a room to get started.
             </p>
           )}
         </CardContent>
@@ -278,11 +281,11 @@ const Tables = () => {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Table</DialogTitle>
+            <DialogTitle>Edit Room</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleEditSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-name">Table Name</Label>
+              <Label htmlFor="edit-name">Room Name</Label>
               <Input
                 id="edit-name"
                 value={editForm.name}
@@ -291,10 +294,10 @@ const Tables = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-table_type">Table Type</Label>
+              <Label htmlFor="edit-room_type">Room Type</Label>
               <Select
-                value={editForm.table_type}
-                onValueChange={(val: 'VIP' | 'NORMAL') => setEditForm({ ...editForm, table_type: val })}
+                value={editForm.room_type}
+                onValueChange={(val: 'VIP' | 'NORMAL') => setEditForm({ ...editForm, room_type: val })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
@@ -317,10 +320,10 @@ const Tables = () => {
                 required
               />
               <p className="text-xs text-muted-foreground">
-                Changing quantity will update the number of tables displayed
+                Changing quantity will update the number of rooms displayed
               </p>
             </div>
-            <Button type="submit" className="w-full">Update Table</Button>
+            <Button type="submit" className="w-full">Update Room</Button>
           </form>
         </DialogContent>
       </Dialog>
@@ -328,5 +331,5 @@ const Tables = () => {
   );
 };
 
-export default Tables;
+export default Rooms;
 

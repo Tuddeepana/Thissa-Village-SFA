@@ -8,9 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ProductSearch } from "@/components/pos/ProductSearch";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
+import { RoomBookingDialog } from "@/components/pos/RoomBookingDialog";
 import api from "@/api/client";
 import { tableService } from "@/api/services/tableService";
+import { orderService } from "@/api/services/orderService";
 import { Product, BillItem, Bill, StockWarning } from "@/types/pos";
+import { OrderType } from "@/types/order.types";
 import { printBillNewWindow } from "@/lib/billPrinter";
 import { toast } from "sonner";
 import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
@@ -22,6 +25,7 @@ import {
   Phone,
   UtensilsCrossed,
   Package,
+  Hotel,
   Minus,
   Plus,
   Trash2,
@@ -30,6 +34,8 @@ import {
   Printer,
   AlertTriangle,
   Crown,
+  Globe,
+  Users,
 } from "lucide-react";
 
 const PAGE_SIZE = 50;
@@ -51,6 +57,7 @@ const POS = () => {
   // Customer Info State
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerType, setCustomerType] = useState<"local" | "foreigner">("local");
   const [orderType, setOrderType] = useState<"dine_in" | "take_away">("dine_in");
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [tables, setTables] = useState<TableInfo[]>([]);
@@ -61,6 +68,7 @@ const POS = () => {
   const [taxRate, setTaxRate] = useState(0);
   const [discountRate, setDiscountRate] = useState(0);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [isRoomBookingDialogOpen, setIsRoomBookingDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -120,6 +128,7 @@ const POS = () => {
           id: r.productId,
           name: r.productName,
           category: r.category?.name ?? '',
+          product_type: r.productType,
           foreignerPrice: r.foreignerPrice ?? 0,
           localPrice: r.localPrice ?? 0,
           cost: r.foreignerPrice ?? 0, // Use foreigner price as default for cost calculation
@@ -161,10 +170,13 @@ const POS = () => {
     return subtotal + tax - discount;
   }, [subtotal, tax, discount]);
 
-  // Check for stock warnings
+  // Check for stock warnings (exclude HANDMADE products)
   const stockWarnings = useMemo(() => {
     const warnings: StockWarning[] = [];
     for (const item of billItems) {
+      // Skip handmade products from stock warnings
+      if (item.product.product_type === 'HANDMADE') continue;
+      
       if (item.product.stock <= item.product.minStock) {
         warnings.push({
           product: item.product,
@@ -193,27 +205,46 @@ const POS = () => {
     return tables.filter((t) => t.status === "free");
   }, [tables]);
 
+  // Update cart prices when customer type changes
+  useEffect(() => {
+    if (billItems.length > 0) {
+      setBillItems(prevItems =>
+        prevItems.map(item => {
+          const priceToUse = customerType === "local" ? item.product.localPrice : item.product.foreignerPrice;
+          return {
+            ...item,
+            subtotal: priceToUse * item.quantity,
+          };
+        })
+      );
+    }
+  }, [customerType]);
+
   const handleAddProduct = (product: Product) => {
-    if (product.stock === 0) {
+    // Skip stock validation for HANDMADE products
+    const isHandmade = product.product_type === 'HANDMADE';
+    
+    if (!isHandmade && product.stock === 0) {
       toast.error("Product is out of stock!");
       return;
     }
 
     const existingItem = billItems.find((item) => item.product.id === product.id);
+    const priceToUse = customerType === "local" ? product.localPrice : product.foreignerPrice;
 
     if (existingItem) {
-      // Check if we can add more
-      if (existingItem.quantity >= product.stock) {
+      // Check if we can add more (skip check for handmade products)
+      if (!isHandmade && existingItem.quantity >= product.stock) {
         toast.error("Cannot add more than available stock!");
         return;
       }
       handleUpdateQuantity(product.id, existingItem.quantity + 1);
     } else {
-      // Add new item (using foreignerPrice as default)
+      // Add new item with appropriate price
       const newItem: BillItem = {
         product,
         quantity: 1,
-        subtotal: product.foreignerPrice,
+        subtotal: priceToUse,
       };
       setBillItems([...billItems, newItem]);
       toast.success(`${product.name} added to order`);
@@ -226,10 +257,15 @@ const POS = () => {
     const item = billItems.find((item) => item.product.id === productId);
     if (!item) return;
 
-    if (newQuantity > item.product.stock) {
+    // Skip stock validation for HANDMADE products
+    const isHandmade = item.product.product_type === 'HANDMADE';
+    
+    if (!isHandmade && newQuantity > item.product.stock) {
       toast.error("Cannot exceed available stock!");
       return;
     }
+
+    const priceToUse = customerType === "local" ? item.product.localPrice : item.product.foreignerPrice;
 
     setBillItems(
       billItems.map((item) =>
@@ -237,7 +273,7 @@ const POS = () => {
           ? {
               ...item,
               quantity: newQuantity,
-              subtotal: item.product.foreignerPrice * newQuantity,
+              subtotal: priceToUse * newQuantity,
             }
           : item
       )
@@ -253,6 +289,7 @@ const POS = () => {
     setBillItems([]);
     setCustomerName("");
     setCustomerPhone("");
+    setCustomerType("local");
     setOrderType("dine_in");
     setSelectedTable(null);
     setDiscountRate(0);
@@ -279,35 +316,62 @@ const POS = () => {
     return true;
   };
 
-  const handleCreateOrder = () => {
+  const handleCreateOrder = async () => {
     if (!validateOrder()) return;
 
-    // Create order and send to kitchen (for dine-in)
-    const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
-    
-    // Mark table as occupied
-    if (orderType === "dine_in" && selectedTable) {
-      setTables(
-        tables.map((t) =>
-          t.id === selectedTable ? { ...t, status: "occupied" as const, orderId: orderNumber } : t
-        )
-      );
+    try {
+      // Get table info for dine-in
+      const selectedTableInfo = orderType === "dine_in" 
+        ? tables.find(t => t.id === selectedTable)
+        : null;
 
-      const selectedTableInfo = tables.find(t => t.id === selectedTable);
-      toast.success(`Order ${orderNumber} created successfully!`, {
-        description: `${selectedTableInfo?.displayName} - ${customerName}. Sent to kitchen.`,
+      // Create order via API
+      const order = await orderService.createOrder({
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        order_type: orderType === "dine_in" ? OrderType.DINE_IN : OrderType.TAKE_AWAY,
+        table_id: selectedTableInfo?.id ?? null,
+        table_name: selectedTableInfo?.displayName ?? null,
+        table_number: selectedTableInfo?.tableNumber ?? null,
+        tax: taxRate,
+        discount: discountRate,
+        terminal_id: currentUser.terminalId,
+        cashier_name: currentUser.name,
+        items: billItems.map(item => ({
+          productId: item.product.id,
+          product_name: item.product.name,
+          quantity: item.quantity,
+          unit_price: item.product.foreignerPrice,
+        })),
       });
-    } else {
-      toast.success(`Order ${orderNumber} created successfully!`, {
-        description: `Take Away - ${customerName}. Sent to kitchen.`,
-      });
+
+      // Mark table as occupied (local state only)
+      if (orderType === "dine_in" && selectedTable && selectedTableInfo) {
+        setTables(
+          tables.map((t) =>
+            t.id === selectedTable ? { ...t, status: "occupied" as const, orderId: order.order_number } : t
+          )
+        );
+
+        toast.success(`Order ${order.order_number} created successfully!`, {
+          description: `${selectedTableInfo.displayName} - ${customerName}. Sent to kitchen.`,
+        });
+      } else {
+        toast.success(`Order ${order.order_number} created successfully!`, {
+          description: `Take Away - ${customerName}. Sent to kitchen.`,
+        });
+      }
+
+      // Navigate to orders page
+      navigate("/orders");
+
+      // Clear the form
+      handleClearOrder();
+    } catch (error: any) {
+      console.error('Failed to create order', error);
+      const msg = error?.response?.data?.message ?? 'Failed to create order';
+      toast.error(msg);
     }
-
-    // Navigate to orders page
-    navigate("/orders");
-
-    // Clear the form
-    handleClearOrder();
   };
 
   const handleTakeAwayPayment = () => {
@@ -389,20 +453,36 @@ const POS = () => {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">POS System</h1>
-        <p className="text-sm md:text-base text-muted-foreground">
-          Terminal: {currentUser.terminalId} • Cashier: {currentUser.name}
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">POS System</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Terminal: {currentUser.terminalId} • Cashier: {currentUser.name}
+          </p>
+        </div>
+        <Badge
+          variant="outline"
+          className={`text-sm px-3 py-1 ${
+            customerType === "local" 
+              ? "bg-green-100 text-green-700 border-green-300" 
+              : "bg-blue-100 text-blue-700 border-blue-300"
+          }`}
+        >
+          {customerType === "local" ? (
+            <><Users className="h-4 w-4 mr-1.5" /> Local Pricing</>
+          ) : (
+            <><Globe className="h-4 w-4 mr-1.5" /> Foreigner Pricing</>
+          )}
+        </Badge>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Left Section - Customer Info & Products */}
+        {/* Left Section - Order Type Selection & Products */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Customer Information Card */}
+          {/* Order Type Selection Card */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Customer Information</CardTitle>
+              <CardTitle className="text-lg">Order Type & Table Selection</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -428,10 +508,33 @@ const POS = () => {
                 </div>
               </div>
 
+              {/* Customer Type Selection */}
+              <div className="space-y-2">
+                <Label>Customer Type</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant={customerType === "local" ? "default" : "outline"}
+                    className={customerType === "local" ? "bg-green-600 hover:bg-green-700" : ""}
+                    onClick={() => setCustomerType("local")}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Local
+                  </Button>
+                  <Button
+                    variant={customerType === "foreigner" ? "default" : "outline"}
+                    className={customerType === "foreigner" ? "bg-blue-600 hover:bg-blue-700" : ""}
+                    onClick={() => setCustomerType("foreigner")}
+                  >
+                    <Globe className="h-4 w-4 mr-2" />
+                    Foreigner
+                  </Button>
+                </div>
+              </div>
+
               {/* Order Type Selection */}
               <div className="space-y-2">
                 <Label>Order Type</Label>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <Button
                     variant={orderType === "dine_in" ? "default" : "outline"}
                     className="flex-1"
@@ -450,6 +553,14 @@ const POS = () => {
                   >
                     <Package className="h-4 w-4 mr-2" />
                     Take Away
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setIsRoomBookingDialogOpen(true)}
+                  >
+                    <Hotel className="h-4 w-4 mr-2" />
+                    Room
                   </Button>
                 </div>
               </div>
@@ -532,7 +643,11 @@ const POS = () => {
                 </div>
               </div>
               <LocalLoader loaderKey="pos-products">
-                <ProductSearch products={products} onAddProduct={handleAddProduct} />
+                <ProductSearch
+                  products={products}
+                  onAddProduct={handleAddProduct}
+                  customerType={customerType}
+                />
               </LocalLoader>
               {loadingProducts && (
                 <p className="text-xs text-muted-foreground mt-2">Loading products...</p>
@@ -557,7 +672,38 @@ const POS = () => {
                 )}
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 flex flex-col">
+            <CardContent className="flex-1 flex flex-col overflow-y-auto">
+              {/* Customer Information */}
+              <div className="space-y-3 border-b pb-4 mb-4">
+                <h3 className="font-semibold text-sm">Customer Information</h3>
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="customer-name" className="flex items-center gap-2 text-xs">
+                      <User className="h-3 w-3" /> Name *
+                    </Label>
+                    <Input
+                      id="customer-name"
+                      placeholder="Enter customer name"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="customer-phone" className="flex items-center gap-2 text-xs">
+                      <Phone className="h-3 w-3" /> Phone *
+                    </Label>
+                    <Input
+                      id="customer-phone"
+                      placeholder="Enter phone number"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="h-8"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Stock Warnings */}
               {stockWarnings.length > 0 && (
                 <Alert variant="destructive" className="mb-4">
@@ -591,7 +737,7 @@ const POS = () => {
                         <div className="flex-1">
                           <h4 className="font-medium text-sm">{item.product.name}</h4>
                           <p className="text-xs text-muted-foreground">
-                            Rs. {item.product.foreignerPrice.toFixed(2)} each
+                            Rs. {(customerType === "local" ? item.product.localPrice : item.product.foreignerPrice).toFixed(2)} each
                           </p>
                         </div>
                         <Button
@@ -729,6 +875,16 @@ const POS = () => {
         onOpenChange={setIsPaymentDialogOpen}
         total={total}
         onConfirmPayment={handleConfirmPayment}
+      />
+
+      {/* Room Booking Dialog */}
+      <RoomBookingDialog
+        open={isRoomBookingDialogOpen}
+        onOpenChange={setIsRoomBookingDialogOpen}
+        cashierName={currentUser.name}
+        onBookingSuccess={() => {
+          toast.success("Room booking completed successfully!");
+        }}
       />
     </div>
   );

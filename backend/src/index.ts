@@ -7,6 +7,8 @@ import userRoutes from './routes/user.routes';
 import categoryRoutes from './routes/category.routes';
 import unitRoutes from './routes/unit.routes';
 import tableRoutes from './routes/table.routes';
+import roomRoutes from './routes/room.routes';
+import roomBookingRoutes from './routes/room-booking.routes';
 import productRoutes from './routes/product.routes';
 import invoiceRoutes from './routes/invoice.routes';
 import inventoryRoutes from './routes/inventory.routes';
@@ -14,6 +16,9 @@ import billRoutes from './routes/bill.routes';
 import mystockRoutes from './routes/mystock.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import salesSummaryRoutes from './routes/sales-summary.routes';
+import expenseRoutes from './routes/expense.routes';
+import orderRoutes from './routes/order.routes';
+import serviceChargeRoutes from './routes/service-charge.routes';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 
 // Load environment variables
@@ -41,6 +46,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/units', unitRoutes);
 app.use('/api/tables', tableRoutes);
+app.use('/api/rooms', roomRoutes);
+app.use('/api/room-bookings', roomBookingRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/bills', billRoutes);
@@ -48,6 +55,9 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/mystock', mystockRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/sales-summary', salesSummaryRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/service-charge', serviceChargeRoutes);
 
 
 // Health check
