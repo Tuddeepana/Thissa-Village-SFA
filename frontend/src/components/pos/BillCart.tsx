@@ -24,6 +24,8 @@ interface BillCartProps {
   onClearBill: () => void;
   onCompleteBill: () => void;
   stockWarnings: StockWarning[];
+  customerType?: 'local' | 'foreign';
+  itemSource?: 'bar' | 'restaurant';
 }
 
 export function BillCart({
@@ -41,12 +43,21 @@ export function BillCart({
   onClearBill,
   onCompleteBill,
   stockWarnings,
+  customerType,
+  itemSource,
 }: BillCartProps) {
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="p-3 md:p-6">
         <CardTitle className="flex justify-between items-center text-base md:text-lg">
-          <span>Current Bill</span>
+          <div className="flex items-center gap-2">
+            <span>Current Bill</span>
+            {itemSource === 'restaurant' && customerType && (
+              <Badge variant={customerType === 'local' ? 'default' : 'secondary'} className="text-xs">
+                {customerType === 'local' ? '🇱🇰 Local' : '🌍 Foreign'}
+              </Badge>
+            )}
+          </div>
           {items.length > 0 && (
             <Button variant="ghost" size="sm" onClick={onClearBill} className="text-xs md:text-sm h-7 md:h-9">
               Clear All

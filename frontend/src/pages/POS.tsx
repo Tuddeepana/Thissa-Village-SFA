@@ -34,6 +34,7 @@ const POS = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [restaurantProducts, setRestaurantProducts] = useState<Product[]>([]);
   const [itemSource, setItemSource] = useState<'bar' | 'restaurant'>('bar');
+  const [customerType, setCustomerType] = useState<'local' | 'foreign'>('local');
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [taxRate, setTaxRate] = useState(0);
   const [discountRate, setDiscountRate] = useState(0);
@@ -270,6 +271,12 @@ const POS = () => {
   }, [navigate, isPaymentDialogOpen, billItems.length, handleCompleteBill]);
 
   const handleAddProduct = (product: Product) => {
+    // For restaurant items, ensure customer type is selected first
+    if (product.source === 'restaurant' && !customerType) {
+      toast.error("Please select customer type (Local/Foreign) first!");
+      return;
+    }
+
     // Restaurant items don't have stock checking
     if (product.source === 'bar' && product.stock === 0) {
       toast.error("Product is out of stock!");
@@ -398,7 +405,7 @@ const POS = () => {
           });
           setProducts(updatedProducts);
 
-          completeBillProcess(billNumber, now, paymentMethod, amountPaid, change, customerName, customerPhone, creditDescription, updatedProducts);
+          completeBillProcess(billNumber, now, paymentMethod, amountPaid, change, customerName, customerPhone, creditDescription, updatedProducts, customerType);
         })
         .catch((err) => {
           console.error('Failed to complete bill', err);
@@ -407,7 +414,7 @@ const POS = () => {
         });
     } else {
       // Only restaurant items, no backend call needed for bar system
-      completeBillProcess(billNumber, now, paymentMethod, amountPaid, change, customerName, customerPhone, creditDescription, products);
+      completeBillProcess(billNumber, now, paymentMethod, amountPaid, change, customerName, customerPhone, creditDescription, products, customerType);
     }
   };
 
@@ -420,7 +427,8 @@ const POS = () => {
     customerName?: string,
     customerPhone?: string,
     creditDescription?: string,
-    updatedProducts?: Product[]
+    updatedProducts?: Product[],
+    customerType?: 'local' | 'foreign'
   ) => {
     // Prepare printable bill object
     const bill: Bill = {
@@ -434,6 +442,7 @@ const POS = () => {
       total,
       customerName,
       customerPhone,
+      customerType,
       paymentMethod,
       amountPaid,
       change,
@@ -542,6 +551,9 @@ const POS = () => {
           <Tabs value={itemSource} onValueChange={(value) => {
             setItemSource(value as 'bar' | 'restaurant');
             setPage(1); // Reset to first page when switching
+            if (value === 'restaurant') {
+              setCustomerType('local'); // Default to local when switching to restaurant
+            }
           }}>
             <TabsList className="grid w-full max-w-md grid-cols-2 h-8 md:h-10">
               <TabsTrigger value="bar" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
@@ -554,6 +566,33 @@ const POS = () => {
               </TabsTrigger>
             </TabsList>
           </Tabs>
+
+          {/* Customer Type Selection - Only show for Restaurant */}
+          {itemSource === 'restaurant' && (
+            <div className="mt-3 md:mt-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs md:text-sm font-medium text-muted-foreground">Customer Type:</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 max-w-md">
+                <Button
+                  variant={customerType === 'local' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setCustomerType('local')}
+                  className="h-8 md:h-10 text-xs md:text-sm font-medium"
+                >
+                  🇱🇰 Local
+                </Button>
+                <Button
+                  variant={customerType === 'foreign' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setCustomerType('foreign')}
+                  className="h-8 md:h-10 text-xs md:text-sm font-medium"
+                >
+                  🌍 Foreign
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -602,6 +641,8 @@ const POS = () => {
             onClearBill={handleClearBill}
             onCompleteBill={handleCompleteBill}
             stockWarnings={stockWarnings}
+            customerType={customerType}
+            itemSource={itemSource}
           />
         </div>
       </div>
