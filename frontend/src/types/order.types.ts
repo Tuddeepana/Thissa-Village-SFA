@@ -1,7 +1,5 @@
 export enum OrderStatus {
   PENDING = 'PENDING',
-  PREPARING = 'PREPARING',
-  READY = 'READY',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
 }
@@ -94,8 +92,6 @@ export interface OrderListResponse {
 
 export interface OrderStats {
   pending: number;
-  preparing: number;
-  ready: number;
   completed: number;
   cancelled: number;
   total: number;

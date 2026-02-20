@@ -9,6 +9,8 @@ import {
   OrderStatus,
   OrderType,
 } from '../types/order.types';
+import { billService } from './bill.service';
+import type { BillCreateWithItemsInput } from '../types/bill.types';
 
 export class OrderService {
   /**
@@ -149,13 +151,56 @@ export class OrderService {
 
   /**
    * Update order status
+   * When status is COMPLETED, creates a bill automatically
    */
   async updateOrderStatus(orderId: string, input: UpdateOrderStatusInput): Promise<OrderDTO> {
+    // Get existing order with items before updating
+    const existingOrder = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+
+    if (!existingOrder) {
+      throw new Error('Order not found');
+    }
+
+    // Update order status
     const order = await prisma.order.update({
       where: { id: orderId },
       data: { status: input.status },
       include: { items: true },
     });
+
+    // If order is completed, create a bill
+    if (input.status === OrderStatus.COMPLETED) {
+      // Generate unique bill number using timestamp
+      const billNumber = `BILL-${Date.now().toString().slice(-8)}`;
+
+      // Calculate item count
+      const itemCount = existingOrder.items.reduce((sum, item) => sum + item.quantity, 0);
+
+      // Prepare bill input
+      const billInput: BillCreateWithItemsInput = {
+        bill_number: billNumber,
+        date: new Date(),
+        payment_method: 'CASH', // Default payment method, can be updated later
+        customer_name: order.customer_name || null,
+        total: Number(order.total),
+        cashier_name: order.cashier_name,
+        item_count: itemCount,
+        credit_note: null,
+        cash_given: Number(order.total), // Assuming exact payment for now
+        balance_given: 0,
+        tax: Number(order.tax),
+        items: existingOrder.items.map((item) => ({
+          productId: item.productId,
+          quantityMoved: item.quantity,
+        })),
+      };
+
+      // Create bill with inventory movements
+      await billService.createBillWithItems(billInput);
+    }
 
     return this.mapToDTO(order);
   }
@@ -228,10 +273,8 @@ export class OrderService {
    * Get order statistics
    */
   async getOrderStats(): Promise<OrderStatsDTO> {
-    const [pending, preparing, ready, completed, cancelled, total] = await Promise.all([
+    const [pending, completed, cancelled, total] = await Promise.all([
       prisma.order.count({ where: { status: OrderStatus.PENDING } }),
-      prisma.order.count({ where: { status: OrderStatus.PREPARING } }),
-      prisma.order.count({ where: { status: OrderStatus.READY } }),
       prisma.order.count({ where: { status: OrderStatus.COMPLETED } }),
       prisma.order.count({ where: { status: OrderStatus.CANCELLED } }),
       prisma.order.count(),
@@ -239,8 +282,6 @@ export class OrderService {
 
     return {
       pending,
-      preparing,
-      ready,
       completed,
       cancelled,
       total,

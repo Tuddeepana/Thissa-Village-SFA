@@ -41,12 +41,15 @@ import {
   CreditCard,
   Search,
   RefreshCw,
+  Check,
+  X,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { orderService } from "@/api/services/orderService";
 import api from "@/api/client";
-import type { Order, OrderStatus as OrderStatusType, OrderStats, OrderStatus } from "@/types/order.types";
+import { OrderStatus } from "@/types/order.types";
+import type { Order, OrderStatus as OrderStatusType, OrderStats } from "@/types/order.types";
 import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
 
 const Orders = () => {
@@ -60,8 +63,6 @@ const Orders = () => {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [stats, setStats] = useState<OrderStats>({
     pending: 0,
-    preparing: 0,
-    ready: 0,
     completed: 0,
     cancelled: 0,
     total: 0,
@@ -310,9 +311,7 @@ const Orders = () => {
   const getStatusBadge = (status: OrderStatusType) => {
     const styles: Record<OrderStatusType, string> = {
       PENDING: "bg-yellow-100 text-yellow-800",
-      PREPARING: "bg-blue-100 text-blue-800",
-      READY: "bg-green-100 text-green-800",
-      COMPLETED: "bg-gray-100 text-gray-800",
+      COMPLETED: "bg-green-100 text-green-800",
       CANCELLED: "bg-red-100 text-red-800",
     };
     return <Badge className={styles[status]}>{status}</Badge>;
@@ -339,23 +338,7 @@ const Orders = () => {
         </Card>
         <Card>
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-medium text-blue-600">Preparing</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold">{stats.preparing}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-medium text-green-600">Ready</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold">{stats.ready}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Completed</CardTitle>
+            <CardTitle className="text-sm font-medium text-green-600">Completed</CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <div className="text-2xl font-bold">{stats.completed}</div>
@@ -393,8 +376,6 @@ const Orders = () => {
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="PENDING">Pending</SelectItem>
-                <SelectItem value="PREPARING">Preparing</SelectItem>
-                <SelectItem value="READY">Ready</SelectItem>
                 <SelectItem value="COMPLETED">Completed</SelectItem>
                 <SelectItem value="CANCELLED">Cancelled</SelectItem>
               </SelectContent>
@@ -540,18 +521,24 @@ const Orders = () => {
               <div className="flex items-center gap-4">
                 <Label>Status:</Label>
                 {getStatusBadge(selectedOrder.status)}
-                {selectedOrder.status !== "COMPLETED" && selectedOrder.status !== "CANCELLED" && (
+                {selectedOrder.status === "PENDING" && (
                   <div className="flex gap-2 ml-auto">
-                    {selectedOrder.status === "PENDING" && (
-                      <Button size="sm" onClick={() => handleUpdateOrderStatus(selectedOrder.id, OrderStatus.PREPARING)}>
-                        Start Preparing
-                      </Button>
-                    )}
-                    {selectedOrder.status === "PREPARING" && (
-                      <Button size="sm" onClick={() => handleUpdateOrderStatus(selectedOrder.id, OrderStatus.READY)}>
-                        Mark Ready
-                      </Button>
-                    )}
+                    <Button 
+                      size="sm" 
+                      variant="default"
+                      onClick={() => handleUpdateOrderStatus(selectedOrder.id, OrderStatus.COMPLETED)}
+                    >
+                      <Check className="h-4 w-4 mr-1" />
+                      Complete Order
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="destructive"
+                      onClick={() => handleUpdateOrderStatus(selectedOrder.id, OrderStatus.CANCELLED)}
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Cancel Order
+                    </Button>
                   </div>
                 )}
               </div>
@@ -562,7 +549,7 @@ const Orders = () => {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <Label className="text-base font-semibold">Order Items</Label>
-                  {selectedOrder.status !== "COMPLETED" && selectedOrder.status !== "CANCELLED" && (
+                  {selectedOrder.status === "PENDING" && (
                     <Button size="sm" variant="outline" onClick={() => setIsAddItemDialogOpen(true)}>
                       <Plus className="h-4 w-4 mr-1" /> Add Item
                     </Button>
@@ -628,7 +615,7 @@ const Orders = () => {
             <Button variant="outline" onClick={() => handlePrintBill(selectedOrder!)}>
               <Printer className="h-4 w-4 mr-2" /> Print Bill
             </Button>
-            {selectedOrder?.status === "READY" && (
+            {selectedOrder?.status === "PENDING" && (
               <Button onClick={() => { setAmountPaid(selectedOrder.total); setIsPaymentDialogOpen(true); }}>
                 <CreditCard className="h-4 w-4 mr-2" /> Complete Payment
               </Button>

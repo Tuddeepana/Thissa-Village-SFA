@@ -1,7 +1,5 @@
 export enum OrderStatus {
   PENDING = 'PENDING',
-  PREPARING = 'PREPARING',
-  READY = 'READY',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
 }
@@ -75,8 +73,6 @@ export interface AddItemsToOrderInput {
 
 export interface OrderStatsDTO {
   pending: number;
-  preparing: number;
-  ready: number;
   completed: number;
   cancelled: number;
   total: number;
