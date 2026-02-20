@@ -16,9 +16,10 @@ import { Product } from "@/types/pos";
 interface ProductSearchProps {
   products: Product[];
   onAddProduct: (product: Product) => void;
+  customerType: "local" | "foreigner";
 }
 
-export function ProductSearch({ products, onAddProduct }: ProductSearchProps) {
+export function ProductSearch({ products, onAddProduct, customerType }: ProductSearchProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
@@ -152,12 +153,20 @@ export function ProductSearch({ products, onAddProduct }: ProductSearchProps) {
 
                   <div className="flex flex-col gap-1 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Foreigner:</span>
-                      <span className="font-bold text-primary">Rs. {product.foreignerPrice.toFixed(2)}</span>
+                      <span className={`${customerType === "foreigner" ? "font-semibold" : "text-muted-foreground"}`}>
+                        Foreigner:
+                      </span>
+                      <span className={`${customerType === "foreigner" ? "font-bold text-primary text-base" : "text-muted-foreground"}`}>
+                        Rs. {product.foreignerPrice.toFixed(2)}
+                      </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Local:</span>
-                      <span className="font-bold text-green-600">Rs. {product.localPrice.toFixed(2)}</span>
+                      <span className={`${customerType === "local" ? "font-semibold" : "text-muted-foreground"}`}>
+                        Local:
+                      </span>
+                      <span className={`${customerType === "local" ? "font-bold text-green-600 text-base" : "text-muted-foreground"}`}>
+                        Rs. {product.localPrice.toFixed(2)}
+                      </span>
                     </div>
                   </div>
 

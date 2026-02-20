@@ -34,6 +34,8 @@ import {
   Printer,
   AlertTriangle,
   Crown,
+  Globe,
+  Users,
 } from "lucide-react";
 
 const PAGE_SIZE = 50;
@@ -55,6 +57,7 @@ const POS = () => {
   // Customer Info State
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerType, setCustomerType] = useState<"local" | "foreigner">("local");
   const [orderType, setOrderType] = useState<"dine_in" | "take_away">("dine_in");
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [tables, setTables] = useState<TableInfo[]>([]);
@@ -202,6 +205,21 @@ const POS = () => {
     return tables.filter((t) => t.status === "free");
   }, [tables]);
 
+  // Update cart prices when customer type changes
+  useEffect(() => {
+    if (billItems.length > 0) {
+      setBillItems(prevItems =>
+        prevItems.map(item => {
+          const priceToUse = customerType === "local" ? item.product.localPrice : item.product.foreignerPrice;
+          return {
+            ...item,
+            subtotal: priceToUse * item.quantity,
+          };
+        })
+      );
+    }
+  }, [customerType]);
+
   const handleAddProduct = (product: Product) => {
     // Skip stock validation for HANDMADE products
     const isHandmade = product.product_type === 'HANDMADE';
@@ -212,6 +230,7 @@ const POS = () => {
     }
 
     const existingItem = billItems.find((item) => item.product.id === product.id);
+    const priceToUse = customerType === "local" ? product.localPrice : product.foreignerPrice;
 
     if (existingItem) {
       // Check if we can add more (skip check for handmade products)
@@ -221,11 +240,11 @@ const POS = () => {
       }
       handleUpdateQuantity(product.id, existingItem.quantity + 1);
     } else {
-      // Add new item (using foreignerPrice as default)
+      // Add new item with appropriate price
       const newItem: BillItem = {
         product,
         quantity: 1,
-        subtotal: product.foreignerPrice,
+        subtotal: priceToUse,
       };
       setBillItems([...billItems, newItem]);
       toast.success(`${product.name} added to order`);
@@ -246,13 +265,15 @@ const POS = () => {
       return;
     }
 
+    const priceToUse = customerType === "local" ? item.product.localPrice : item.product.foreignerPrice;
+
     setBillItems(
       billItems.map((item) =>
         item.product.id === productId
           ? {
               ...item,
               quantity: newQuantity,
-              subtotal: item.product.foreignerPrice * newQuantity,
+              subtotal: priceToUse * newQuantity,
             }
           : item
       )
@@ -268,6 +289,7 @@ const POS = () => {
     setBillItems([]);
     setCustomerName("");
     setCustomerPhone("");
+    setCustomerType("local");
     setOrderType("dine_in");
     setSelectedTable(null);
     setDiscountRate(0);
@@ -431,11 +453,27 @@ const POS = () => {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">POS System</h1>
-        <p className="text-sm md:text-base text-muted-foreground">
-          Terminal: {currentUser.terminalId} • Cashier: {currentUser.name}
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">POS System</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Terminal: {currentUser.terminalId} • Cashier: {currentUser.name}
+          </p>
+        </div>
+        <Badge
+          variant="outline"
+          className={`text-sm px-3 py-1 ${
+            customerType === "local" 
+              ? "bg-green-100 text-green-700 border-green-300" 
+              : "bg-blue-100 text-blue-700 border-blue-300"
+          }`}
+        >
+          {customerType === "local" ? (
+            <><Users className="h-4 w-4 mr-1.5" /> Local Pricing</>
+          ) : (
+            <><Globe className="h-4 w-4 mr-1.5" /> Foreigner Pricing</>
+          )}
+        </Badge>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -447,6 +485,52 @@ const POS = () => {
               <CardTitle className="text-lg">Order Type & Table Selection</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <User className="h-4 w-4" /> Customer Name
+                  </Label>
+                  <Input
+                    placeholder="Enter customer name"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Phone className="h-4 w-4" /> Customer Phone
+                  </Label>
+                  <Input
+                    placeholder="Enter phone number"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Customer Type Selection */}
+              <div className="space-y-2">
+                <Label>Customer Type</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant={customerType === "local" ? "default" : "outline"}
+                    className={customerType === "local" ? "bg-green-600 hover:bg-green-700" : ""}
+                    onClick={() => setCustomerType("local")}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Local
+                  </Button>
+                  <Button
+                    variant={customerType === "foreigner" ? "default" : "outline"}
+                    className={customerType === "foreigner" ? "bg-blue-600 hover:bg-blue-700" : ""}
+                    onClick={() => setCustomerType("foreigner")}
+                  >
+                    <Globe className="h-4 w-4 mr-2" />
+                    Foreigner
+                  </Button>
+                </div>
+              </div>
+
               {/* Order Type Selection */}
               <div className="space-y-2">
                 <Label>Order Type</Label>
@@ -559,7 +643,11 @@ const POS = () => {
                 </div>
               </div>
               <LocalLoader loaderKey="pos-products">
-                <ProductSearch products={products} onAddProduct={handleAddProduct} />
+                <ProductSearch
+                  products={products}
+                  onAddProduct={handleAddProduct}
+                  customerType={customerType}
+                />
               </LocalLoader>
               {loadingProducts && (
                 <p className="text-xs text-muted-foreground mt-2">Loading products...</p>
@@ -649,7 +737,7 @@ const POS = () => {
                         <div className="flex-1">
                           <h4 className="font-medium text-sm">{item.product.name}</h4>
                           <p className="text-xs text-muted-foreground">
-                            Rs. {item.product.foreignerPrice.toFixed(2)} each
+                            Rs. {(customerType === "local" ? item.product.localPrice : item.product.foreignerPrice).toFixed(2)} each
                           </p>
                         </div>
                         <Button
