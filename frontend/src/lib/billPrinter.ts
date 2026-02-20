@@ -1,5 +1,19 @@
 import { Bill } from '@/types/pos';
 import { format } from 'date-fns';
+import logoUrl from '@/assets/images/tissa_bar_logo.png';
+
+/** Convert an image URL to a base64 data-URI so it embeds inside the
+ *  iframe/new-window HTML without cross-origin issues. */
+const toDataURL = (url: string): Promise<string> =>
+  fetch(url)
+    .then(r => r.blob())
+    .then(blob => new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    }))
+    .catch(() => '');   // graceful fallback — header will just be empty
 
 /* ─────────────────────────────────────────────────────────────────
    Shared CSS for both print functions
@@ -45,19 +59,14 @@ const BILL_CSS = `
     margin-bottom: 5px;
     border-bottom: 2px solid #000;
   }
-  .store-name {
-    font-size: 17px;
-    font-weight: 900;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    margin-bottom: 2px;
-  }
-  .store-tagline {
-    font-size: 9.5px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    font-weight: 600;
-    margin-bottom: 1px;
+  .logo-img {
+    display: block;
+    width: 100%;
+    max-width: 72mm;
+    margin: 0 auto 3px auto;
+    /* Thermal printers are monochrome — invert the white-on-black logo
+       so it prints as black-on-white (no wasted ink on a solid black bg) */
+    filter: invert(1);
   }
   .divider-thick  { border: none; border-top: 2px solid #000; margin: 4px 0; }
   .divider-dashed { border: none; border-top: 1px dashed #000; margin: 4px 0; }
@@ -170,10 +179,12 @@ const BILL_CSS = `
   }
 `;
 
-const buildBillBody = (bill: Bill, billNo: string | number, storeName: string) => `
+const buildBillBody = (bill: Bill, billNo: string | number, logoDataUrl: string) => `
   <div class="header">
-    <div class="store-name">${storeName}</div>
-    <div class="store-tagline">Point of Sale</div>
+    ${logoDataUrl
+      ? `<img class="logo-img" src="${logoDataUrl}" alt="Tissa Village" />`
+      : `<div style="font-size:17px;font-weight:900;letter-spacing:0.12em;text-transform:uppercase;">Tissa Village</div>`
+    }
   </div>
 
   <div class="info-row">
@@ -277,7 +288,9 @@ const buildBillBody = (bill: Bill, billNo: string | number, storeName: string) =
   </div>
 `;
 
-export const printBill = (bill: Bill, storeName: string = "Tissa Village") => {
+export const printBill = async (bill: Bill, _storeName: string = "Tissa Village") => {
+  const logoDataUrl = await toDataURL(logoUrl);
+
   // Create a hidden iframe for printing
   const printFrame = document.createElement('iframe');
   printFrame.style.position = 'absolute';
@@ -298,7 +311,7 @@ export const printBill = (bill: Bill, storeName: string = "Tissa Village") => {
       <style>${BILL_CSS}</style>
     </head>
     <body>
-      ${buildBillBody(bill, bill.id, storeName)}
+      ${buildBillBody(bill, bill.id, logoDataUrl)}
       <script>
         window.onload = function() {
           window.print();
@@ -317,7 +330,8 @@ export const printBill = (bill: Bill, storeName: string = "Tissa Village") => {
 };
 
 // Alternative: Generate print-friendly content in new window
-export const printBillNewWindow = (bill: Bill, storeName: string = "Thissa Village") => {
+export const printBillNewWindow = async (bill: Bill, _storeName: string = "Thissa Village") => {
+  const logoDataUrl = await toDataURL(logoUrl);
   const printWindow = window.open('', '_blank', 'width=320,height=600');
   if (!printWindow) return;
 
@@ -349,7 +363,7 @@ export const printBillNewWindow = (bill: Bill, storeName: string = "Thissa Villa
       </style>
     </head>
     <body>
-      ${buildBillBody(bill, billNo, storeName)}
+      ${buildBillBody(bill, billNo, logoDataUrl)}
       <div class="no-print">
         <button onclick="window.print()">&#128438; Print Bill</button>
         <button onclick="window.close()">&#10005; Close</button>
