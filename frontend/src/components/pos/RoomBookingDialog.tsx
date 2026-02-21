@@ -35,6 +35,9 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
   const [submitting, setSubmitting] = useState(false);
   const [pricePerNight] = useState(100); // Default price, can be made configurable
   const [pricePerHour] = useState(20); // Default hourly price
+  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'CREDIT' | 'OTHER'>('CASH');
+  const [cashGiven, setCashGiven] = useState(0);
+  const [generateBill, setGenerateBill] = useState(true);
 
   // Set default check-in date to today
   useEffect(() => {
@@ -189,7 +192,7 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
         ? new Date(`${checkInDate}T${checkInTime}`).toISOString()
         : new Date(checkInDate).toISOString();
 
-      await roomBookingService.create({
+      const bookingPayload = {
         customerName,
         customerNic: customerNic || undefined,
         customerPhone,
@@ -199,11 +202,30 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
         totalAmount: calculateTotal(),
         cashierName,
         rooms,
-      });
+        paymentMethod,
+        cashGiven: cashGiven || calculateTotal(),
+        generateBill,
+      };
 
-      toast.success("Room booking created successfully!", {
-        description: `${selectedRooms.size} room(s) booked for ${customerName}`,
-      });
+      console.log('🏨 Creating room booking with payload:', bookingPayload);
+
+      const result = await roomBookingService.create(bookingPayload);
+
+      console.log('✅ Room booking result:', result);
+
+      // Show success message with bill info if generated
+      if (result.bill) {
+        console.log('🧾 Bill generated:', result.bill.bill_number);
+        toast.success("Room booking and bill created successfully!", {
+          description: `${selectedRooms.size} room(s) booked. Bill #${result.bill.bill_number}`,
+          duration: 5000,
+        });
+      } else {
+        console.log('ℹ️ No bill generated');
+        toast.success("Room booking created successfully!", {
+          description: `${selectedRooms.size} room(s) booked for ${customerName}`,
+        });
+      }
 
       // Reset form
       setCustomerName("");
@@ -211,6 +233,9 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
       setCustomerPhone("");
       setCustomerAddress("");
       setSelectedRooms(new Set());
+      setCashGiven(0);
+      setPaymentMethod('CASH');
+      setGenerateBill(true);
       onBookingSuccess();
       onOpenChange(false);
     } catch (error) {
@@ -475,42 +500,99 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
 
           {/* Booking Summary */}
           {selectedRooms.size > 0 && calculateNights() > 0 && (
-            <div className="space-y-2 p-4 bg-muted rounded-lg">
-              <h3 className="font-semibold text-sm">Booking Summary</h3>
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span>Rooms:</span>
-                  <span>{selectedRooms.size}</span>
-                </div>
-                {bookingType === 'short_time' ? (
-                  <>
-                    <div className="flex justify-between">
-                      <span>Hours:</span>
-                      <span>{shortTimeHours}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Price per hour:</span>
-                      <span>${pricePerHour}</span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex justify-between">
-                      <span>Nights:</span>
-                      <span>{calculateNights()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Price per night:</span>
-                      <span>${pricePerNight}</span>
-                    </div>
-                  </>
-                )}
-                <div className="flex justify-between font-bold text-base pt-2 border-t">
-                  <span>Total Amount:</span>
-                  <span>${calculateTotal()}</span>
+            <>
+              <div className="space-y-2 p-4 bg-muted rounded-lg">
+                <h3 className="font-semibold text-sm">Booking Summary</h3>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Rooms:</span>
+                    <span>{selectedRooms.size}</span>
+                  </div>
+                  {bookingType === 'short_time' ? (
+                    <>
+                      <div className="flex justify-between">
+                        <span>Hours:</span>
+                        <span>{shortTimeHours}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Price per hour:</span>
+                        <span>Rs. {pricePerHour}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex justify-between">
+                        <span>Nights:</span>
+                        <span>{calculateNights()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Price per night:</span>
+                        <span>Rs. {pricePerNight}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="flex justify-between font-bold text-base pt-2 border-t">
+                    <span>Total Amount:</span>
+                    <span>Rs. {calculateTotal().toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+
+              {/* Payment Section */}
+              <div className="space-y-4 p-4 border rounded-lg">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="generateBill"
+                    checked={generateBill}
+                    onChange={(e) => setGenerateBill(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="generateBill" className="font-semibold cursor-pointer">
+                    Generate Bill (POS Receipt)
+                  </Label>
+                </div>
+
+                {generateBill && (
+                  <div className="space-y-4 pl-6">
+                    <div className="space-y-2">
+                      <Label>Payment Method</Label>
+                      <Select value={paymentMethod} onValueChange={(value: 'CASH' | 'CARD' | 'CREDIT' | 'OTHER') => setPaymentMethod(value)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="CASH">Cash</SelectItem>
+                          <SelectItem value="CARD">Card</SelectItem>
+                          <SelectItem value="CREDIT">Credit</SelectItem>
+                          <SelectItem value="OTHER">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {paymentMethod === 'CASH' && (
+                      <div className="space-y-2">
+                        <Label htmlFor="cashGiven">Cash Given</Label>
+                        <Input
+                          id="cashGiven"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={cashGiven || ''}
+                          onChange={(e) => setCashGiven(parseFloat(e.target.value) || 0)}
+                          placeholder="Enter cash amount"
+                        />
+                        {cashGiven > 0 && (
+                          <p className="text-sm text-muted-foreground">
+                            Change: <strong>Rs. {(cashGiven - calculateTotal()).toFixed(2)}</strong>
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
           )}
 
           {/* Actions */}

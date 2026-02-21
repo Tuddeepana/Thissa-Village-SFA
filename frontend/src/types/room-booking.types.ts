@@ -6,6 +6,24 @@
   pricePerNight: number;
   createdAt: string;
 }
+
+export interface Bill {
+  id: string;
+  bill_number: string;
+  date: string;
+  payment_method: string;
+  customer_name?: string | null;
+  total: string;
+  cashier_name: string;
+  item_count: number;
+  credit_note?: string | null;
+  cash_given: string;
+  balance_given: string;
+  tax?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface RoomBooking {
   id: string;
   customerName: string;
@@ -35,6 +53,9 @@ export interface CreateRoomBookingPayload {
     roomName: string;
     pricePerNight: number;
   }[];
+  paymentMethod?: string;
+  cashGiven?: number;
+  generateBill?: boolean;
 }
 export interface UpdateRoomBookingPayload {
   customerName?: string;
