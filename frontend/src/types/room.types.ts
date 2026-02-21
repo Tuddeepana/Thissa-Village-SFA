@@ -5,6 +5,8 @@ export interface Room {
   name: string;
   room_type: RoomType;
   quantity: number;
+  price_full_day: number;
+  price_short_time: number;
   createdAt?: string;
   updatedAt?: string;
   deletedAt?: string | null;
@@ -14,12 +16,16 @@ export interface CreateRoomPayload {
   name: string;
   room_type: RoomType;
   quantity: number;
+  price_full_day: number;
+  price_short_time: number;
 }
 
 export interface UpdateRoomPayload {
   name?: string;
   room_type?: RoomType;
   quantity?: number;
+  price_full_day?: number;
+  price_short_time?: number;
 }
 
 export interface RoomListResponse {
