@@ -1,4 +1,5 @@
 import prisma from '../lib/prisma';
+import { billService } from './bill.service';
 
 interface BookedRoomInput {
   roomId: string;
@@ -16,6 +17,9 @@ interface CreateBookingPayload {
   totalAmount: number;
   cashierName: string;
   rooms: BookedRoomInput[];
+  paymentMethod?: string;
+  cashGiven?: number;
+  generateBill?: boolean;
 }
 
 interface UpdateBookingPayload {
@@ -30,29 +34,70 @@ interface UpdateBookingPayload {
 }
 
 export const createRoomBooking = async (payload: CreateBookingPayload) => {
-  const { rooms, ...bookingData } = payload;
+  const { rooms, generateBill, paymentMethod, cashGiven, ...bookingData } = payload;
 
-  const booking = await prisma.roomBooking.create({
-    data: {
-      ...bookingData,
-      bookedRooms: {
-        create: rooms.map(room => ({
-          roomId: room.roomId,
-          roomName: room.roomName,
-          pricePerNight: room.pricePerNight,
-        })),
-      },
-    },
-    include: {
-      bookedRooms: {
-        include: {
-          room: true,
+  return await prisma.$transaction(async (tx) => {
+    // Create the room booking
+    const booking = await tx.roomBooking.create({
+      data: {
+        ...bookingData,
+        bookedRooms: {
+          create: rooms.map(room => ({
+            roomId: room.roomId,
+            roomName: room.roomName,
+            pricePerNight: room.pricePerNight,
+          })),
         },
       },
-    },
-  });
+      include: {
+        bookedRooms: {
+          include: {
+            room: true,
+          },
+        },
+      },
+    });
 
-  return booking;
+    let bill = null;
+
+    // Generate bill if requested
+    if (generateBill) {
+      console.log('🧾 Generating bill for room booking...');
+      const billNumber = `ROOM-${Date.now()}`;
+      const totalAmount = Number(payload.totalAmount);
+      const cash = cashGiven || totalAmount;
+      const balance = cash - totalAmount;
+
+      console.log('Bill details:', {
+        billNumber,
+        totalAmount,
+        cash,
+        balance,
+        paymentMethod: paymentMethod || 'CASH',
+      });
+
+      // Create bill using the bill service
+      bill = await billService.createBill({
+        bill_number: billNumber,
+        date: new Date(),
+        payment_method: paymentMethod || 'CASH',
+        customer_name: payload.customerName,
+        total: totalAmount,
+        cashier_name: payload.cashierName,
+        item_count: rooms.length,
+        credit_note: `Room Booking: ${rooms.map(r => r.roomName).join(', ')}`,
+        cash_given: cash,
+        balance_given: balance,
+        tax: 0,
+      });
+
+      console.log('✅ Bill created successfully:', bill.bill_number);
+    } else {
+      console.log('ℹ️ Bill generation skipped (generateBill = false)');
+    }
+
+    return { booking, bill };
+  });
 };
 
 export const getRoomBookingById = async (id: string) => {

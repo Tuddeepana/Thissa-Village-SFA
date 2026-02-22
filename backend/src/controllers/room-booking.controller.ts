@@ -10,12 +10,12 @@ export const createRoomBooking = async (req: Request, res: Response, next: NextF
       checkOutDate: new Date(req.body.checkOutDate),
     };
 
-    const booking = await roomBookingService.createRoomBooking(payload);
-    
+    const result = await roomBookingService.createRoomBooking(payload);
+
     res.status(201).json({
       success: true,
-      message: 'Room booking created successfully',
-      data: booking,
+      message: result.bill ? 'Room booking and bill created successfully' : 'Room booking created successfully',
+      data: result,
     });
   } catch (error: any) {
     next(error);

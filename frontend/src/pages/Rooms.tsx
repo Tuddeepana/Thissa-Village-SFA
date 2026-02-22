@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Pencil, Plus, Crown } from "lucide-react";
+import { Pencil, Plus, Crown, Calendar, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { DeleteButton } from "@/components/common";
@@ -37,7 +37,9 @@ const Rooms = () => {
   const [formData, setFormData] = useState({
     name: "",
     room_type: "NORMAL" as 'VIP' | 'NORMAL',
-    quantity: 1
+    quantity: 1,
+    price_full_day: 0,
+    price_short_time: 0
   });
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -45,7 +47,9 @@ const Rooms = () => {
   const [editForm, setEditForm] = useState({
     name: "",
     room_type: "NORMAL" as 'VIP' | 'NORMAL',
-    quantity: 1
+    quantity: 1,
+    price_full_day: 0,
+    price_short_time: 0
   });
 
   const { data, refetch } = useQuery({
@@ -80,10 +84,12 @@ const Rooms = () => {
       await roomService.create({
         name: formData.name,
         room_type: formData.room_type,
-        quantity: formData.quantity
+        quantity: formData.quantity,
+        price_full_day: formData.price_full_day,
+        price_short_time: formData.price_short_time
       });
       toast({ title: "Success", description: "Room added successfully" });
-      setFormData({ name: "", room_type: "NORMAL", quantity: 1 });
+      setFormData({ name: "", room_type: "NORMAL", quantity: 1, price_full_day: 0, price_short_time: 0 });
       setOpen(false);
       refetch();
       refetchExpanded();
@@ -110,7 +116,9 @@ const Rooms = () => {
     setEditForm({
       name: room.name,
       room_type: room.room_type,
-      quantity: room.quantity
+      quantity: room.quantity,
+      price_full_day: room.price_full_day,
+      price_short_time: room.price_short_time
     });
     setEditOpen(true);
   };
@@ -123,6 +131,8 @@ const Rooms = () => {
         name: editForm.name,
         room_type: editForm.room_type,
         quantity: editForm.quantity,
+        price_full_day: editForm.price_full_day,
+        price_short_time: editForm.price_short_time,
       });
       toast({ title: "Updated", description: "Room updated successfully" });
       setEditOpen(false);
@@ -179,6 +189,51 @@ const Rooms = () => {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="quantity">Quantity</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="1"
+                  value={formData.quantity}
+                  onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="price_full_day" className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    Full Day Price (Rs.)
+                  </Label>
+                  <Input
+                    id="price_full_day"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.price_full_day}
+                    onChange={(e) => setFormData({ ...formData, price_full_day: parseFloat(e.target.value) || 0 })}
+                    required
+                    placeholder="Per night"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="price_short_time" className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Short Time Price (Rs.)
+                  </Label>
+                  <Input
+                    id="price_short_time"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.price_short_time}
+                    onChange={(e) => setFormData({ ...formData, price_short_time: parseFloat(e.target.value) || 0 })}
+                    required
+                    placeholder="Per hour/session"
+                  />
+                </div>
+              </div>
               <Button type="submit" className="w-full">Add Room</Button>
             </form>
           </DialogContent>
@@ -197,6 +252,9 @@ const Rooms = () => {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>Full Day Price</TableHead>
+                  <TableHead>Short Time Price</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -214,6 +272,19 @@ const Rooms = () => {
                       ) : (
                         <Badge variant="secondary">Normal</Badge>
                       )}
+                    </TableCell>
+                    <TableCell>{room.quantity}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-1 text-purple-700">
+                        <Calendar className="h-3 w-3" />
+                        Rs. {Number(room.price_full_day).toFixed(2)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-1 text-blue-700">
+                        <Clock className="h-3 w-3" />
+                        Rs. {Number(room.price_short_time).toFixed(2)}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {room.createdAt ? format(new Date(room.createdAt), "PP") : "-"}
@@ -322,6 +393,40 @@ const Rooms = () => {
               <p className="text-xs text-muted-foreground">
                 Changing quantity will update the number of rooms displayed
               </p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-price_full_day" className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  Full Day Price (Rs.)
+                </Label>
+                <Input
+                  id="edit-price_full_day"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editForm.price_full_day}
+                  onChange={(e) => setEditForm({ ...editForm, price_full_day: parseFloat(e.target.value) || 0 })}
+                  required
+                  placeholder="Per night"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-price_short_time" className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Short Time Price (Rs.)
+                </Label>
+                <Input
+                  id="edit-price_short_time"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editForm.price_short_time}
+                  onChange={(e) => setEditForm({ ...editForm, price_short_time: parseFloat(e.target.value) || 0 })}
+                  required
+                  placeholder="Per hour/session"
+                />
+              </div>
             </div>
             <Button type="submit" className="w-full">Update Room</Button>
           </form>

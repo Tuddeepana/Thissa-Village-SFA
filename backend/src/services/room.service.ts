@@ -1,16 +1,21 @@
 import prisma from '../lib/prisma';
+// @ts-ignore
 import { RoomType } from '@prisma/client';
 
 interface CreateRoomPayload {
   name: string;
   room_type: RoomType;
   quantity: number;
+  price_full_day: number;
+  price_short_time: number;
 }
 
 interface UpdateRoomPayload {
   name?: string;
   room_type?: RoomType;
   quantity?: number;
+  price_full_day?: number;
+  price_short_time?: number;
 }
 
 interface ExpandedRoomItem {

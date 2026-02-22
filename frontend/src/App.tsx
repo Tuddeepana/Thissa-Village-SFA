@@ -19,6 +19,7 @@ import POS from "./pages/POS";
 import Orders from "./pages/Orders";
 import Bills from "./pages/Bills";
 import RoomStatus from "./pages/RoomStatus";
+import TableStatus from "./pages/TableStatus";
 import ProfitAndLoss from "./pages/ProfitAndLoss";
 import Users from "./pages/Users";
 import Profile from "./pages/Profile";
@@ -85,6 +86,7 @@ const App = () => (
             <Route path="orders" element={<Orders />} />
             <Route path="bills" element={<Bills />} />
             <Route path="room-status" element={<RoomStatus />} />
+            <Route path="table-status" element={<TableStatus />} />
             <Route path="profit-and-loss" element={<ProfitAndLoss />} />
             <Route path="users" element={<Users />} />
             <Route path="profile" element={<Profile />} />
