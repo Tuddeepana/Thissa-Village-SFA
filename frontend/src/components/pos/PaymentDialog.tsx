@@ -17,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 
 interface PaymentDialogProps {
@@ -27,8 +26,6 @@ interface PaymentDialogProps {
   onConfirmPayment: (
     paymentMethod: 'cash' | 'card' | 'credit' | 'other',
     amountPaid: number,
-    customerName?: string,
-    customerPhone?: string,
     creditDescription?: string
   ) => void;
 }
@@ -41,8 +38,6 @@ export function PaymentDialog({
 }: PaymentDialogProps) {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'credit' | 'other'>('cash');
   const [amountPaid, setAmountPaid] = useState(total.toString());
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
   const [creditDescription, setCreditDescription] = useState("");
 
   const amountPaidNum = parseFloat(amountPaid) || 0;
@@ -51,19 +46,14 @@ export function PaymentDialog({
   const creditMissing = isCredit && creditDescription.trim() === '';
 
   const handleConfirm = () => {
-    // For credit, amount paid can be 0, otherwise must be >= total
     if (isCredit || amountPaidNum >= total) {
       onConfirmPayment(
         paymentMethod,
         isCredit ? 0 : amountPaidNum,
-        customerName || undefined,
-        customerPhone || undefined,
         isCredit ? creditDescription || undefined : undefined
       );
       // Reset form
       setAmountPaid(total.toString());
-      setCustomerName("");
-      setCustomerPhone("");
       setCreditDescription("");
       setPaymentMethod('cash');
     }
@@ -84,29 +74,6 @@ export function PaymentDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Customer Information (Optional) */}
-          <div className="space-y-2">
-            <Label htmlFor="customerName">Customer Name (Optional)</Label>
-            <Input
-              id="customerName"
-              placeholder="Enter customer name"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="customerPhone">Customer Phone (Optional)</Label>
-            <Input
-              id="customerPhone"
-              placeholder="Enter customer phone"
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-            />
-          </div>
-
-          <Separator />
-
           {/* Payment Method */}
           <div className="space-y-2">
             <Label htmlFor="paymentMethod">Payment Method</Label>

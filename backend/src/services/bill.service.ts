@@ -75,6 +75,7 @@ class BillService {
       productId: rec.productId,
       name: rec.product?.name ?? null,
       categoryName: rec.product?.category?.name ?? null,
+      unit_type: rec.product?.unit_type ?? null,
       cost_price: rec.product?.cost_price !== undefined ? String(rec.product.cost_price) : null,
       foreigner_price: rec.product?.foreigner_price !== undefined ? String(rec.product.foreigner_price) : null,
       local_price: rec.product?.local_price !== undefined ? String(rec.product.local_price) : null,

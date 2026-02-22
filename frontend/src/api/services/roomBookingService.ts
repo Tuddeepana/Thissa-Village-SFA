@@ -5,7 +5,8 @@ import type {
   CreateRoomBookingPayload,
   UpdateRoomBookingPayload,
   RoomBookingListResponse,
-  AvailableRoomsResponse
+  AvailableRoomsResponse,
+  Bill
 } from '@/types/room-booking.types';
 
 export const roomBookingService = {
@@ -28,7 +29,14 @@ export const roomBookingService = {
   },
 
   async create(payload: CreateRoomBookingPayload) {
-    const res = await api.post<{ success: boolean; data: RoomBooking }>(ENDPOINTS.roomBookings, payload);
+    const res = await api.post<{
+      success: boolean;
+      message: string;
+      data: {
+        booking: RoomBooking;
+        bill: Bill | null;
+      }
+    }>(ENDPOINTS.roomBookings, payload);
     return res.data.data;
   },
 

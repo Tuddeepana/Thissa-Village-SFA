@@ -64,6 +64,7 @@ const hotelMenuGroups: MenuGroup[] = [
             { title: "Rooms", url: "/rooms", icon: Hotel },
             { title: "Room Status", url: "/room-status", icon: Building2 },
             { title: "Tables", url: "/tables", icon: TableProperties },
+            { title: "Table Status", url: "/table-status", icon: TableProperties },
         ],
     },
     {
@@ -99,6 +100,7 @@ const posItems = [
     { title: "POS System", url: "/pos", icon: ShoppingCart },
     { title: "Orders", url: "/orders", icon: ClipboardList },
     { title: "Room Status", url: "/room-status", icon: Hotel },
+    { title: "Table Status", url: "/table-status", icon: TableProperties },
     { title: "Bills", url: "/bills", icon: Receipt },
 ];
 

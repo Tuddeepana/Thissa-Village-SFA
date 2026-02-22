@@ -1,16 +1,35 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Crown, Hotel, Calendar, User, Phone, Clock, Eye, MapPin } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Crown, Hotel, Calendar, User, Phone, Clock, Eye, MapPin, LogOut, Filter, X } from "lucide-react";
 import { roomService } from "@/api/services/roomService";
 import { roomBookingService } from "@/api/services/roomBookingService";
 import type { ExpandedRoomItem } from "@/types/room.types";
 import type { RoomBooking } from "@/types/room-booking.types";
 import { useQuery } from "@tanstack/react-query";
 import LocalLoader from "@/components/common/LocalLoader";
-import { format, differenceInHours, differenceInDays } from "date-fns";
+import { format, differenceInHours, differenceInDays, isToday, startOfDay, endOfDay } from "date-fns";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
 
 interface RoomWithBooking extends ExpandedRoomItem {
   booking?: RoomBooking;
@@ -21,6 +40,13 @@ const RoomStatus = () => {
   const [roomsWithStatus, setRoomsWithStatus] = useState<RoomWithBooking[]>([]);
   const [selectedBooking, setSelectedBooking] = useState<RoomBooking | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [releaseDialogOpen, setReleaseDialogOpen] = useState(false);
+  const [bookingToRelease, setBookingToRelease] = useState<RoomBooking | null>(null);
+
+  // Filter states
+  const [roomStatusFilter, setRoomStatusFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<string>("");
+  const [todayFilter, setTodayFilter] = useState(true);
 
   // Fetch all expanded rooms
   const { data: expandedRoomsData, isLoading: loadingRooms } = useQuery({
@@ -87,186 +113,395 @@ const RoomStatus = () => {
 
     // If less than 24 hours and same day, it's short time
     if (hours <= 6 && days === 0) {
-      return { type: 'short_time', duration: `${hours} hour${hours !== 1 ? 's' : ''}` };
+      return { type: 'Short Time', duration: `${hours} hour${hours !== 1 ? 's' : ''}` };
     } else {
       const nights = days > 0 ? days : 1;
-      return { type: 'full_day', duration: `${nights} night${nights !== 1 ? 's' : ''}` };
+      return { type: 'Full Time', duration: `${nights} night${nights !== 1 ? 's' : ''}` };
     }
   };
+
+  // Filter rooms based on filters
+  const filteredRooms = useMemo(() => {
+    let filtered = [...roomsWithStatus];
+
+    // Room status filter
+    if (roomStatusFilter !== "all") {
+      filtered = filtered.filter(room => room.status === roomStatusFilter);
+    }
+
+    // Date filter
+    if (todayFilter) {
+      filtered = filtered.filter(room => {
+        if (!room.booking) return true; // Show available rooms
+        const checkIn = new Date(room.booking.checkInDate);
+        const checkOut = new Date(room.booking.checkOutDate);
+        const now = new Date();
+        return isToday(checkIn) || isToday(checkOut) || (checkIn < now && checkOut > now);
+      });
+    } else if (dateFilter) {
+      const filterDate = new Date(dateFilter);
+      filtered = filtered.filter(room => {
+        if (!room.booking) return false; // Hide available rooms when specific date is selected
+        const checkIn = new Date(room.booking.checkInDate);
+        const checkOut = new Date(room.booking.checkOutDate);
+        return checkIn <= endOfDay(filterDate) && checkOut >= startOfDay(filterDate);
+      });
+    }
+
+    return filtered;
+  }, [roomsWithStatus, roomStatusFilter, dateFilter, todayFilter]);
 
   const handleViewDetails = (booking: RoomBooking) => {
     setSelectedBooking(booking);
     setDetailsDialogOpen(true);
   };
 
+  const handleReleaseRoom = (booking: RoomBooking) => {
+    setBookingToRelease(booking);
+    setReleaseDialogOpen(true);
+  };
+
+  const confirmReleaseRoom = async () => {
+    if (!bookingToRelease) return;
+
+    try {
+      await roomBookingService.checkOut(bookingToRelease.id);
+      toast.success("Room released successfully");
+      setReleaseDialogOpen(false);
+      setBookingToRelease(null);
+      // Refetch data
+      window.location.reload();
+    } catch (error) {
+      console.error("Failed to release room:", error);
+      toast.error("Failed to release room");
+    }
+  };
+
+  const clearFilters = () => {
+    setRoomStatusFilter("all");
+    setDateFilter("");
+    setTodayFilter(true);
+  };
+
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
+      {/* Header */}
       <div>
         <h1 className="text-2xl md:text-3xl font-bold text-foreground">Room Status</h1>
-        <p className="text-sm md:text-base text-muted-foreground">View current room availability and bookings</p>
+        <p className="text-sm md:text-base text-muted-foreground">View and manage room availability and bookings</p>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+        <Card className="border-blue-200 bg-blue-50/50">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Rooms</CardTitle>
+            <CardTitle className="text-sm font-medium text-blue-700 flex items-center gap-2">
+              <Hotel className="h-4 w-4" />
+              Total Rooms
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{roomsWithStatus.length}</div>
+            <div className="text-3xl font-bold text-blue-900">{roomsWithStatus.length}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-green-200 bg-green-50/50">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Available</CardTitle>
+            <CardTitle className="text-sm font-medium text-green-700 flex items-center gap-2">
+              <Hotel className="h-4 w-4" />
+              Available Rooms
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{availableCount}</div>
+            <div className="text-3xl font-bold text-green-900">{availableCount}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-red-200 bg-red-50/50">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Booked</CardTitle>
+            <CardTitle className="text-sm font-medium text-red-700 flex items-center gap-2">
+              <Hotel className="h-4 w-4" />
+              Booked Rooms
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{bookedCount}</div>
+            <div className="text-3xl font-bold text-red-900">{bookedCount}</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Room Grid */}
+      {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base md:text-lg">All Rooms ({roomsWithStatus.length})</CardTitle>
+          <CardTitle className="text-base md:text-lg flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Room Status Filter */}
+            <div className="space-y-2">
+              <Label className="text-xs md:text-sm">Room Status</Label>
+              <Select value={roomStatusFilter} onValueChange={setRoomStatusFilter}>
+                <SelectTrigger className="h-9 md:h-10">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="available">Available</SelectItem>
+                  <SelectItem value="booked">Booked</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Today Filter Checkbox */}
+            <div className="space-y-2">
+              <Label className="text-xs md:text-sm">Date Filter</Label>
+              <div className="flex items-center space-x-2 h-9 md:h-10">
+                <Checkbox
+                  id="today"
+                  checked={todayFilter}
+                  onCheckedChange={(checked) => {
+                    setTodayFilter(!!checked);
+                    if (checked) setDateFilter("");
+                  }}
+                />
+                <label
+                  htmlFor="today"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Today
+                </label>
+              </div>
+            </div>
+
+            {/* Date Picker */}
+            <div className="space-y-2">
+              <Label className="text-xs md:text-sm">Select Date</Label>
+              <Input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => {
+                  setDateFilter(e.target.value);
+                  if (e.target.value) setTodayFilter(false);
+                }}
+                disabled={todayFilter}
+                className="h-9 md:h-10"
+              />
+            </div>
+
+            {/* Clear Filters */}
+            <div className="space-y-2">
+              <Label className="text-xs md:text-sm hidden md:block">&nbsp;</Label>
+              <Button
+                variant="outline"
+                onClick={clearFilters}
+                className="h-9 md:h-10 w-full gap-2"
+              >
+                <X className="h-4 w-4" />
+                Clear Filters
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Room Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base md:text-lg">
+            Room Details ({filteredRooms.length} {filteredRooms.length === 1 ? 'room' : 'rooms'})
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <LocalLoader loaderKey="room-status">
             {loadingRooms || loadingBookings ? (
               <p className="text-center text-muted-foreground py-8">Loading room status...</p>
-            ) : roomsWithStatus.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No rooms available</p>
+            ) : filteredRooms.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                <Hotel className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>No rooms found</p>
+                <p className="text-sm mt-1">Try adjusting your filters</p>
+              </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {roomsWithStatus.map((room) => (
-                  <Card
-                    key={room.id}
-                    className={`${
-                      room.status === 'booked'
-                        ? 'border-red-300 bg-red-50'
-                        : room.room_type === 'VIP'
-                        ? 'border-amber-200 bg-amber-50/50'
-                        : 'border-green-300 bg-green-50/50'
-                    }`}
-                  >
-                    <CardContent className="p-4">
-                      {/* Room Header */}
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <Hotel className="h-5 w-5 text-muted-foreground" />
-                          <h3 className="font-semibold text-base">{room.displayName}</h3>
-                        </div>
-                        {room.room_type === 'VIP' && (
-                          <Crown className="h-4 w-4 text-amber-600" />
-                        )}
-                      </div>
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="font-semibold">Room Number</TableHead>
+                      <TableHead className="font-semibold">Room Type</TableHead>
+                      <TableHead className="font-semibold">From Date</TableHead>
+                      <TableHead className="font-semibold">To Date</TableHead>
+                      <TableHead className="font-semibold">Booking Type</TableHead>
+                      <TableHead className="font-semibold">Room Status</TableHead>
+                      <TableHead className="text-center font-semibold">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredRooms.map((room) => (
+                      <TableRow key={room.id}>
+                        {/* Room Number */}
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Hotel className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">{room.displayName}</span>
+                          </div>
+                        </TableCell>
 
-                      {/* Room Type Badge */}
-                      <div className="mb-3">
-                        {room.room_type === 'VIP' ? (
-                          <Badge className="text-xs bg-amber-100 text-amber-800 border-amber-300">
-                            <Crown className="h-3 w-3 mr-1" />
-                            VIP Room
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs">Normal Room</Badge>
-                        )}
-                      </div>
+                        {/* Room Type */}
+                        <TableCell>
+                          {room.room_type === 'VIP' ? (
+                            <Badge className="bg-amber-100 text-amber-800 border-amber-300">
+                              <Crown className="h-3 w-3 mr-1" />
+                              VIP
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">Normal</Badge>
+                          )}
+                        </TableCell>
 
-                      {/* Status Badge */}
-                      <div className="mb-3">
-                        {room.status === 'available' ? (
-                          <Badge className="text-xs bg-green-100 text-green-700 border-green-300">
-                            Available
-                          </Badge>
-                        ) : (
-                          <Badge className="text-xs bg-red-100 text-red-700 border-red-300">
-                            Booked
-                          </Badge>
-                        )}
-                      </div>
+                        {/* From Date */}
+                        <TableCell>
+                          {room.booking ? (
+                            <div className="flex items-center gap-1 text-sm">
+                              <Calendar className="h-3 w-3 text-muted-foreground" />
+                              {format(new Date(room.booking.checkInDate), "MMM dd, yyyy HH:mm")}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
 
-                      {/* Booking Details (if booked) */}
-                      {room.booking && (
-                        <div className="space-y-2 pt-3 border-t">
-                          {/* Booking Type Badge */}
-                          <div className="mb-2">
-                            {(() => {
+                        {/* To Date */}
+                        <TableCell>
+                          {room.booking ? (
+                            <div className="flex items-center gap-1 text-sm">
+                              <Calendar className="h-3 w-3 text-muted-foreground" />
+                              {format(new Date(room.booking.checkOutDate), "MMM dd, yyyy HH:mm")}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+
+                        {/* Booking Type */}
+                        <TableCell>
+                          {room.booking ? (
+                            (() => {
                               const bookingInfo = getBookingType(room.booking);
-                              return bookingInfo.type === 'short_time' ? (
-                                <Badge className="text-xs bg-blue-100 text-blue-700 border-blue-300">
+                              return bookingInfo.type === 'Short Time' ? (
+                                <Badge className="bg-blue-100 text-blue-700 border-blue-300">
                                   <Clock className="h-3 w-3 mr-1" />
-                                  Short Time ({bookingInfo.duration})
+                                  {bookingInfo.type}
                                 </Badge>
                               ) : (
-                                <Badge className="text-xs bg-purple-100 text-purple-700 border-purple-300">
+                                <Badge className="bg-purple-100 text-purple-700 border-purple-300">
                                   <Calendar className="h-3 w-3 mr-1" />
-                                  Full Day ({bookingInfo.duration})
+                                  {bookingInfo.type}
                                 </Badge>
                               );
-                            })()}
-                          </div>
+                            })()
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
 
-                          <div className="flex items-start gap-2 text-xs">
-                            <User className="h-3 w-3 mt-0.5 text-muted-foreground flex-shrink-0" />
-                            <div>
-                              <p className="font-medium">{room.booking.customerName}</p>
-                              {room.booking.customerPhone && (
-                                <p className="text-muted-foreground flex items-center gap-1 mt-0.5">
-                                  <Phone className="h-3 w-3" />
-                                  {room.booking.customerPhone}
-                                </p>
-                              )}
-                            </div>
-                          </div>
+                        {/* Room Status */}
+                        <TableCell>
+                          {room.status === 'available' ? (
+                            <Badge className="bg-green-100 text-green-700 border-green-300">
+                              Available
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-red-100 text-red-700 border-red-300">
+                              Booked
+                            </Badge>
+                          )}
+                        </TableCell>
 
-                          <div className="flex items-start gap-2 text-xs">
-                            <Calendar className="h-3 w-3 mt-0.5 text-muted-foreground flex-shrink-0" />
-                            <div>
-                              <p className="text-muted-foreground">
-                                In: {format(new Date(room.booking.checkInDate), "MMM dd, HH:mm")}
-                              </p>
-                              <p className="text-muted-foreground">
-                                Out: {format(new Date(room.booking.checkOutDate), "MMM dd, HH:mm")}
-                              </p>
-                            </div>
+                        {/* Actions */}
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-2">
+                            {room.booking && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleViewDetails(room.booking!)}
+                                  title="View Details"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleReleaseRoom(room.booking!)}
+                                  title="Release Room"
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <LogOut className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
+                            {!room.booking && (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
                           </div>
-
-                          <div className="pt-2 border-t">
-                            <p className="text-xs font-semibold mb-2">
-                              Total: ${Number(room.booking.totalAmount).toFixed(2)}
-                            </p>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="w-full text-xs"
-                              onClick={() => handleViewDetails(room.booking!)}
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              View Full Details
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             )}
           </LocalLoader>
         </CardContent>
       </Card>
+
+      {/* Release Room Confirmation Dialog */}
+      <Dialog open={releaseDialogOpen} onOpenChange={setReleaseDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LogOut className="h-5 w-5 text-red-600" />
+              Release Room
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to release this room? This action will mark the booking as checked out.
+            </DialogDescription>
+          </DialogHeader>
+
+          {bookingToRelease && (
+            <div className="space-y-4 py-4">
+              <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Customer:</span>
+                  <span className="font-medium">{bookingToRelease.customerName}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Rooms:</span>
+                  <span className="font-medium">{bookingToRelease.bookedRooms.length} room(s)</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Total Amount:</span>
+                  <span className="font-medium">Rs. {Number(bookingToRelease.totalAmount).toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setReleaseDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={confirmReleaseRoom}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Release Room
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Full Details Dialog */}
       {selectedBooking && (
@@ -285,7 +520,7 @@ const RoomStatus = () => {
                 <h3 className="font-semibold text-sm mb-2">Booking Type</h3>
                 {(() => {
                   const bookingInfo = getBookingType(selectedBooking);
-                  return bookingInfo.type === 'short_time' ? (
+                  return bookingInfo.type === 'Short Time' ? (
                     <Badge className="bg-blue-100 text-blue-700 border-blue-300">
                       <Clock className="h-4 w-4 mr-1" />
                       Short Time - {bookingInfo.duration}
@@ -293,7 +528,7 @@ const RoomStatus = () => {
                   ) : (
                     <Badge className="bg-purple-100 text-purple-700 border-purple-300">
                       <Calendar className="h-4 w-4 mr-1" />
-                      Full Day (Holiday) - {bookingInfo.duration}
+                      Full Time - {bookingInfo.duration}
                     </Badge>
                   );
                 })()}

@@ -129,6 +129,7 @@ const POS = () => {
           name: r.productName,
           category: r.category?.name ?? '',
           product_type: r.productType,
+          unit: r.unitType ?? null,
           foreignerPrice: r.foreignerPrice ?? 0,
           localPrice: r.localPrice ?? 0,
           cost: r.foreignerPrice ?? 0, // Use foreigner price as default for cost calculation
@@ -297,14 +298,6 @@ const POS = () => {
   };
 
   const validateOrder = () => {
-    if (!customerName.trim()) {
-      toast.error("Please enter customer name");
-      return false;
-    }
-    if (!customerPhone.trim()) {
-      toast.error("Please enter customer phone");
-      return false;
-    }
     if (billItems.length === 0) {
       toast.error("Please add items to the order");
       return false;
@@ -341,7 +334,7 @@ const POS = () => {
           productId: item.product.id,
           product_name: item.product.name,
           quantity: item.quantity,
-          unit_price: item.product.foreignerPrice,
+          unit_price: customerType === "local" ? item.product.localPrice : item.product.foreignerPrice,
         })),
       });
 
@@ -382,8 +375,6 @@ const POS = () => {
   const handleConfirmPayment = (
     paymentMethod: 'cash' | 'card' | 'credit' | 'other',
     amountPaid: number,
-    _customerNameArg?: string,
-    _customerPhoneArg?: string,
     creditDescription?: string
   ) => {
     const now = new Date();
@@ -426,7 +417,7 @@ const POS = () => {
           discount,
           discountRate,
           total,
-          customerName,
+          customerName: currentUser.name,  // Cashier name shown on receipt
           customerPhone,
           paymentMethod,
           amountPaid,
@@ -485,28 +476,6 @@ const POS = () => {
               <CardTitle className="text-lg">Order Type & Table Selection</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <User className="h-4 w-4" /> Customer Name
-                  </Label>
-                  <Input
-                    placeholder="Enter customer name"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Phone className="h-4 w-4" /> Customer Phone
-                  </Label>
-                  <Input
-                    placeholder="Enter phone number"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                  />
-                </div>
-              </div>
 
               {/* Customer Type Selection */}
               <div className="space-y-2">
@@ -679,7 +648,7 @@ const POS = () => {
                 <div className="space-y-2">
                   <div className="space-y-1">
                     <Label htmlFor="customer-name" className="flex items-center gap-2 text-xs">
-                      <User className="h-3 w-3" /> Name *
+                      <User className="h-3 w-3" /> Name
                     </Label>
                     <Input
                       id="customer-name"
@@ -691,7 +660,7 @@ const POS = () => {
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="customer-phone" className="flex items-center gap-2 text-xs">
-                      <Phone className="h-3 w-3" /> Phone *
+                      <Phone className="h-3 w-3" /> Phone
                     </Label>
                     <Input
                       id="customer-phone"
