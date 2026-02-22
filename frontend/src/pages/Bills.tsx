@@ -146,7 +146,7 @@ const Bills = () => {
           discount: 0,
           discountRate: 0,
           total: Number(b.total || 0),
-          customerName: b.customer_name ?? undefined,
+          customerName: b.cashier_name ?? b.customer_name ?? undefined,
           customerPhone: undefined,
           paymentMethod: (String(b.payment_method || 'other').toLowerCase() as any),
           amountPaid: b.cash_given !== undefined && b.cash_given !== null ? Number(b.cash_given) : Number(b.total || 0),
@@ -200,6 +200,7 @@ const Bills = () => {
               id: it.productId || it.productId || 'unknown',
               name: it.name || it.productName || 'Unknown Product',
               category: it.categoryName || it.category || 'General',
+              unit: it.unit_type ?? null,
               foreignerPrice: it.foreigner_price !== undefined ? Number(it.foreigner_price) : price,
               localPrice: it.local_price !== undefined ? Number(it.local_price) : price,
               cost: it.cost_price !== undefined && it.cost_price !== null ? Number(it.cost_price) : price * 0.7,
@@ -227,7 +228,7 @@ const Bills = () => {
           discount: 0,
           discountRate: 0,
           total: totalNum,
-          customerName: detailed.customer ?? undefined,
+          customerName: detailed.cashier_name ?? detailed.customer ?? undefined,
           customerPhone: undefined,
           paymentMethod: (String(detailed.PaymentMethod || bill.paymentMethod || '').toLowerCase()),
           amountPaid: detailed.PaymentMethod && String(detailed.PaymentMethod).toLowerCase() === 'credit' ? 0 : totalNum,
@@ -271,8 +272,6 @@ const Bills = () => {
   const handleConfirmPayment = (
     paymentMethod: 'cash' | 'card' | 'credit' | 'other',
     amountPaid: number,
-    customerName?: string,
-    customerPhone?: string,
     creditDescription?: string
   ) => {
     if (!billForPayment) return;
@@ -286,7 +285,7 @@ const Bills = () => {
           cash_given: paymentMethod === 'credit' ? 0 : amountPaid,
           balance_given: paymentMethod === 'credit' ? 0 : Math.max(0, change),
           credit_note: paymentMethod === 'credit' ? (creditDescription || null) : null,
-          customer_name: customerName || null,
+          customer_name: billForPayment.customerName || null,
         };
         await api.patch(`/bills/${encodeURIComponent(billForPayment.id)}/payment`, payload);
         // Optimistically update list UI
@@ -296,7 +295,6 @@ const Bills = () => {
           amountPaid,
           change: Math.max(0, change),
           creditDescription: paymentMethod === 'credit' ? (creditDescription || null as any) : null as any,
-          customerName: customerName || b.customerName,
         } : b));
       } catch (e) {
         console.error('Failed updating bill payment, proceeding to print locally', e);
@@ -310,8 +308,8 @@ const Bills = () => {
         discount: billForPayment.discount ?? 0,
         discountRate: billForPayment.discountRate ?? 0,
         total: billForPayment.total,
-        customerName: customerName ?? billForPayment.customerName,
-        customerPhone: customerPhone ?? billForPayment.customerPhone,
+        customerName: billForPayment.customerName,
+        customerPhone: billForPayment.customerPhone,
         paymentMethod,
         amountPaid,
         change,
@@ -871,7 +869,12 @@ const Bills = () => {
                     <TableBody>
                       {selectedBill.items.map((item: any, index: number) => (
                         <TableRow key={index}>
-                          <TableCell>{item.product.name}</TableCell>
+                          <TableCell>
+                            {item.product.name}
+                            {item.product.unit && (
+                              <span className="text-muted-foreground text-xs ml-1">({item.product.unit})</span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-center">{item.quantity}</TableCell>
                           <TableCell className="text-right">Rs.{item.product.foreignerPrice?.toFixed(2) ?? '0.00'}</TableCell>
                           <TableCell className="text-right">Rs.{item.subtotal.toFixed(2)}</TableCell>

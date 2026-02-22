@@ -118,9 +118,9 @@ export function ProductSearch({ products, onAddProduct, customerType }: ProductS
                     <Badge variant="secondary" className="text-xs">
                       {product.category}
                     </Badge>
-                    {product.product_type === 'HANDMADE' && (
+                    {product.unit && (
                       <Badge variant="outline" className="text-xs border-purple-500 text-purple-700">
-                        Handmade
+                        {product.unit}
                       </Badge>
                     )}
                   </div>
