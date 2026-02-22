@@ -333,7 +333,7 @@ const POS = () => {
           productId: item.product.id,
           product_name: item.product.name,
           quantity: item.quantity,
-          unit_price: item.product.foreignerPrice,
+          unit_price: customerType === "local" ? item.product.localPrice : item.product.foreignerPrice,
         })),
       });
 
@@ -374,8 +374,6 @@ const POS = () => {
   const handleConfirmPayment = (
     paymentMethod: 'cash' | 'card' | 'credit' | 'other',
     amountPaid: number,
-    _customerNameArg?: string,
-    _customerPhoneArg?: string,
     creditDescription?: string
   ) => {
     const now = new Date();
@@ -418,7 +416,7 @@ const POS = () => {
           discount,
           discountRate,
           total,
-          customerName,
+          customerName: currentUser.name,  // Cashier name shown on receipt
           customerPhone,
           paymentMethod,
           amountPaid,
