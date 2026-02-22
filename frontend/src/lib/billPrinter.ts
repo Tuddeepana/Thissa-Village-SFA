@@ -100,16 +100,16 @@ const BILL_CSS = `
   }
   .items-table th.r { text-align: right; }
   .items-table td {
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 600;
     padding: 2px 2px;
     vertical-align: top;
   }
   .items-table td.r { text-align: right; white-space: nowrap; }
-  .col-name  { word-break: break-word; }
-  .col-qty   { width: 9mm; }
-  .col-price { width: 16mm; }
-  .col-total { width: 16mm; }
+  .col-name  { word-break: keep-all; white-space: nowrap; overflow: hidden; }
+  .col-qty   { width: 7mm; }
+  .col-price { width: 14mm; }
+  .col-total { width: 14mm; }
 
   /* ── Totals ──────────────────────────────────────────────── */
   .totals { margin: 2px 0; padding-top: 8px; margin-top: 4px; }
@@ -227,9 +227,12 @@ const buildBillBody = (
       ${bill.items.map(item => {
         // Derive the unit price actually charged from the stored subtotal
         const unitPrice = item.quantity > 0 ? item.subtotal / item.quantity : 0;
+        const nameWithUnit = item.product.unit
+          ? `${item.product.name} (${item.product.unit})`
+          : item.product.name;
         return `
       <tr>
-        <td class="col-name">${item.product.name}</td>
+        <td class="col-name">${nameWithUnit}</td>
         <td class="col-qty r">${item.quantity}</td>
         <td class="col-price r">${unitPrice.toFixed(2)}</td>
         <td class="col-total r">${item.subtotal.toFixed(2)}</td>

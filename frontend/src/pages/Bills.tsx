@@ -200,6 +200,7 @@ const Bills = () => {
               id: it.productId || it.productId || 'unknown',
               name: it.name || it.productName || 'Unknown Product',
               category: it.categoryName || it.category || 'General',
+              unit: it.unit_type ?? null,
               foreignerPrice: it.foreigner_price !== undefined ? Number(it.foreigner_price) : price,
               localPrice: it.local_price !== undefined ? Number(it.local_price) : price,
               cost: it.cost_price !== undefined && it.cost_price !== null ? Number(it.cost_price) : price * 0.7,
@@ -868,7 +869,12 @@ const Bills = () => {
                     <TableBody>
                       {selectedBill.items.map((item: any, index: number) => (
                         <TableRow key={index}>
-                          <TableCell>{item.product.name}</TableCell>
+                          <TableCell>
+                            {item.product.name}
+                            {item.product.unit && (
+                              <span className="text-muted-foreground text-xs ml-1">({item.product.unit})</span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-center">{item.quantity}</TableCell>
                           <TableCell className="text-right">Rs.{item.product.foreignerPrice?.toFixed(2) ?? '0.00'}</TableCell>
                           <TableCell className="text-right">Rs.{item.subtotal.toFixed(2)}</TableCell>

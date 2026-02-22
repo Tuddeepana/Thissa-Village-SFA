@@ -129,6 +129,7 @@ const POS = () => {
           name: r.productName,
           category: r.category?.name ?? '',
           product_type: r.productType,
+          unit: r.unitType ?? null,
           foreignerPrice: r.foreignerPrice ?? 0,
           localPrice: r.localPrice ?? 0,
           cost: r.foreignerPrice ?? 0, // Use foreigner price as default for cost calculation

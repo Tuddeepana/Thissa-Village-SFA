@@ -3,6 +3,7 @@ export interface Product {
   name: string;
   category: string;
   product_type?: 'HANDMADE' | 'PURCHASE';
+  unit?: string | null;
   foreignerPrice: number; // Selling price for foreigners
   localPrice: number; // Selling price for locals
   cost: number; // Cost price for profit calculation
