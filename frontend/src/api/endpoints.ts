@@ -26,6 +26,7 @@ export const ENDPOINTS = {
 	orders: {
 		base: '/orders',
 		stats: '/orders/stats',
+		tableStatus: '/orders/table-status',
 		byId: (id: string) => `/orders/${id}`,
 		status: (id: string) => `/orders/${id}/status`,
 		addItems: (id: string) => `/orders/${id}/items`,

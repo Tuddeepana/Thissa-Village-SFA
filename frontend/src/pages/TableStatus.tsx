@@ -21,8 +21,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Utensils, Clock, Eye, Filter, X, Users } from "lucide-react";
-import { format, isToday, startOfDay, endOfDay } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { orderService } from "@/api/services/orderService";
+import LocalLoader from "@/components/common/LocalLoader";
 
 // Mock data structure - replace with actual API calls
 interface TableOrder {
@@ -65,119 +68,54 @@ interface TableWithStatus {
 
 const TableStatus = () => {
   const [tables, setTables] = useState<TableWithStatus[]>([]);
+  const [summary, setSummary] = useState({ total: 0, occupied: 0, available: 0, reserved: 0 });
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("");
   const [todayFilter, setTodayFilter] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<TableOrder | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
 
-  // Mock data - replace with actual API call
+  // Fetch table status from API
+  const { data } = useQuery({
+    queryKey: ["table-status", statusFilter, dateFilter, todayFilter],
+    queryFn: async () => {
+      const params: {
+        status?: 'available' | 'occupied' | 'all';
+        date_from?: string;
+        date_to?: string;
+      } = {};
+
+      if (statusFilter !== "all") {
+        params.status = statusFilter as 'available' | 'occupied';
+      }
+
+      if (todayFilter) {
+        const today = new Date();
+        params.date_from = startOfDay(today).toISOString();
+        params.date_to = endOfDay(today).toISOString();
+      } else if (dateFilter) {
+        const selectedDate = new Date(dateFilter);
+        params.date_from = startOfDay(selectedDate).toISOString();
+        params.date_to = endOfDay(selectedDate).toISOString();
+      }
+
+      return await orderService.getTableStatus(params);
+    },
+    staleTime: 30_000, // Refetch every 30 seconds
+    refetchInterval: 30_000, // Auto-refetch every 30 seconds
+  });
+
   useEffect(() => {
-    // Simulating API call to fetch table status
-    const mockTables: TableWithStatus[] = [
-      {
-        table_number: 1,
-        table_name: "Table 1",
-        status: "occupied",
-        customer_name: "John Doe",
-        order_time: new Date().toISOString(),
-        total_amount: 1500,
-        item_count: 3,
-        current_order: {
-          id: "1",
-          table_id: "t1",
-          table_name: "Table 1",
-          table_number: 1,
-          customer_name: "John Doe",
-          customer_phone: "0771234567",
-          order_type: "DINE_IN",
-          status: "PENDING",
-          order_number: "ORD-001",
-          subtotal: 1500,
-          tax: 0,
-          discount: 0,
-          total: 1500,
-          cashier_name: "Sarah",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          items: [
-            { id: "1", product_name: "Pizza", quantity: 1, unit_price: 800, total: 800 },
-            { id: "2", product_name: "Coke", quantity: 2, unit_price: 350, total: 700 },
-          ],
-        },
-      },
-      {
-        table_number: 2,
-        table_name: "Table 2",
-        status: "available",
-      },
-      {
-        table_number: 3,
-        table_name: "Table 3",
-        status: "occupied",
-        customer_name: "Jane Smith",
-        order_time: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-        total_amount: 2500,
-        item_count: 5,
-      },
-      {
-        table_number: 4,
-        table_name: "Table 4",
-        status: "available",
-      },
-      {
-        table_number: 5,
-        table_name: "Table 5",
-        status: "occupied",
-        customer_name: "Bob Wilson",
-        order_time: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-        total_amount: 3200,
-        item_count: 4,
-      },
-    ];
-    setTables(mockTables);
-  }, []);
+    if (data) {
+      setTables(data.tables || []);
+      setSummary(data.summary || { total: 0, occupied: 0, available: 0, reserved: 0 });
+    }
+  }, [data]);
 
-  // Summary calculations
-  const summary = useMemo(() => {
-    const total = tables.length;
-    const occupied = tables.filter(t => t.status === 'occupied').length;
-    const available = tables.filter(t => t.status === 'available').length;
-    const reserved = tables.filter(t => t.status === 'reserved').length;
-
-    return { total, occupied, available, reserved };
-  }, [tables]);
-
-  // Filtered tables
+  // Filtered tables - already filtered by backend, but we can add client-side filtering if needed
   const filteredTables = useMemo(() => {
-    let filtered = [...tables];
-
-    // Status filter
-    if (statusFilter !== "all") {
-      filtered = filtered.filter(table => table.status === statusFilter);
-    }
-
-    // Date filter
-    if (todayFilter) {
-      filtered = filtered.filter(table => {
-        if (!table.order_time) return table.status === 'available';
-        const orderDate = new Date(table.order_time);
-        return isToday(orderDate);
-      });
-    } else if (dateFilter) {
-      const selectedDate = new Date(dateFilter);
-      const startDate = startOfDay(selectedDate);
-      const endDate = endOfDay(selectedDate);
-
-      filtered = filtered.filter(table => {
-        if (!table.order_time) return false;
-        const orderDate = new Date(table.order_time);
-        return orderDate >= startDate && orderDate <= endDate;
-      });
-    }
-
-    return filtered;
-  }, [tables, statusFilter, dateFilter, todayFilter]);
+    return tables;
+  }, [tables]);
 
   const clearFilters = () => {
     setStatusFilter("all");
@@ -204,7 +142,7 @@ const TableStatus = () => {
       setSelectedOrder(table.current_order);
       setViewDialogOpen(true);
     } else {
-      toast.info("No active order for this table");
+      toast.error("No active order for this table");
     }
   };
 
@@ -361,87 +299,89 @@ const TableStatus = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Table</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Order Time</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTables.length === 0 ? (
+          <LocalLoader loaderKey="table-status">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                      No tables found
-                    </TableCell>
+                    <TableHead>Table</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Order Time</TableHead>
+                    <TableHead>Items</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ) : (
-                  filteredTables.map((table) => (
-                    <TableRow key={table.table_number}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <Utensils className="h-4 w-4 text-muted-foreground" />
-                          {table.table_name}
-                        </div>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(table.status)}</TableCell>
-                      <TableCell>
-                        {table.customer_name ? (
-                          <div className="flex items-center gap-2">
-                            <Users className="h-3 w-3 text-muted-foreground" />
-                            {table.customer_name}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {table.order_time ? (
-                          <div className="flex items-center gap-1 text-sm">
-                            <Clock className="h-3 w-3" />
-                            {format(new Date(table.order_time), "MMM dd, yyyy HH:mm")}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {table.item_count ? (
-                          <Badge variant="secondary">{table.item_count} items</Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {table.total_amount ? (
-                          `Rs. ${table.total_amount.toFixed(2)}`
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {table.current_order && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewOrder(table)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        )}
+                </TableHeader>
+                <TableBody>
+                  {filteredTables.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                        No tables found
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                  ) : (
+                    filteredTables.map((table) => (
+                      <TableRow key={table.table_number}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <Utensils className="h-4 w-4 text-muted-foreground" />
+                            {table.table_name}
+                          </div>
+                        </TableCell>
+                        <TableCell>{getStatusBadge(table.status)}</TableCell>
+                        <TableCell>
+                          {table.customer_name ? (
+                            <div className="flex items-center gap-2">
+                              <Users className="h-3 w-3 text-muted-foreground" />
+                              {table.customer_name}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {table.order_time ? (
+                            <div className="flex items-center gap-1 text-sm">
+                              <Clock className="h-3 w-3" />
+                              {format(new Date(table.order_time), "MMM dd, yyyy HH:mm")}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {table.item_count ? (
+                            <Badge variant="secondary">{table.item_count} items</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {table.total_amount ? (
+                            `Rs. ${table.total_amount.toFixed(2)}`
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {table.current_order && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewOrder(table)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </LocalLoader>
         </CardContent>
       </Card>
 

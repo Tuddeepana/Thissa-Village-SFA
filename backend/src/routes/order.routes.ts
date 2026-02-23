@@ -7,6 +7,7 @@ import {
   addItemsToOrder,
   cancelOrder,
   getOrderStats,
+  getTableStatus,
 } from '../controllers/order.controller';
 import { authenticate } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validate.middleware';
@@ -27,6 +28,12 @@ router.use(authenticate);
  * Get order statistics
  */
 router.get('/stats', getOrderStats);
+
+/**
+ * GET /api/orders/table-status
+ * Get table status with current orders
+ */
+router.get('/table-status', getTableStatus);
 
 /**
  * GET /api/orders

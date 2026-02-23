@@ -91,3 +91,19 @@ export const getOrderStats = async (req: Request, res: Response) => {
   const stats = await orderService.getOrderStats();
   res.json({ stats });
 };
+
+/**
+ * Get table status with current orders
+ */
+export const getTableStatus = async (req: Request, res: Response) => {
+  const { status, date_from, date_to } = req.query;
+
+  const result = await orderService.getTableStatus({
+    status: status as 'available' | 'occupied' | 'all' | undefined,
+    date_from: date_from ? new Date(date_from as string) : undefined,
+    date_to: date_to ? new Date(date_to as string) : undefined,
+  });
+
+  res.json(result);
+};
+
