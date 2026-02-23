@@ -176,6 +176,21 @@ const Tables = () => {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="quantity">Quantity</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={formData.quantity}
+                  onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Number of tables to create (e.g., 5 will create Table 1, Table 2, ... Table 5)
+                </p>
+              </div>
               <Button type="submit" className="w-full">Add Table</Button>
             </form>
           </DialogContent>
@@ -194,6 +209,7 @@ const Tables = () => {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead>Quantity</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -212,6 +228,7 @@ const Tables = () => {
                         <Badge variant="secondary">Normal</Badge>
                       )}
                     </TableCell>
+                    <TableCell>{table.quantity}</TableCell>
                     <TableCell>
                       {table.createdAt ? format(new Date(table.createdAt), "PP") : "-"}
                     </TableCell>
