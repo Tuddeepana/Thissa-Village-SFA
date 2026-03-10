@@ -1,5 +1,7 @@
 import { z } from 'zod';
-import { BottleVolume } from '@prisma/client';
+import * as PrismaClient from '@prisma/client';
+// @ts-ignore
+const { BottleVolume } = PrismaClient;
 
 // Coerce string/number inputs into numbers
 const decimalNumber = z.coerce.number();
@@ -7,6 +9,7 @@ const decimalNumber = z.coerce.number();
 export const createProductSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional().nullable(),
+  barcode: z.string().optional().nullable(),
   litres: decimalNumber.min(0, 'Litres must be >= 0'),
   cost_price: decimalNumber.min(0, 'Cost price must be >= 0'),
   selling_price: decimalNumber.min(0, 'Selling price must be >= 0'),

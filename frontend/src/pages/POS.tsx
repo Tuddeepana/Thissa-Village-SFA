@@ -34,6 +34,7 @@ const POS = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [restaurantProducts, setRestaurantProducts] = useState<Product[]>([]);
   const [itemSource, setItemSource] = useState<'bar' | 'restaurant'>('bar');
+  const [customerType, setCustomerType] = useState<'local' | 'foreign'>('local');
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [taxRate, setTaxRate] = useState(0);
   const [discountRate, setDiscountRate] = useState(0);
@@ -41,6 +42,17 @@ const POS = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setPage(1); // Reset to first page when searching
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Fetch products from /api/mystock and map to POS Product shape
   useEffect(() => {
@@ -49,8 +61,19 @@ const POS = () => {
       setLoadingProducts(true);
       try {
         if (itemSource === 'bar') {
+          // Detect if search query looks like a barcode (numeric, >= 8 digits)
+          const isBarcode = debouncedSearchQuery && /^\d{8,}$/.test(debouncedSearchQuery.trim());
+
           const res = await api.get<MyStockResponse>('/mystock', {
-            params: { page, pageSize: PAGE_SIZE },
+            params: {
+              page,
+              pageSize: PAGE_SIZE,
+              // Use barcode param if it looks like a barcode, otherwise use productName
+              ...(isBarcode
+                ? { barcode: debouncedSearchQuery }
+                : { productName: debouncedSearchQuery || undefined }
+              )
+            },
             meta: { showLoader: 'local', loaderKey: 'pos-products' }
           });
           if (cancelled) return;
@@ -64,7 +87,7 @@ const POS = () => {
             stock: r.availableQuantity,
             minStock: r.minStock ?? 0,
             bottleVolume: r.bottle_size ?? undefined,
-            barcode: undefined,
+            barcode: r.barcode ?? undefined,
             image: undefined,
             description: undefined,
             createdAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
@@ -111,7 +134,7 @@ const POS = () => {
     };
     fetchProducts();
     return () => { cancelled = true; };
-  }, [page, itemSource]);
+  }, [page, itemSource, debouncedSearchQuery]);
 
   // Get the current list of products to display based on item source
   const displayProducts = useMemo(() => {
@@ -245,6 +268,20 @@ const POS = () => {
           });
           break;
 
+        case 'r':
+        case 'w':
+          // Toggle between bar and restaurant items
+          e.preventDefault();
+          setItemSource((prev) => {
+            const newSource = prev === 'bar' ? 'restaurant' : 'bar';
+            setPage(1); // Reset to first page
+            toast.success(`Switched to ${newSource === 'bar' ? '🍷 Bar' : '🍴 Restaurant'} items`, {
+              description: `Now viewing ${newSource} products`
+            });
+            return newSource;
+          });
+          break;
+
         default:
           break;
       }
@@ -255,6 +292,12 @@ const POS = () => {
   }, [navigate, isPaymentDialogOpen, billItems.length, handleCompleteBill]);
 
   const handleAddProduct = (product: Product) => {
+    // For restaurant items, ensure customer type is selected first
+    if (product.source === 'restaurant' && !customerType) {
+      toast.error("Please select customer type (Local/Foreign) first!");
+      return;
+    }
+
     // Restaurant items don't have stock checking
     if (product.source === 'bar' && product.stock === 0) {
       toast.error("Product is out of stock!");
@@ -383,7 +426,7 @@ const POS = () => {
           });
           setProducts(updatedProducts);
 
-          completeBillProcess(billNumber, now, paymentMethod, amountPaid, change, customerName, customerPhone, creditDescription, updatedProducts);
+          completeBillProcess(billNumber, now, paymentMethod, amountPaid, change, customerName, customerPhone, creditDescription, updatedProducts, customerType);
         })
         .catch((err) => {
           console.error('Failed to complete bill', err);
@@ -392,7 +435,7 @@ const POS = () => {
         });
     } else {
       // Only restaurant items, no backend call needed for bar system
-      completeBillProcess(billNumber, now, paymentMethod, amountPaid, change, customerName, customerPhone, creditDescription, products);
+      completeBillProcess(billNumber, now, paymentMethod, amountPaid, change, customerName, customerPhone, creditDescription, products, customerType);
     }
   };
 
@@ -405,7 +448,8 @@ const POS = () => {
     customerName?: string,
     customerPhone?: string,
     creditDescription?: string,
-    updatedProducts?: Product[]
+    updatedProducts?: Product[],
+    customerType?: 'local' | 'foreign'
   ) => {
     // Prepare printable bill object
     const bill: Bill = {
@@ -419,6 +463,7 @@ const POS = () => {
       total,
       customerName,
       customerPhone,
+      customerType,
       paymentMethod,
       amountPaid,
       change,
@@ -527,6 +572,9 @@ const POS = () => {
           <Tabs value={itemSource} onValueChange={(value) => {
             setItemSource(value as 'bar' | 'restaurant');
             setPage(1); // Reset to first page when switching
+            if (value === 'restaurant') {
+              setCustomerType('local'); // Default to local when switching to restaurant
+            }
           }}>
             <TabsList className="grid w-full max-w-md grid-cols-2 h-8 md:h-10">
               <TabsTrigger value="bar" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
@@ -539,6 +587,33 @@ const POS = () => {
               </TabsTrigger>
             </TabsList>
           </Tabs>
+
+          {/* Customer Type Selection - Only show for Restaurant */}
+          {itemSource === 'restaurant' && (
+            <div className="mt-3 md:mt-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs md:text-sm font-medium text-muted-foreground">Customer Type:</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 max-w-md">
+                <Button
+                  variant={customerType === 'local' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setCustomerType('local')}
+                  className="h-8 md:h-10 text-xs md:text-sm font-medium"
+                >
+                  🇱🇰 Local
+                </Button>
+                <Button
+                  variant={customerType === 'foreign' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setCustomerType('foreign')}
+                  className="h-8 md:h-10 text-xs md:text-sm font-medium"
+                >
+                  🌍 Foreign
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -557,7 +632,13 @@ const POS = () => {
                 </div>
               </div>
               <LocalLoader loaderKey="pos-products">
-                <ProductSearch ref={searchInputRef} products={displayProducts} onAddProduct={handleAddProduct} />
+                <ProductSearch
+                  ref={searchInputRef}
+                  products={displayProducts}
+                  onAddProduct={handleAddProduct}
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                />
               </LocalLoader>
               {loadingProducts && <p className="text-xs text-muted-foreground mt-2">Loading products...</p>}
             </CardContent>
@@ -581,6 +662,8 @@ const POS = () => {
             onClearBill={handleClearBill}
             onCompleteBill={handleCompleteBill}
             stockWarnings={stockWarnings}
+            customerType={customerType}
+            itemSource={itemSource}
           />
         </div>
       </div>

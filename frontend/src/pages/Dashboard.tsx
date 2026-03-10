@@ -6,15 +6,12 @@ import {
   Bar,
   LineChart,
   Line,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
+  Cell,
 } from "recharts";
 import api from '@/api/client';
 import LocalLoader from '@/components/common/LocalLoader';
@@ -234,38 +231,89 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base md:text-lg">Product Category Distribution</CardTitle>
-        </CardHeader>
-        <CardContent className="px-2 md:px-6">
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie
-                data={categoryData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius={100}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {categoryData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "var(--radius)",
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base md:text-lg">Product Category Distribution</CardTitle>
+            <p className="text-xs md:text-sm text-muted-foreground mt-1">Percentage of products by category</p>
+          </CardHeader>
+          <CardContent className="px-2 md:px-6">
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={categoryData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                <defs>
+                  {categoryData.map((entry, index) => (
+                    <linearGradient key={`gradient-${index}`} id={`colorGradient${index}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={entry.color} stopOpacity={0.9}/>
+                      <stop offset="95%" stopColor={entry.color} stopOpacity={0.6}/>
+                    </linearGradient>
+                  ))}
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+                <XAxis
+                  dataKey="name"
+                  stroke="hsl(var(--muted-foreground))"
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                  tick={{ fontSize: 12 }}
+                />
+                <YAxis
+                  stroke="hsl(var(--muted-foreground))"
+                  label={{ value: 'Percentage (%)', angle: -90, position: 'insideLeft', style: { fontSize: 12 } }}
+                  tick={{ fontSize: 12 }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "var(--radius)",
+                    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+                  }}
+                  formatter={(value: any) => [`${Number(value).toFixed(1)}%`, 'Percentage']}
+                  labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
+                />
+                <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={60}>
+                  {categoryData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={`url(#colorGradient${index})`} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base md:text-lg">Category Summary</CardTitle>
+            <p className="text-xs md:text-sm text-muted-foreground mt-1">Detailed breakdown</p>
+          </CardHeader>
+          <CardContent className="px-2 md:px-6">
+            <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
+              {categoryData.length > 0 ? (
+                categoryData.map((category, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-4 h-4 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: category.color }}
+                      />
+                      <span className="text-sm font-medium text-foreground">{category.name}</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-bold text-foreground">{category.value.toFixed(1)}%</div>
+                      <div className="text-xs text-muted-foreground">of total</div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No category data available
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

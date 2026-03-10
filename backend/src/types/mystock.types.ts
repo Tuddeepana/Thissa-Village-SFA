@@ -13,6 +13,7 @@ export type MyStockTableRow = {
   minStock: number; // low_stock from product
   sellingPrice?: number; // selling price from product (nullable)
   bottle_size?: string | null; // constructed as litres + ' ' + bottle_volume
+  barcode?: string | null; // barcode from product
   status: 'InStock' | 'LowStock' | 'OutOfStock';
   lastUpdatedAt: string | null;
 };
@@ -36,6 +37,7 @@ export type MyStockQuery = {
   page?: number;
   pageSize?: number;
   productName?: string;
+  barcode?: string;
   categoryId?: string;
   status?: 'InStock' | 'LowStock' | 'OutOfStock' | string;
   // When true, return all filtered rows in tableResponse.data (no slicing/pagination)

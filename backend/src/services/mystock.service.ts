@@ -13,7 +13,17 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
   // Build product where filter
   const productWhere: any = {
     AND: [
-      query.productName ? { name: { contains: query.productName, mode: 'insensitive' } } : {},
+      // If either productName or barcode is provided, search accordingly
+      query.productName || query.barcode ? {
+        OR: [
+          // Product name: use contains for flexible matching
+          query.productName ? { name: { contains: query.productName, mode: 'insensitive' } } : null,
+          // Barcode parameter: use startsWith for precise barcode matching
+          query.barcode ? { barcode: { startsWith: query.barcode, mode: 'insensitive' } } : null,
+          // ProductName also searches barcode: use startsWith for barcode-like searches
+          query.productName ? { barcode: { startsWith: query.productName, mode: 'insensitive' } } : null,
+        ].filter(Boolean) // Remove null values
+      } : {},
       query.categoryId ? { categoryId: query.categoryId } : {},
     ],
   };
@@ -56,6 +66,7 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
       minStock: p.low_stock ?? 0,
       sellingPrice: p.selling_price ? Number(p.selling_price) : undefined,
       bottle_size: p.litres !== undefined && p.bottle_volume ? `${String(p.litres)} ${p.bottle_volume.toLowerCase()}` : null,
+      barcode: p.barcode ?? null,
       status,
       lastUpdatedAt: inv ? inv.updatedAt?.toISOString?.() ?? inv.updatedAt : null,
     } as MyStockTableRow;
