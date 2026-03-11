@@ -20,7 +20,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Download, Filter, TrendingUp, DollarSign, Package } from "lucide-react";
-import { format } from "date-fns";
+import { format } from 'date-fns';
+import { LoadingState, TableLoadingState } from '@/components/common/LoadingState';
 import LocalLoader from '@/components/common/LocalLoader';
 import { Skeleton } from '@/components/ui/skeleton';
 import { salesSummaryService } from '@/api/services/salesSummaryService';

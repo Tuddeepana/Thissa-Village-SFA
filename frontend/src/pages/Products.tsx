@@ -21,8 +21,7 @@ import {
 import { Pencil, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { DeleteButton, BarcodeScanner } from "@/components/common";
-import LocalLoader from "@/components/common/LocalLoader";
+import { DeleteButton, TableLoadingState, BarcodeScanner } from "@/components/common";
 import {
   useGetProductsQuery,
   useCreateProductMutation,
@@ -357,7 +356,6 @@ const Products = () => {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
-                    <LocalLoader loading={productsLoading}>
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -372,7 +370,16 @@ const Products = () => {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {products.map((product) => (
+                            {productsLoading ? (
+                                <TableLoadingState colSpan={8} message="Loading products..." />
+                            ) : products.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                                        No products found
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                            products.map((product) => (
                                 <TableRow key={product.id}>
                                     <TableCell className="font-medium">{product.name}</TableCell>
                                     <TableCell>{categoryNameById[product.categoryId] ?? "-"}</TableCell>
@@ -474,10 +481,11 @@ const Products = () => {
                                         </div>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            ))
+                            )}
                         </TableBody>
                     </Table>
-                    </LocalLoader>
+
                     {/* Pagination */}
                     {totalPages > 1 && (
                         <div className="flex items-center justify-between gap-3 mt-4">

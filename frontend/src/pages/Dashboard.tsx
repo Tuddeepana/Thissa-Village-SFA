@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { useGetDashboardSummaryQuery } from '@/store/api/dashboardApi';
 import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState } from '@/components/common/LoadingState';
 
 // color palette for pie slices
 const COLOR_VARS = [

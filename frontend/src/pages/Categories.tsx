@@ -15,7 +15,7 @@ import { Pencil, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { DeleteButton } from "@/components/common";
+import { DeleteButton, LoadingState, TableLoadingState } from "@/components/common";
 import LocalLoader from "@/components/common/LocalLoader";
 import {
   useGetCategoriesQuery,
@@ -30,7 +30,7 @@ const Categories = () => {
   const { toast } = useToast();
 
   // RTK Query hooks
-  const { data: categoriesData } = useGetCategoriesQuery({ limit: 100 });
+  const { data: categoriesData, isLoading } = useGetCategoriesQuery({ limit: 100 });
   const [createCategory] = useCreateCategoryMutation();
   const [updateCategory] = useUpdateCategoryMutation();
   const [deleteCategory] = useDeleteCategoryMutation();
@@ -140,9 +140,8 @@ const Categories = () => {
         <CardHeader>
           <CardTitle className="text-base md:text-lg">All Categories</CardTitle>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
-          <LocalLoader loaderKey="categories">
-            <Table>
+        <CardContent>
+          <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
@@ -152,7 +151,16 @@ const Categories = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {categories.map((category) => (
+              {isLoading ? (
+                <TableLoadingState colSpan={4} message="Loading categories..." />
+              ) : categories.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    No categories found
+                  </TableCell>
+                </TableRow>
+              ) : (
+              categories.map((category) => (
                 <TableRow key={category.id}>
                   <TableCell className="font-medium">{category.name}</TableCell>
                   <TableCell>{category.description ?? '-'}</TableCell>
@@ -169,10 +177,10 @@ const Categories = () => {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              ))
+              )}
             </TableBody>
-            </Table>
-          </LocalLoader>
+          </Table>
         </CardContent>
       </Card>
 

@@ -57,6 +57,7 @@ import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import { printBillNewWindow } from "@/lib/billPrinter";
 import { STORAGE_KEYS } from "@/utils/constants";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LoadingState } from "@/components/common/LoadingState";
 
 const Bills = () => {
   const navigate = useNavigate();
@@ -486,9 +487,7 @@ const Bills = () => {
         </CardHeader>
         <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
           {isLoading ? (
-            <div className="py-8 flex items-center justify-center">
-              <div>Loading bills...</div>
-            </div>
+            <LoadingState message="Loading bills..." />
           ) : (
             <>
               {/* Desktop Table */}

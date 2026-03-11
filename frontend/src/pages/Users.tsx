@@ -45,7 +45,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { DeleteButton } from "@/components/common";
+import { DeleteButton, LoadingState, TableLoadingState } from "@/components/common";
 import {
   useGetUsersQuery,
   useRegisterMutation,
@@ -69,7 +69,7 @@ const Users = () => {
   const itemsPerPage = 10;
 
   // RTK Query hooks
-  const { data: usersData } = useGetUsersQuery({
+  const { data: usersData, isLoading } = useGetUsersQuery({
     search: searchQuery || undefined,
     role: roleFilter !== "all" ? toBackendRole(roleFilter as "admin" | "cashier") : undefined,
     status: toBackendStatus(statusFilter),
@@ -416,7 +416,9 @@ const Users = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedUsers.length === 0 ? (
+                {isLoading ? (
+                  <TableLoadingState colSpan={7} message="Loading users..." />
+                ) : paginatedUsers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
                       <div className="flex flex-col items-center gap-2 text-muted-foreground">
