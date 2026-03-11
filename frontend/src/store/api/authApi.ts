@@ -18,13 +18,14 @@ export const authApiSlice = apiSlice.injectEndpoints({
         body: credentials,
       }),
       invalidatesTags: ['Auth'],
-      transformResponse: (response: { success: boolean; data: AuthResponse } | AuthResponse) => {
+      transformResponse: (response: unknown): AuthResponse => {
+        const resp = response as { success: boolean; data: AuthResponse } | AuthResponse;
         // Backend returns { success: true, data: { user, token } }
         // Extract the nested data
-        if ('data' in response && response.data) {
-          return response.data;
+        if (resp && typeof resp === 'object' && 'data' in resp && resp.data) {
+          return resp.data;
         }
-        return response;
+        return resp as AuthResponse;
       },
     }),
 
@@ -58,8 +59,9 @@ export const userApiSlice = apiSlice.injectEndpoints({
         params,
       }),
       providesTags: ['User'],
-      transformResponse: (response: any) => {
-        const payload = response.data || response;
+      transformResponse: (response: unknown) => {
+        const resp = response as any;
+        const payload = resp.data || resp;
         const items = Array.isArray(payload)
           ? payload
           : (payload?.items ?? payload?.data ?? []);
