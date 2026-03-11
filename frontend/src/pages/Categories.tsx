@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,14 +17,25 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { DeleteButton } from "@/components/common";
 import LocalLoader from "@/components/common/LocalLoader";
-import { useQuery } from "@tanstack/react-query";
-import { categoryService } from "@/api/services/categoryService";
+import {
+  useGetCategoriesQuery,
+  useCreateCategoryMutation,
+  useUpdateCategoryMutation,
+  useDeleteCategoryMutation
+} from "@/store/api/categoriesApi";
 import type { Category } from "@/types/category.types";
 import { format } from "date-fns";
 
 const Categories = () => {
   const { toast } = useToast();
-  const [categories, setCategories] = useState<Category[]>([]);
+
+  // RTK Query hooks
+  const { data: categoriesData } = useGetCategoriesQuery({ limit: 100 });
+  const [createCategory] = useCreateCategoryMutation();
+  const [updateCategory] = useUpdateCategoryMutation();
+  const [deleteCategory] = useDeleteCategoryMutation();
+
+  const categories = categoriesData?.items ?? [];
 
   const [formData, setFormData] = useState({ name: "", description: "" });
   const [open, setOpen] = useState(false);
@@ -32,39 +43,27 @@ const Categories = () => {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [editForm, setEditForm] = useState({ name: "", description: "" });
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const { categories } = await categoryService.list({ page: 1, limit: 100 });
-      return categories;
-    },
-    staleTime: 10_000,
-  });
-
-  useEffect(() => {
-    if (data) setCategories(data);
-  }, [data]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await categoryService.create({ name: formData.name, description: formData.description || undefined });
+      await createCategory({ name: formData.name, description: formData.description || undefined }).unwrap();
       toast({ title: "Success", description: "Category added successfully" });
       setFormData({ name: "", description: "" });
       setOpen(false);
-      refetch();
-    } catch (err: any) {
-      toast({ title: "Error", description: err?.response?.data?.message ?? "Failed to add category" });
+    } catch (err: unknown) {
+      const error = err as { data?: { message?: string } };
+      toast({ title: "Error", description: error?.data?.message ?? "Failed to add category" });
     }
   };
 
   const handleDelete = async (id: string) => {
     try {
-      await categoryService.softDelete(id);
+      await deleteCategory(id).unwrap();
       toast({ title: "Deleted", description: "Category removed successfully" });
-      refetch();
-    } catch (err: any) {
-      toast({ title: "Error", description: err?.response?.data?.message ?? "Failed to remove category" });
+    } catch (err: unknown) {
+      const error = err as { data?: { message?: string } };
+      toast({ title: "Error", description: error?.data?.message ?? "Failed to remove category" });
     }
   };
 
@@ -78,16 +77,19 @@ const Categories = () => {
     e.preventDefault();
     if (!selectedCategory) return;
     try {
-      await categoryService.update(selectedCategory.id, {
-        name: editForm.name,
-        description: editForm.description || null,
-      });
+      await updateCategory({
+        id: selectedCategory.id,
+        data: {
+          name: editForm.name,
+          description: editForm.description || null,
+        }
+      }).unwrap();
       toast({ title: "Updated", description: "Category updated successfully" });
       setEditOpen(false);
       setSelectedCategory(null);
-      refetch();
-    } catch (err: any) {
-      toast({ title: "Error", description: err?.response?.data?.message ?? "Failed to update category" });
+    } catch (err: unknown) {
+      const error = err as { data?: { message?: string } };
+      toast({ title: "Error", description: error?.data?.message ?? "Failed to update category" });
     }
   };
 

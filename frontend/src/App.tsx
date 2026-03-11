@@ -1,7 +1,8 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Provider } from "react-redux";
+import { store } from "@/store";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Auth from "./pages/Auth";
 import ModuleSelection from "./pages/ModuleSelection";
@@ -20,10 +21,6 @@ import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import { STORAGE_KEYS } from "./utils/constants";
-import { LoadingProvider } from "@/state/loadingProvider";
-import GlobalLoaderOverlay from "@/components/common/GlobalLoaderOverlay";
-
-const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = localStorage.getItem(STORAGE_KEYS.isAuthenticated);
@@ -41,13 +38,11 @@ const ModuleRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
+  <Provider store={store}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <LoadingProvider>
-        <GlobalLoaderOverlay />
-        <BrowserRouter>
+      <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
           <Route
@@ -82,10 +77,9 @@ const App = () => (
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
-        </BrowserRouter>
-      </LoadingProvider>
+      </BrowserRouter>
     </TooltipProvider>
-  </QueryClientProvider>
+  </Provider>
 );
 
 export default App;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,30 +23,58 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from "@/hooks/use-toast";
 import { DeleteButton, BarcodeScanner } from "@/components/common";
 import LocalLoader from "@/components/common/LocalLoader";
-import { useQuery } from "@tanstack/react-query";
-import { productService } from "@/api/services/productService";
-import { categoryService } from "@/api/services/categoryService";
+import {
+  useGetProductsQuery,
+  useCreateProductMutation,
+  useUpdateProductMutation,
+  useDeleteProductMutation
+} from "@/store/api/productsApi";
+import {
+  useGetCategoriesQuery
+} from "@/store/api/categoriesApi";
 import type { Product } from "@/types/product.types";
-import type { Category } from "@/types/category.types";
-
-// Result shape returned by productService.list
-type ProductListResult = {
-    items: Product[];
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-};
 
 const Products = () => {
     const { toast } = useToast();
-    const [products, setProducts] = useState<Product[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
+
+    // Local state for pagination and filters
+    const [page, setPage] = useState(1);
+    const [search, setSearch] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState("");
+    const limit = 10;
+
+    // RTK Query hooks
+    const {
+        data: productsData,
+        isLoading: productsLoading,
+        refetch: refetchProducts
+    } = useGetProductsQuery({
+        page,
+        limit,
+        search: search || undefined,
+        categoryId: selectedCategory || undefined
+    });
+
+    const {
+        data: categoriesData,
+        isLoading: categoriesLoading
+    } = useGetCategoriesQuery({});
+
+    const [createProduct] = useCreateProductMutation();
+    const [updateProduct] = useUpdateProductMutation();
+    const [deleteProduct] = useDeleteProductMutation();
+
+    const products = productsData?.items ?? [];
+    const categories = categoriesData?.items ?? [];
     const categoryNameById = useMemo(() => {
         const map: Record<string, string> = {};
         categories.forEach(c => { if (c.id) map[c.id] = c.name; });
         return map;
     }, [categories]);
+
+    // Derived pagination values
+    const totalPages = productsData?.totalPages ?? 1;
+    const total = productsData?.total ?? 0;
 
     const [open, setOpen] = useState(false);
 
@@ -71,11 +99,11 @@ const Products = () => {
 
     const handleDelete = async (id: string) => {
         try {
-            await productService.delete(id);
+            await deleteProduct(id).unwrap();
             toast({ title: "Deleted", description: "Product removed successfully" });
-            refetchProducts();
-        } catch (e: any) {
-            toast({ title: "Error", description: e?.response?.data?.message ?? "Failed to delete product" });
+        } catch (e: unknown) {
+            const error = e as { data?: { message?: string } };
+            toast({ title: "Error", description: error?.data?.message ?? "Failed to delete product" });
         }
     };
 
@@ -110,13 +138,6 @@ const Products = () => {
         setEditingBarcode(""); // Clear barcode on cancel
     };
 
-    const toLitresString = (sizeStr: string, unit: string) => {
-        const size = Number.parseFloat(sizeStr);
-        if (Number.isNaN(size)) return "0.00";
-        const litres = unit === "ml" ? size / 1000 : size;
-        return litres.toFixed(2);
-    };
-
     const saveEditing = async () => {
         if (editingId == null) return;
         const alertLevel = typeof editingLow === "number" ? editingLow : Number.parseInt(String(editingLow || "0"), 10);
@@ -126,14 +147,17 @@ const Products = () => {
         const unitToEnum = (unit: string) => (String(unit).toLowerCase() === "l" ? "L" : "ML");
         const bottle_volume = unitToEnum(editingBottleUnit);
         try {
-            await productService.update(editingId, {
-                low_stock: Number.isNaN(alertLevel) ? 0 : alertLevel,
-                cost_price: Number.isNaN(costPriceNum) ? undefined : costPriceNum.toFixed(2),
-                selling_price: Number.isNaN(sellingPriceNum) ? undefined : sellingPriceNum.toFixed(2),
-                litres: litresStr,
-                bottle_volume,
-                barcode: editingBarcode || null,
-            });
+            await updateProduct({
+                id: editingId,
+                data: {
+                    low_stock: Number.isNaN(alertLevel) ? 0 : alertLevel,
+                    cost_price: Number.isNaN(costPriceNum) ? undefined : costPriceNum.toFixed(2),
+                    selling_price: Number.isNaN(sellingPriceNum) ? undefined : sellingPriceNum.toFixed(2),
+                    litres: litresStr,
+                    bottle_volume,
+                    barcode: editingBarcode || null,
+                }
+            }).unwrap();
             toast({ title: "Updated", description: "Product details updated" });
             setEditingId(null);
             setEditingLow("");
@@ -142,9 +166,9 @@ const Products = () => {
             setEditingBottleSize("");
             setEditingBottleUnit("ml");
             setEditingBarcode("");
-            refetchProducts();
-        } catch (e: any) {
-            toast({ title: "Error", description: e?.response?.data?.message ?? "Failed to update product" });
+        } catch (e: unknown) {
+            const error = e as { data?: { message?: string } };
+            toast({ title: "Error", description: error?.data?.message ?? "Failed to update product" });
         }
     };
 
@@ -158,43 +182,6 @@ const Products = () => {
         setNewBottleUnit("ml");
         setNewBarcode("");
     };
-
-    // Pagination
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
-
-    // Fetch products with pagination
-    const { data: productResult, refetch: refetchProducts, isFetching } = useQuery<ProductListResult,Error, ProductListResult>({
-        queryKey: ["products", { page: currentPage, limit: itemsPerPage }],
-        queryFn: async () => productService.list({ page: currentPage, limit: itemsPerPage }),
-        staleTime: 10_000,
-        keepPreviousData: true,
-    });
-
-    useEffect(() => {
-        if (productResult?.items) setProducts(productResult.items);
-    }, [productResult]);
-
-    // Derived pagination values with safe typing
-    const pr = productResult as ProductListResult | undefined;
-    const page = pr?.page ?? currentPage;
-    const limit = pr?.limit ?? itemsPerPage;
-    const total = pr?.total ?? (products?.length ?? 0);
-    const totalPages = pr?.totalPages ?? Math.max(1, Math.ceil((total || 1) / (limit || 1)));
-
-    // Fetch categories for select and name mapping
-    const { data: categoryList } = useQuery({
-        queryKey: ["categories-all"],
-        queryFn: async () => {
-            const { categories } = await categoryService.list();
-            return categories;
-        },
-        staleTime: 30_000,
-    });
-
-    useEffect(() => {
-        if (categoryList) setCategories(categoryList);
-    }, [categoryList]);
 
     const handleAddSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -220,7 +207,7 @@ const Products = () => {
         const litresStr = String(newBottleSize).trim() || "0";
 
         try {
-            await productService.create({
+            await createProduct({
                 name: newName.trim(),
                 litres: litresStr,
                 cost_price: Number.isNaN(costPrice) ? "0.00" : costPrice.toFixed(2),
@@ -229,13 +216,13 @@ const Products = () => {
                 bottle_volume,
                 categoryId: newCategory,
                 barcode: newBarcode || null,
-            });
+            }).unwrap();
             toast({ title: "Added", description: "Product added successfully" });
             resetForm();
             setOpen(false);
-            refetchProducts();
-        } catch (e: any) {
-            toast({ title: "Error", description: e?.response?.data?.message ?? "Failed to add product" });
+        } catch (e: unknown) {
+            const error = e as { data?: { message?: string } };
+            toast({ title: "Error", description: error?.data?.message ?? "Failed to add product" });
         }
     };
 
@@ -370,7 +357,7 @@ const Products = () => {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
-                    <LocalLoader loaderKey="products">
+                    <LocalLoader loading={productsLoading}>
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -501,8 +488,8 @@ const Products = () => {
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                                    disabled={isFetching || page === 1}
+                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    disabled={productsLoading || page === 1}
                                 >
                                     <ChevronLeft className="h-4 w-4" />
                                     Previous
@@ -513,8 +500,8 @@ const Products = () => {
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                                    disabled={isFetching || page === totalPages}
+                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                    disabled={productsLoading || page === totalPages}
                                 >
                                     Next
                                     <ChevronRight className="h-4 w-4" />

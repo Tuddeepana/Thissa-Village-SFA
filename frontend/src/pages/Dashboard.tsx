@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, TrendingUp, Package, AlertCircle } from "lucide-react";
 import {
@@ -13,8 +13,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import api from '@/api/client';
-import LocalLoader from '@/components/common/LocalLoader';
+import { useGetDashboardSummaryQuery } from '@/store/api/dashboardApi';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // color palette for pie slices
@@ -33,63 +32,41 @@ const MONTH_KEYS = ['jan','feb','march','april','may','june','july','aug','sep',
 const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 const Dashboard = () => {
-  const [weeklyData, setWeeklyData] = useState<Array<{ day: string; income: number }>>([]);
-  const [monthlyData, setMonthlyData] = useState<Array<{ month: string; revenue: number }>>([]);
-  const [categoryData, setCategoryData] = useState<Array<{ name: string; value: number; color: string }>>([]);
+  // Use RTK Query to fetch dashboard data
+  const { data: dashboardData, isLoading, error } = useGetDashboardSummaryQuery();
 
-  const [weeklyIncome, setWeeklyIncome] = useState<string>('0');
-  const [monthlyIncome, setMonthlyIncome] = useState<string>('0');
-  const [totalProducts, setTotalProducts] = useState<number>(0);
-  const [lowStockCount, setLowStockCount] = useState<number>(0);
+  // Memoize computed values
+  const weeklyData = useMemo(() => {
+    if (!dashboardData?.weeklyIncomeResponse) return [];
+    const wResp = dashboardData.weeklyIncomeResponse;
+    return DAY_ORDER.map((key, idx) => ({
+      day: DAY_LABELS[idx],
+      income: Number(wResp[key] ?? '0'),
+    }));
+  }, [dashboardData?.weeklyIncomeResponse]);
 
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const monthlyData = useMemo(() => {
+    if (!dashboardData?.monthlyIncomeResponse) return [];
+    const mResp = dashboardData.monthlyIncomeResponse;
+    return MONTH_KEYS.map((k, idx) => ({
+      month: MONTH_LABELS[idx],
+      revenue: Number(mResp[k] ?? '0'),
+    }));
+  }, [dashboardData?.monthlyIncomeResponse]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-  const resp = await api.get('/dashboard/summary', { meta: { showLoader: 'local', loaderKey: 'dashboard-stats' } });
-        const payload = resp.data?.response ?? resp.data;
+  const categoryData = useMemo(() => {
+    if (!dashboardData?.categoryDistribution) return [];
+    return dashboardData.categoryDistribution.map((c, i) => ({
+      name: c.categoryName,
+      value: c.percentage,
+      color: COLOR_VARS[i % COLOR_VARS.length],
+    }));
+  }, [dashboardData?.categoryDistribution]);
 
-        if (cancelled) return;
-
-        // Stats
-        setWeeklyIncome(payload.weeklyIncome ?? '0');
-        setMonthlyIncome(payload.monthlyIncome ?? '0');
-        setTotalProducts(Number(payload.TotalProduct ?? 0));
-        setLowStockCount((payload.lowStockItems ?? []).length ?? 0);
-
-        // Weekly chart mapping
-        const wResp = payload.weeklyIncomeResponse ?? {};
-        const wData = DAY_ORDER.map((key, idx) => ({
-          day: DAY_LABELS[idx],
-          income: Number((wResp[key] ?? '0')),
-        }));
-        setWeeklyData(wData);
-
-        // Monthly mapping
-        const mResp = payload.monthlyIncomeResponse ?? {};
-        const mData = MONTH_KEYS.map((k, idx) => ({ month: MONTH_LABELS[idx], revenue: Number(mResp[k] ?? '0') }));
-        setMonthlyData(mData);
-
-        // Category distribution
-        const cat = payload.categoryDistribution ?? [];
-        const mappedCats = (cat as any[]).map((c, i) => ({ name: c.categoryName ?? c.name, value: Number(c.percentage ?? c.value ?? 0), color: COLOR_VARS[i % COLOR_VARS.length] }));
-        setCategoryData(mappedCats);
-      } catch (err: any) {
-        console.error('Failed to load dashboard summary', err);
-        setError(err?.response?.data?.message ?? err.message ?? 'Failed to load data');
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    fetchData();
-    return () => { cancelled = true; };
-  }, []);
+  const weeklyIncome = dashboardData?.weeklyIncome ?? '0';
+  const monthlyIncome = dashboardData?.monthlyIncome ?? '0';
+  const totalProducts = dashboardData?.TotalProduct ?? 0;
+  const lowStockCount = dashboardData?.lowStockItems?.length ?? 0;
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -99,82 +76,80 @@ const Dashboard = () => {
       </div>
 
       {error && (
-        <div className="text-sm text-destructive">Error loading dashboard: {error}</div>
+        <div className="text-sm text-destructive">
+          Error loading dashboard: {typeof error === 'object' && 'message' in error ? String(error.message) : 'Failed to load data'}
+        </div>
       )}
 
-      {/* Stat Cards with Loader */}
-      <LocalLoader
-        loaderKey="dashboard-stats"
-        renderSkeleton={() => (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i}>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-4" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-6 w-28" />
-                  <Skeleton className="h-3 w-24 mt-2" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      >
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Weekly Income</CardTitle>
-            <DollarSign className="h-4 w-4 text-accent" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">Rs.{Number(weeklyIncome || '0').toFixed(2)}</div>
-            <p className="text-xs text-success flex items-center gap-1 mt-1">
-              <TrendingUp className="h-3 w-3" />
-              {/* Placeholder percent; could be derived from previous week */}
-              +{weeklyData.length ? Math.round(((weeklyData.reduce((s, d) => s + d.income, 0) / (weeklyData.length || 1)) / 100) * 100) : 0}% from last week
-            </p>
-          </CardContent>
-        </Card>
+      {/* Stat Cards with Loading */}
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-4" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-6 w-28" />
+                <Skeleton className="h-3 w-24 mt-2" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Weekly Income</CardTitle>
+              <DollarSign className="h-4 w-4 text-accent" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">Rs.{Number(weeklyIncome || '0').toFixed(2)}</div>
+              <p className="text-xs text-success flex items-center gap-1 mt-1">
+                <TrendingUp className="h-3 w-3" />
+                +{weeklyData.length ? Math.round(((weeklyData.reduce((s, d) => s + d.income, 0) / (weeklyData.length || 1)) / 100) * 100) : 0}% from last week
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Revenue</CardTitle>
-            <TrendingUp className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">Rs.{Number(monthlyIncome || '0').toFixed(2)}</div>
-            <p className="text-xs text-success flex items-center gap-1 mt-1">
-              <TrendingUp className="h-3 w-3" />
-              +{monthlyData.length ? Math.round(((monthlyData.reduce((s, d) => s + d.revenue, 0) / (monthlyData.length || 1)) / 100) * 100) : 0}% from last month
-            </p>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Revenue</CardTitle>
+              <TrendingUp className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">Rs.{Number(monthlyIncome || '0').toFixed(2)}</div>
+              <p className="text-xs text-success flex items-center gap-1 mt-1">
+                <TrendingUp className="h-3 w-3" />
+                +{monthlyData.length ? Math.round(((monthlyData.reduce((s, d) => s + d.revenue, 0) / (monthlyData.length || 1)) / 100) * 100) : 0}% from last month
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Products</CardTitle>
-            <Package className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{totalProducts}</div>
-            <p className="text-xs text-muted-foreground mt-1">Across categories</p>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Products</CardTitle>
+              <Package className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">{totalProducts}</div>
+              <p className="text-xs text-muted-foreground mt-1">Across categories</p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Low Stock Items</CardTitle>
-            <AlertCircle className="h-4 w-4 text-warning" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-warning">{lowStockCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">Require attention</p>
-          </CardContent>
-        </Card>
-      </div>
-      </LocalLoader>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Low Stock Items</CardTitle>
+              <AlertCircle className="h-4 w-4 text-warning" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-warning">{lowStockCount}</div>
+              <p className="text-xs text-muted-foreground mt-1">Require attention</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Charts */}
       <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
@@ -269,7 +244,7 @@ const Dashboard = () => {
                     borderRadius: "var(--radius)",
                     boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
                   }}
-                  formatter={(value: any) => [`${Number(value).toFixed(1)}%`, 'Percentage']}
+                  formatter={(value: number | string) => [`${Number(value).toFixed(1)}%`, 'Percentage']}
                   labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
                 />
                 <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={60}>

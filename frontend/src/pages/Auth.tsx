@@ -6,15 +6,19 @@ import { Label } from "@/components/ui/label";
 import { Wine } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { authService } from "@/api/services/authService";
-import { STORAGE_KEYS } from "@/utils/constants";
+import { useLoginMutation } from "@/store/api/authApi";
+import { useAppDispatch } from "@/store/hooks";
+import { setCredentials } from "@/store/slices/authSlice";
 
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const dispatch = useAppDispatch();
+
+  const [login, { isLoading }] = useLoginMutation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,15 +28,32 @@ const Auth = () => {
         toast({ title: "Info", description: "Sign up not implemented. Use an admin to register." });
         return;
       }
-      const res = await authService.login({ email, password });
-      console.log("Login response:", email,password, res);
-      localStorage.setItem(STORAGE_KEYS.isAuthenticated, "true");
-      localStorage.setItem(STORAGE_KEYS.token, res.token);
-      localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(res.user));
+      const res = await login({ email, password }).unwrap();
+
+      // Comprehensive debug logging
+      console.log("=== LOGIN DEBUG ===");
+      console.log("Full response:", res);
+      console.log("User object:", res.user);
+      console.log("User role:", res.user?.role);
+      console.log("Token:", res.token);
+      console.log("==================");
+
+      // Dispatch to Redux store
+      dispatch(setCredentials({
+        user: res.user,
+        token: res.token
+      }));
+
+      // Verify Redux store after dispatch
+      console.log("=== AFTER REDUX DISPATCH ===");
+      console.log("localStorage authUser:", localStorage.getItem('authUser'));
+      console.log("============================");
+
       toast({ title: "Welcome!", description: "Successfully logged in" });
       navigate("/modules");
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || "Invalid credentials";
+    } catch (err: unknown) {
+      const error = err as { data?: { message?: string } };
+      const msg = error?.data?.message || "Invalid credentials";
       toast({ title: "Login failed", description: msg, variant: "destructive" });
     }
   };
@@ -75,8 +96,8 @@ const Auth = () => {
                 required
               />
             </div>
-            <Button type="submit" className="w-full" size="lg">
-              {isLogin ? "Sign In" : "Create Account"}
+            <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+              {isLoading ? "Signing In..." : (isLogin ? "Sign In" : "Create Account")}
             </Button>
           </form>
 

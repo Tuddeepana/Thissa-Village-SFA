@@ -1,13 +1,38 @@
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { STORAGE_KEYS, ROLES } from "@/utils/constants";
-import { User } from "@/types/user.types";
+import { useAppSelector } from "@/store/hooks";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wine, ShoppingCart, LayoutDashboard, Package, FileText, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const ModuleSelection = () => {
   const navigate = useNavigate();
+
+  // Get user from Redux store
+  const reduxUser = useAppSelector((state) => state.auth.user);
+
+  // Fallback to localStorage if Redux state is not available
+  const authUser = useMemo(() => {
+    if (reduxUser) return reduxUser;
+
+    const raw = localStorage.getItem(STORAGE_KEYS.user);
+    try {
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, [reduxUser]);
+
+  // Debug logging
+  useEffect(() => {
+    console.log("ModuleSelection - Auth User:", authUser);
+    console.log("ModuleSelection - User Role:", authUser?.role);
+    console.log("ModuleSelection - Is Admin:", authUser?.role === ROLES.ADMIN);
+    console.log("ModuleSelection - Redux User:", reduxUser);
+  }, [authUser, reduxUser]);
+
+  const isAdmin = authUser?.role === ROLES.ADMIN;
 
   const handleModuleSelect = (module: string) => {
     localStorage.setItem(STORAGE_KEYS.selectedModule, module);
@@ -26,11 +51,6 @@ const ModuleSelection = () => {
     navigate("/auth");
   };
 
-  const authUser = useMemo<User | null>(() => {
-    const raw = localStorage.getItem(STORAGE_KEYS.user);
-    try { return raw ? (JSON.parse(raw) as User) : null; } catch { return null; }
-  }, []);
-  const isAdmin = authUser?.role === ROLES.ADMIN;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/20 to-background p-4">

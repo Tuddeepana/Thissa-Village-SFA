@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,25 +46,43 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { DeleteButton } from "@/components/common";
-import { useQuery } from "@tanstack/react-query";
-import { userService } from "@/api/services/userService";
+import {
+  useGetUsersQuery,
+  useRegisterMutation,
+  useUpdateUserMutation,
+  usePermanentDeleteUserMutation
+} from "@/store/api/authApi";
 import type { User, Role } from "@/types/user.types";
 
 // Helper mappers for role/status casing
 const toBackendRole = (role: "admin" | "cashier"): Role =>
   role === "admin" ? "ADMIN" : "CASHIER";
-const toUIRole = (role: Role): "admin" | "cashier" =>
-  role === "ADMIN" ? "admin" : "cashier";
 const toBackendStatus = (status: string | undefined) =>
   status === "active" ? "Active" : status === "inactive" ? "Inactive" : undefined;
 
 const Users = () => {
-  const [users, setUsers] = useState<User[]>([]);
+  // Filter and pagination state
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  // RTK Query hooks
+  const { data: usersData } = useGetUsersQuery({
+    search: searchQuery || undefined,
+    role: roleFilter !== "all" ? toBackendRole(roleFilter as "admin" | "cashier") : undefined,
+    status: toBackendStatus(statusFilter),
+    page: currentPage,
+    limit: itemsPerPage,
+  });
+
+  const [registerUser] = useRegisterMutation();
+  const [updateUser] = useUpdateUserMutation();
+  const [permanentDeleteUser] = usePermanentDeleteUserMutation();
+
+  // Memoize users array to prevent useMemo dependency issues
+  const users = useMemo(() => usersData?.items ?? [], [usersData?.items]);
 
   // Dialog states
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -80,21 +98,11 @@ const Users = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   // Filter users (server applies most filters; local guard remains for UI-side checks)
-  const filteredUsers = useMemo(() => {
-    return users.filter((user) => {
-      if (roleFilter !== "all" && toUIRole(user.role) !== roleFilter) return false;
-      if (statusFilter === "active" && user.status !== "Active") return false;
-      if (statusFilter === "inactive" && user.status !== "Inactive") return false;
-      return true;
-    });
-  }, [users, roleFilter, statusFilter]);
+  const filteredUsers = users; // RTK Query already filters on server
 
-  // Pagination
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
-  const paginatedUsers = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredUsers.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredUsers, currentPage]);
+  // Use server-side pagination
+  const totalPages = usersData?.totalPages ?? 1;
+  const paginatedUsers = users; // Already paginated by server
 
   // Statistics
   const stats = useMemo(() => {
@@ -121,19 +129,19 @@ const Users = () => {
       return;
     }
     try {
-      await userService.registerUser({
+      await registerUser({
         email: formEmail,
         password: formPassword,
         name: formName,
         nic: formNic,
         role: toBackendRole(formRole),
-      });
+      }).unwrap();
       toast.success("User created successfully!");
       setIsAddDialogOpen(false);
       resetForm();
-      refetch();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message ?? "Failed to create user");
+    } catch (e: unknown) {
+      const error = e as { data?: { message?: string } };
+      toast.error(error?.data?.message ?? "Failed to create user");
     }
   };
 
@@ -144,20 +152,23 @@ const Users = () => {
       return;
     }
     try {
-      await userService.updateUser(selectedUser.id, {
-        email: formEmail,
-        password: formPassword || undefined,
-        name: formName,
-        nic: formNic,
-        role: toBackendRole(formRole),
-      });
+      await updateUser({
+        id: selectedUser.id,
+        data: {
+          email: formEmail,
+          password: formPassword || undefined,
+          name: formName,
+          nic: formNic,
+          role: toBackendRole(formRole),
+        }
+      }).unwrap();
       toast.success("User updated successfully!");
       setIsEditDialogOpen(false);
       setSelectedUser(null);
       resetForm();
-      refetch();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message ?? "Failed to update user");
+    } catch (e: unknown) {
+      const error = e as { data?: { message?: string } };
+      toast.error(error?.data?.message ?? "Failed to update user");
     }
   };
 
@@ -166,21 +177,24 @@ const Users = () => {
     if (!user) return;
     const nextStatus = user.status === "Active" ? "Inactive" : "Active";
     try {
-      await userService.updateUser(userId, { status: nextStatus });
+      await updateUser({
+        id: userId,
+        data: { status: nextStatus }
+      }).unwrap();
       toast.success(`User ${nextStatus === 'Active' ? 'activated' : 'deactivated'} successfully!`);
-      refetch();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message ?? "Failed to update status");
+    } catch (e: unknown) {
+      const error = e as { data?: { message?: string } };
+      toast.error(error?.data?.message ?? "Failed to update status");
     }
   };
 
   const handleDeleteUser = async (userId: string) => {
     try {
-      await userService.permanentlyDeleteUser(userId);
+      await permanentDeleteUser(userId).unwrap();
       toast.success("User deleted successfully!");
-      refetch();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message ?? "Failed to delete user");
+    } catch (e: unknown) {
+      const error = e as { data?: { message?: string } };
+      toast.error(error?.data?.message ?? "Failed to delete user");
     }
   };
 
@@ -201,28 +215,6 @@ const Users = () => {
     setCurrentPage(1);
   };
 
-  // Fetch users from backend when filters change
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: [
-      "users",
-      { searchQuery, roleFilter, statusFilter },
-    ],
-    queryFn: async () => {
-      const { users, count } = await userService.listUsers({
-        search: searchQuery || undefined,
-        role: roleFilter !== "all" ? toBackendRole(roleFilter as "admin" | "cashier") : undefined,
-        status: toBackendStatus(statusFilter),
-      });
-      return { users, count };
-    },
-    staleTime: 10_000,
-  });
-
-  useEffect(() => {
-    if (data?.users) {
-      setUsers(data.users);
-    }
-  }, [data]);
 
   const getRoleBadge = (role: Role) => {
     if (role === "ADMIN") {
