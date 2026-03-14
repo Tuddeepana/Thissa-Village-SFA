@@ -1,0 +1,3 @@
+# This file is part of Prisma Migrate.
+# It will be ignored since the repo already has a top-level migration_lock.toml.
+# (intentionally left blank)

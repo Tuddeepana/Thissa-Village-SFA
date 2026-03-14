@@ -116,6 +116,7 @@ model Inventory {
 model Bill {
   id             String   @id @default(uuid())
   bill_number    String   @unique
+  bill_seq       Int      @unique @default(autoincrement())
   date           DateTime
   payment_method String
   customer_name  String?
