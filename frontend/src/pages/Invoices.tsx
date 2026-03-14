@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { authService } from "@/api/services/authService";
 import LocalLoader from "@/components/common/LocalLoader";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // API response shapes from backend for invoices and nested products
 interface ApiProduct {
@@ -57,6 +58,7 @@ const Invoices = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [isFiltering, setIsFiltering] = useState(false);
 
   // Password confirmation state
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -241,15 +243,32 @@ const Invoices = () => {
   // fetch invoices from backend with pagination (and optional invoiceNumber search)
   const fetchInvoices = useCallback(async (page: number = currentPage, limit: number = itemsPerPage) => {
     try {
+      setIsFiltering(true);
       const params: string[] = [];
       params.push(`page=${page}`);
       params.push(`limit=${limit}`);
       if (filters.invoiceNumber) params.push(`search=${encodeURIComponent(filters.invoiceNumber)}`);
       if (filters.category) params.push(`category=${encodeURIComponent(filters.category)}`);
-      if (typeof filters.month === 'number') params.push(`month=${filters.month}`);
-      if (typeof filters.year === 'number') params.push(`year=${filters.year}`);
-      if (filters.dateFrom) params.push(`dateFrom=${encodeURIComponent(filters.dateFrom.toISOString())}`);
-      if (filters.dateTo) params.push(`dateTo=${encodeURIComponent(filters.dateTo.toISOString())}`);
+
+      // Date filtering strategy (matches backend rules)
+      // 1) If explicit dateFrom/dateTo are set, prefer them and DO NOT send month/year.
+      // 2) Otherwise, send year (and month only if year is provided).
+      const hasExplicitRange = !!filters.dateFrom || !!filters.dateTo;
+      if (hasExplicitRange) {
+        if (filters.dateFrom) {
+          const df = new Date(filters.dateFrom);
+          df.setHours(0, 0, 0, 0);
+          params.push(`dateFrom=${encodeURIComponent(df.toISOString())}`);
+        }
+        if (filters.dateTo) {
+          const dt = new Date(filters.dateTo);
+          dt.setHours(23, 59, 59, 999);
+          params.push(`dateTo=${encodeURIComponent(dt.toISOString())}`);
+        }
+      } else {
+        if (typeof filters.year === 'number') params.push(`year=${filters.year}`);
+        if (typeof filters.year === 'number' && typeof filters.month === 'number') params.push(`month=${filters.month}`);
+      }
 
     const qs = params.join('&');
     const res = await api.get(`/invoices/with-products?${qs}`, { meta: { showLoader: 'local', loaderKey: 'invoices' } });
@@ -322,6 +341,8 @@ const Invoices = () => {
       setInvoices([]);
       setServerStats(null);
       setServerTotalPages(1);
+    } finally {
+      setIsFiltering(false);
     }
   }, [itemsPerPage, filters.invoiceNumber, filters.category, filters.month, filters.year, filters.dateFrom, filters.dateTo]);
 
@@ -391,6 +412,16 @@ const Invoices = () => {
   };
 
   const missingDates = getDatesWithNoInvoices();
+
+  // Warn user about ambiguous filter combinations that the backend can't interpret reliably.
+  // Backend expects month+year together; month alone won't filter and can show other months.
+  const filterWarnings = useMemo(() => {
+    const warnings: string[] = [];
+    if (typeof filters.month === 'number' && typeof filters.year !== 'number') {
+      warnings.push('You selected a Month without a Year. Month filtering requires a Year, so results may include invoices from other months. Please select a Year too.');
+    }
+    return warnings;
+  }, [filters.month, filters.year]);
 
   // Handler to mark invoice as paid
   const handleMarkPaid = async (invoice: Invoice) => {
@@ -496,6 +527,20 @@ const Invoices = () => {
           <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent>
+          {filterWarnings.length > 0 && (
+            <div className="mb-4">
+              <Alert variant="destructive">
+                <AlertTitle>Filter warning</AlertTitle>
+                <AlertDescription>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {filterWarnings.map((w, idx) => (
+                      <li key={idx}>{w}</li>
+                    ))}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
           <InvoiceFiltersComponent
             filters={filters}
             onFilterChange={setFilters}
@@ -510,22 +555,22 @@ const Invoices = () => {
           <CardTitle>Invoices</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <LocalLoader loaderKey="invoices">
-          <InvoiceTable
-            invoices={filteredInvoices}
-            currentPage={currentPage}
-            totalPages={serverTotalPages}
-            onPageChange={(p) => {
-               const clamped = Math.max(1, Math.min(p, serverTotalPages));
-               setCurrentPage(clamped);
-               fetchInvoices(clamped, itemsPerPage);
-             }}
-            onEdit={(inv) => {
-              setEditingInvoice(inv);
-              setIsAddDialogOpen(true);
-            }}
-            onDelete={requestDeleteInvoice}
-            onMarkPaid={handleMarkPaid}
+          <LocalLoader loading={isFiltering}>
+            <InvoiceTable
+              invoices={filteredInvoices}
+              currentPage={currentPage}
+              totalPages={serverTotalPages}
+              onPageChange={(p) => {
+                const clamped = Math.max(1, Math.min(p, serverTotalPages));
+                setCurrentPage(clamped);
+                fetchInvoices(clamped, itemsPerPage);
+              }}
+              onEdit={(inv) => {
+                setEditingInvoice(inv);
+                setIsAddDialogOpen(true);
+              }}
+              onDelete={requestDeleteInvoice}
+              onMarkPaid={handleMarkPaid}
             />
           </LocalLoader>
         </CardContent>

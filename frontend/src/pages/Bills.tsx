@@ -58,6 +58,7 @@ import { printBillNewWindow } from "@/lib/billPrinter";
 import { STORAGE_KEYS } from "@/utils/constants";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LoadingState } from "@/components/common/LoadingState";
+import LocalLoader from "@/components/common/LocalLoader";
 
 const Bills = () => {
   const navigate = useNavigate();
@@ -68,7 +69,7 @@ const Bills = () => {
   // Filter state
   const [dateFrom, setDateFrom] = useState(todayStr);
   const [dateTo, setDateTo] = useState(todayStr);
-  const [filterToday, setFilterToday] = useState(false);
+  const [filterToday, setFilterToday] = useState(true);
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -78,6 +79,7 @@ const Bills = () => {
   const {
     data: billsData,
     isLoading,
+    isFetching,
     refetch
   } = useGetBillsQuery({
     page: currentPage,
@@ -489,7 +491,7 @@ const Bills = () => {
           {isLoading ? (
             <LoadingState message="Loading bills..." />
           ) : (
-            <>
+            <LocalLoader loading={isFetching}>
               {/* Desktop Table */}
               <div className="hidden md:block rounded-md border overflow-x-auto">
                 <Table>
@@ -627,7 +629,7 @@ const Bills = () => {
                   ))
                 )}
               </div>
-            </>
+            </LocalLoader>
           )}
 
           {/* Pagination */}

@@ -59,7 +59,7 @@ const Products = () => {
         isLoading: categoriesLoading
     } = useGetCategoriesQuery({});
 
-    const [createProduct] = useCreateProductMutation();
+    const [createProduct, { isLoading: isCreating }] = useCreateProductMutation();
     const [updateProduct] = useUpdateProductMutation();
     const [deleteProduct] = useDeleteProductMutation();
 
@@ -338,7 +338,9 @@ const Products = () => {
                                 />
                             </div>
 
-                            <Button type="submit" className="w-full">Add Product</Button>
+                            <Button type="submit" className="w-full" disabled={isCreating}>
+                                {isCreating ? "Adding..." : "Add Product"}
+                            </Button>
                         </form>
                     </DialogContent>
                 </Dialog>

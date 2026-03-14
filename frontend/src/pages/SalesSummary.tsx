@@ -43,7 +43,7 @@ const SalesSummary = () => {
   // Filters
   const [dateFrom, setDateFrom] = useState(todayStr);
   const [dateTo, setDateTo] = useState(todayStr);
-  const [filterToday, setFilterToday] = useState(false);
+  const [filterToday, setFilterToday] = useState(true);
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedProduct, setSelectedProduct] = useState<string>("all");

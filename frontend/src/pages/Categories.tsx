@@ -31,7 +31,7 @@ const Categories = () => {
 
   // RTK Query hooks
   const { data: categoriesData, isLoading } = useGetCategoriesQuery({ limit: 100 });
-  const [createCategory] = useCreateCategoryMutation();
+  const [createCategory, { isLoading: isCreating }] = useCreateCategoryMutation();
   const [updateCategory] = useUpdateCategoryMutation();
   const [deleteCategory] = useDeleteCategoryMutation();
 
@@ -111,7 +111,8 @@ const Categories = () => {
             <DialogHeader>
               <DialogTitle>Add New Category</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <LocalLoader loading={isCreating}>
+              <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Category Name</Label>
                 <Input
@@ -119,6 +120,7 @@ const Categories = () => {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
+                  disabled={isCreating}
                 />
               </div>
               <div className="space-y-2">
@@ -128,10 +130,14 @@ const Categories = () => {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Optional"
+                  disabled={isCreating}
                 />
               </div>
-              <Button type="submit" className="w-full">Add Category</Button>
-            </form>
+              <Button type="submit" className="w-full" disabled={isCreating}>
+                {isCreating ? "Adding..." : "Add Category"}
+              </Button>
+              </form>
+            </LocalLoader>
           </DialogContent>
         </Dialog>
       </div>
