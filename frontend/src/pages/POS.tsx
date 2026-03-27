@@ -12,6 +12,7 @@ import { RoomBookingDialog } from "@/components/pos/RoomBookingDialog";
 import api from "@/api/client";
 import { tableService } from "@/api/services/tableService";
 import { orderService } from "@/api/services/orderService";
+import { serviceChargeService } from "@/api/services/serviceChargeService";
 import { Product, BillItem, Bill, StockWarning } from "@/types/pos";
 import { OrderType } from "@/types/order.types";
 import { printBillNewWindow } from "@/lib/billPrinter";
@@ -67,6 +68,7 @@ const POS = () => {
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [taxRate, setTaxRate] = useState(0);
   const [discountRate, setDiscountRate] = useState(0);
+  const [serviceCharge, setServiceCharge] = useState<{ percentage: number; isActive: boolean } | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isRoomBookingDialogOpen, setIsRoomBookingDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -154,6 +156,25 @@ const POS = () => {
     return () => { cancelled = true; };
   }, [page]);
 
+  // Fetch service charge config (SFA setting)
+  useEffect(() => {
+    let cancelled = false;
+    const fetchServiceCharge = async () => {
+      try {
+        const sc = await serviceChargeService.get();
+        if (cancelled) return;
+        setServiceCharge({ percentage: Number(sc.percentage || 0), isActive: !!sc.isActive });
+      } catch (err) {
+        // Non-blocking: if not configured, treat as 0
+        if (!cancelled) setServiceCharge(null);
+      }
+    };
+    fetchServiceCharge();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Calculate totals
   const subtotal = useMemo(() => {
     return billItems.reduce((sum, item) => sum + item.subtotal, 0);
@@ -167,9 +188,18 @@ const POS = () => {
     return (subtotal * discountRate) / 100;
   }, [subtotal, discountRate]);
 
+  const serviceChargeAmount = useMemo(() => {
+    if (!serviceCharge?.isActive) return 0;
+    const pct = Number(serviceCharge.percentage || 0);
+    if (!pct) return 0;
+    // Apply service charge on (subtotal - discount) (common approach)
+    const base = Math.max(0, subtotal - discount);
+    return (base * pct) / 100;
+  }, [serviceCharge, subtotal, discount]);
+
   const total = useMemo(() => {
-    return subtotal + tax - discount;
-  }, [subtotal, tax, discount]);
+    return subtotal + tax + serviceChargeAmount - discount;
+  }, [subtotal, tax, discount, serviceChargeAmount]);
 
   // Check for stock warnings (exclude HANDMADE products)
   const stockWarnings = useMemo(() => {
@@ -393,6 +423,8 @@ const POS = () => {
       payment_method: paymentMethod.toUpperCase(),
       customer_name: customerName,
       customer_type: customerType,
+      service_charge_percentage: serviceCharge?.isActive ? Number(serviceCharge.percentage || 0) : 0,
+      service_charge_amount: Number(serviceChargeAmount.toFixed(2)),
       total: Number(total.toFixed(2)),
       cashier_name: currentUser.name,
       terminal_id: currentUser.terminalId,
@@ -423,6 +455,10 @@ const POS = () => {
           taxRate,
           discount,
           discountRate,
+          // @ts-ignore - optional extra fields used by printer/UI
+          serviceCharge: serviceChargeAmount,
+          // @ts-ignore
+          serviceChargeRate: serviceCharge?.isActive ? Number(serviceCharge.percentage || 0) : 0,
           total,
           customerName: currentUser.name,  // Cashier name shown on receipt
           customerPhone,
@@ -813,6 +849,14 @@ const POS = () => {
                       <span className="text-muted-foreground">Tax:</span>
                       <span>Rs. {tax.toFixed(2)}</span>
                     </div>
+                    {serviceCharge?.isActive && serviceChargeAmount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          Service Charge ({Number(serviceCharge.percentage || 0).toFixed(2)}%):
+                        </span>
+                        <span>Rs. {serviceChargeAmount.toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Discount:</span>
                       <span className="text-green-600">- Rs. {discount.toFixed(2)}</span>

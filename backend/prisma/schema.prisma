@@ -208,6 +208,8 @@ model Bill {
   payment_method String
   customer_name  String?
   customer_type  String?  @default("local")
+  service_charge_percentage Decimal? @db.Decimal(5, 2)
+  service_charge_amount     Decimal? @db.Decimal(10, 2)
   total          Decimal  @db.Decimal(10, 2)
   cashier_name   String
   item_count     Int

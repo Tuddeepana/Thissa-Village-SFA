@@ -6,11 +6,16 @@ class ServiceChargeService {
    * Get the current service charge configuration
    */
   async getServiceCharge(): Promise<ServiceChargeDTO | null> {
-    const serviceCharge = await (prisma as any).serviceCharge.findUnique({
+    // Ensure there's always a default config row so the UI can load reliably.
+    const serviceCharge = await (prisma as any).serviceCharge.upsert({
       where: { id: 'default' },
+      update: {},
+      create: {
+        id: 'default',
+        percentage: '10.00',
+        isActive: true,
+      },
     });
-
-    if (!serviceCharge) return null;
 
     return {
       id: serviceCharge.id,

@@ -25,6 +25,12 @@ class BillService {
           payment_method: input.payment_method,
           customer_name: input.customer_name ?? null,
           customer_type: (input as any).customer_type ?? 'local',
+          service_charge_percentage: (input as any).service_charge_percentage !== undefined && (input as any).service_charge_percentage !== null
+            ? (typeof (input as any).service_charge_percentage === 'number' ? (input as any).service_charge_percentage : Number((input as any).service_charge_percentage))
+            : null,
+          service_charge_amount: (input as any).service_charge_amount !== undefined && (input as any).service_charge_amount !== null
+            ? (typeof (input as any).service_charge_amount === 'number' ? (input as any).service_charge_amount : Number((input as any).service_charge_amount))
+            : null,
           total: (typeof input.total === 'number' ? input.total : Number(input.total)).toFixed(2),
           cashier_name: input.cashier_name,
           item_count: input.item_count,
@@ -59,6 +65,12 @@ class BillService {
           payment_method: input.payment_method,
           customer_name: input.customer_name ?? null,
           customer_type: (input as any).customer_type ?? 'local',
+          service_charge_percentage: (input as any).service_charge_percentage !== undefined && (input as any).service_charge_percentage !== null
+            ? (typeof (input as any).service_charge_percentage === 'number' ? (input as any).service_charge_percentage : Number((input as any).service_charge_percentage))
+            : null,
+          service_charge_amount: (input as any).service_charge_amount !== undefined && (input as any).service_charge_amount !== null
+            ? (typeof (input as any).service_charge_amount === 'number' ? (input as any).service_charge_amount : Number((input as any).service_charge_amount))
+            : null,
           total: (typeof input.total === 'number' ? input.total : Number(input.total)).toFixed(2),
           cashier_name: input.cashier_name,
           item_count: input.item_count,
@@ -150,6 +162,8 @@ class BillService {
       creditNote: bill.credit_note ?? null,
       cash_given: bill.cash_given !== undefined && bill.cash_given !== null ? String(bill.cash_given) : '0',
       balance_given: bill.balance_given !== undefined && bill.balance_given !== null ? String(bill.balance_given) : '0',
+      service_charge_percentage: bill.service_charge_percentage !== undefined && bill.service_charge_percentage !== null ? String(bill.service_charge_percentage) : null,
+      service_charge_amount: bill.service_charge_amount !== undefined && bill.service_charge_amount !== null ? String(bill.service_charge_amount) : null,
       Items: items,
       Subtotal: subtotalVal,
       Tax: taxVal,

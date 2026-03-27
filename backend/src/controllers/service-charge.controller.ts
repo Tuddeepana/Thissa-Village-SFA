@@ -6,13 +6,6 @@ export const getServiceCharge = async (req: Request, res: Response) => {
   try {
     const serviceCharge = await serviceChargeService.getServiceCharge();
 
-    if (!serviceCharge) {
-      return res.status(404).json({
-        success: false,
-        message: 'Service charge configuration not found',
-      });
-    }
-
     res.json({
       success: true,
       data: serviceCharge,

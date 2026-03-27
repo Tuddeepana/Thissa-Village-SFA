@@ -12,6 +12,8 @@ export const createBillSchema = z.object({
   payment_method: z.string().min(1),
   customer_name: z.string().optional().nullable(),
   customer_type: z.enum(['local', 'foreigner']).optional(),
+  service_charge_percentage: z.union([z.number(), z.string()]).optional().nullable(),
+  service_charge_amount: z.union([z.number(), z.string()]).optional().nullable(),
   total: z.union([z.number(), z.string()]),
   cashier_name: z.string().min(1),
   item_count: z.number().int().min(0),

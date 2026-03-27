@@ -220,6 +220,12 @@ const Bills = () => {
         const subtotalNum = Number(detailed.Subtotal ?? mappedItems.reduce((s: number, it: any) => s + it.subtotal, 0));
         const taxNum = Number(detailed.Tax ?? 0);
         const totalNum = Number(detailed.Total ?? (subtotalNum + taxNum));
+        const serviceChargeAmountNum = detailed.service_charge_amount !== undefined && detailed.service_charge_amount !== null
+          ? Number(detailed.service_charge_amount)
+          : 0;
+        const serviceChargeRateNum = detailed.service_charge_percentage !== undefined && detailed.service_charge_percentage !== null
+          ? Number(detailed.service_charge_percentage)
+          : 0;
 
         const paymentMethodLower = String(detailed.PaymentMethod || bill.paymentMethod || '').toLowerCase();
         const cashGivenRaw = (detailed.cash_given ?? detailed.cashGiven ?? detailed.cash_given_amount ?? detailed.cash ?? (detailed.bill?.cash_given));
@@ -236,6 +242,8 @@ const Bills = () => {
           taxRate: mappedItems.length ? Math.round((taxNum / (subtotalNum || 1)) * 100) : 0,
           discount: 0,
           discountRate: 0,
+          serviceCharge: serviceChargeAmountNum,
+          serviceChargeRate: serviceChargeRateNum,
           total: totalNum,
           customerName: detailed.cashier_name ?? detailed.customer ?? undefined,
           customerPhone: undefined,
@@ -918,6 +926,14 @@ const Bills = () => {
                   <span className="text-muted-foreground">Tax ({selectedBill.taxRate}%)</span>
                   <span>Rs.{selectedBill.tax.toFixed(2)}</span>
                 </div>
+                {selectedBill.serviceCharge !== undefined && selectedBill.serviceCharge !== null && selectedBill.serviceCharge > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      Service Charge{selectedBill.serviceChargeRate ? ` (${selectedBill.serviceChargeRate}%)` : ''}
+                    </span>
+                    <span>Rs.{Number(selectedBill.serviceCharge).toFixed(2)}</span>
+                  </div>
+                )}
                 {selectedBill.discount > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Discount ({selectedBill.discountRate}%)</span>
