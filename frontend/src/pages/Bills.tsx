@@ -188,13 +188,16 @@ const Bills = () => {
       const detailed = data;
 
       if (detailed && detailed.Items) {
+        const billCustomerType: 'local' | 'foreigner' = detailed.customer_type === 'foreigner' ? 'foreigner' : 'local';
         // Map to the frontend Bill shape used in the modal
         const mappedItems = (detailed.Items || []).map((it: any) => {
           const qty = Math.abs(Number(it.quantity_moved || 0));
           // Use the price that was used for this sale (could be foreigner or local)
           const price = it.unit_price !== undefined && it.unit_price !== null
             ? Number(it.unit_price)
-            : (it.foreigner_price !== undefined ? Number(it.foreigner_price) : 0);
+            : (billCustomerType === 'local'
+              ? (it.local_price !== undefined ? Number(it.local_price) : 0)
+              : (it.foreigner_price !== undefined ? Number(it.foreigner_price) : 0));
           return {
             product: {
               id: it.productId || it.productId || 'unknown',
@@ -218,6 +221,12 @@ const Bills = () => {
         const taxNum = Number(detailed.Tax ?? 0);
         const totalNum = Number(detailed.Total ?? (subtotalNum + taxNum));
 
+        const paymentMethodLower = String(detailed.PaymentMethod || bill.paymentMethod || '').toLowerCase();
+        const cashGivenRaw = (detailed.cash_given ?? detailed.cashGiven ?? detailed.cash_given_amount ?? detailed.cash ?? (detailed.bill?.cash_given));
+        const balanceGivenRaw = (detailed.balance_given ?? detailed.balanceGiven ?? detailed.balance ?? (detailed.bill?.balance_given));
+        const cashGivenNum = cashGivenRaw !== undefined && cashGivenRaw !== null ? Number(cashGivenRaw) : undefined;
+        const balanceGivenNum = balanceGivenRaw !== undefined && balanceGivenRaw !== null ? Number(balanceGivenRaw) : undefined;
+
         const mappedBill = {
           id: detailed.id || bill.id,
           billNumber: detailed.bill_number || detailed.billNo || bill.billNumber,
@@ -230,9 +239,13 @@ const Bills = () => {
           total: totalNum,
           customerName: detailed.cashier_name ?? detailed.customer ?? undefined,
           customerPhone: undefined,
-          paymentMethod: (String(detailed.PaymentMethod || bill.paymentMethod || '').toLowerCase()),
-          amountPaid: detailed.PaymentMethod && String(detailed.PaymentMethod).toLowerCase() === 'credit' ? 0 : totalNum,
-          change: 0,
+          paymentMethod: paymentMethodLower,
+          amountPaid: paymentMethodLower === 'credit'
+            ? 0
+            : (cashGivenNum !== undefined && !Number.isNaN(cashGivenNum) ? cashGivenNum : totalNum),
+          change: paymentMethodLower === 'credit'
+            ? 0
+            : (balanceGivenNum !== undefined && !Number.isNaN(balanceGivenNum) ? balanceGivenNum : 0),
           creditDescription: detailed.creditNote ?? undefined,
           createdAt: detailed.dateTime ? new Date(detailed.dateTime) : bill.createdAt,
         };
@@ -876,7 +889,15 @@ const Bills = () => {
                             )}
                           </TableCell>
                           <TableCell className="text-center">{item.quantity}</TableCell>
-                          <TableCell className="text-right">Rs.{item.product.foreignerPrice?.toFixed(2) ?? '0.00'}</TableCell>
+                          <TableCell className="text-right">
+                            Rs.{(
+                              item?.unitPrice !== undefined && item?.unitPrice !== null
+                                ? Number(item.unitPrice)
+                                : (item?.subtotal && item?.quantity
+                                  ? Number(item.subtotal) / Number(item.quantity)
+                                  : (item?.product?.localPrice ?? item?.product?.foreignerPrice ?? 0))
+                            ).toFixed(2)}
+                          </TableCell>
                           <TableCell className="text-right">Rs.{item.subtotal.toFixed(2)}</TableCell>
                         </TableRow>
                       ))}

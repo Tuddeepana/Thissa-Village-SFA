@@ -202,10 +202,12 @@ model Inventory {
 
 model Bill {
   id             String   @id @default(uuid())
+  bill_seq       Int      @unique @default(autoincrement())
   bill_number    String   @unique
   date           DateTime
   payment_method String
   customer_name  String?
+  customer_type  String?  @default("local")
   total          Decimal  @db.Decimal(10, 2)
   cashier_name   String
   item_count     Int
