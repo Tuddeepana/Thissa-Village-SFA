@@ -30,7 +30,7 @@ import {
     SidebarMenu,
     SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import logoSvg from "@/img/logo.svg";
+import resturentLogo from "@/assets/images/village-bar-logo.png";
 import { cn } from "@/lib/utils";
 
 // Define menu item type
@@ -195,8 +195,8 @@ export function AppSidebar() {
                 {/* Header Section */}
                 <div className="p-4 md:p-6 border-b bg-sidebar">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shadow-md">
-                            <img src={logoSvg} alt="Tissa Village Logo" className="w-6 h-6" />
+                        <div className="w-14 h-14 rounded-lg bg-transparent flex items-center justify-centeroverflow-hidden ">
+                            <img src={resturentLogo} alt="Tissa Village Logo" className="w-full h-full object-contain p-1" />
                         </div>
                         <div>
                             <h1 className="font-bold text-base md:text-lg text-foreground">Tissa Village</h1>
