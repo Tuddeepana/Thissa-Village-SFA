@@ -30,6 +30,8 @@ export interface Bill {
   taxRate: number; // Tax rate as percentage (e.g., 15 for 15%)
   discount: number;
   discountRate: number; // Discount rate as percentage
+  serviceCharge?: number;
+  serviceChargeRate?: number;
   total: number;
   customerName?: string;
   customerPhone?: string;

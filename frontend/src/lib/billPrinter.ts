@@ -252,6 +252,11 @@ const buildBillBody = (
       <span>Tax (${bill.taxRate}%)</span>
       <span>Rs. ${bill.tax.toFixed(2)}</span>
     </div>
+    ${bill.serviceCharge && bill.serviceCharge > 0 ? `
+    <div class="total-row">
+      <span>Service Charge${bill.serviceChargeRate ? ` (${bill.serviceChargeRate}%)` : ''}</span>
+      <span>Rs. ${bill.serviceCharge.toFixed(2)}</span>
+    </div>` : ''}
     ${bill.discount > 0 ? `
     <div class="total-row">
       <span>Discount (${bill.discountRate}%)</span>
