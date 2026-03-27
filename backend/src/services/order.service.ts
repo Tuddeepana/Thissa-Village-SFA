@@ -289,6 +289,104 @@ export class OrderService {
   }
 
   /**
+   * Get table status with current orders
+   */
+  async getTableStatus(params?: {
+    status?: 'available' | 'occupied' | 'all';
+    date_from?: Date;
+    date_to?: Date;
+  }) {
+    // Get all expanded tables
+    const expandedTables = await (prisma as any).restaurantTable.findMany({
+      where: { deletedAt: null },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Expand tables based on quantity
+    const allTables: any[] = [];
+    for (const table of expandedTables) {
+      for (let i = 1; i <= table.quantity; i++) {
+        allTables.push({
+          id: `${table.id}-${i}`,
+          displayName: `${table.name} ${i}`,
+          baseName: table.name,
+          tableNumber: i,
+          table_type: table.table_type,
+          parentId: table.id,
+        });
+      }
+    }
+
+    // Build where clause for orders
+    const orderWhere: Prisma.OrderWhereInput = {
+      status: OrderStatus.PENDING,
+      order_type: 'DINE_IN',
+    };
+
+    if (params?.date_from || params?.date_to) {
+      orderWhere.createdAt = {};
+      if (params.date_from) {
+        orderWhere.createdAt.gte = params.date_from;
+      }
+      if (params.date_to) {
+        orderWhere.createdAt.lte = params.date_to;
+      }
+    }
+
+    // Get all pending dine-in orders
+    const pendingOrders = await prisma.order.findMany({
+      where: orderWhere,
+      include: { items: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Map orders to table numbers
+    const ordersByTable = new Map<string, any>();
+    for (const order of pendingOrders) {
+      if (order.table_id) {
+        ordersByTable.set(order.table_id, this.mapToDTO(order));
+      }
+    }
+
+    // Combine table info with order status
+    const tableStatus = allTables.map((table) => {
+      const currentOrder = ordersByTable.get(table.id);
+
+      return {
+        table_id: table.id,
+        table_number: table.tableNumber,
+        table_name: table.displayName,
+        table_type: table.table_type,
+        status: currentOrder ? 'occupied' : 'available',
+        current_order: currentOrder || null,
+        customer_name: currentOrder?.customer_name || null,
+        order_time: currentOrder?.createdAt || null,
+        total_amount: currentOrder?.total || null,
+        item_count: currentOrder?.items?.length || null,
+      };
+    });
+
+    // Apply status filter if provided
+    let filteredTables = tableStatus;
+    if (params?.status && params.status !== 'all') {
+      filteredTables = tableStatus.filter(t => t.status === params.status);
+    }
+
+    // Calculate summary
+    const summary = {
+      total: tableStatus.length,
+      occupied: tableStatus.filter(t => t.status === 'occupied').length,
+      available: tableStatus.filter(t => t.status === 'available').length,
+      reserved: 0, // Reserved feature can be added later
+    };
+
+    return {
+      tables: filteredTables,
+      summary,
+    };
+  }
+
+  /**
    * Map Prisma order to DTO
    */
   private mapToDTO(order: any): OrderDTO {

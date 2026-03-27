@@ -3,34 +3,34 @@ import type { BillCreateInput, BillDTO, BillCreateWithItemsInput, BillListQuery,
 import type { InventoryDTO } from '../types/inventory.types';
 import { inventoryService } from './inventory.service';
 
+const formatBillNumber = (seq: number | bigint) => {
+  const n = typeof seq === 'bigint' ? Number(seq) : seq;
+  // 12 digits gives lots of room: B-000000000001
+  return `B-${String(n).padStart(12, '0')}`;
+};
+
 class BillService {
   async createBill(input: BillCreateInput): Promise<BillDTO> {
-    const bill = await (prisma as any).bill.create({
-      data: {
-        bill_number: input.bill_number,
-        date: new Date(input.date as any),
-        payment_method: input.payment_method,
-        customer_name: input.customer_name ?? null,
-        total: (typeof input.total === 'number' ? input.total : Number(input.total)).toFixed(2),
-        cashier_name: input.cashier_name,
-        item_count: input.item_count,
-        credit_note: input.credit_note ?? null,
-        cash_given: (typeof input.cash_given === 'number' ? input.cash_given : Number(input.cash_given)).toFixed(2),
-        balance_given: (typeof input.balance_given === 'number' ? input.balance_given : Number(input.balance_given)).toFixed(2),
-        tax: input.tax !== undefined && input.tax !== null ? (typeof input.tax === 'number' ? input.tax : Number(input.tax)).toFixed(2) : null,
-      },
-    });
-    return bill as BillDTO;
-  }
-
-  async createBillWithItems(input: BillCreateWithItemsInput): Promise<{ bill: BillDTO; inventory: InventoryDTO[] }> {
-    const result = await (prisma as any).$transaction(async (tx: any) => {
+    // bill_number is required by Prisma/DB (NOT NULL), but frontend no longer sends it.
+    // Generate a unique placeholder; if you have bill_seq formatting logic elsewhere,
+    // it can update this value after creation.
+    const billNumber = input.bill_number && String(input.bill_number).trim().length > 0
+      ? String(input.bill_number)
+      : `TMP-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const bill = await (prisma as any).$transaction(async (tx: any) => {
       const createdBill = await tx.bill.create({
         data: {
-          bill_number: input.bill_number,
+          bill_number: billNumber,
           date: new Date(input.date as any),
           payment_method: input.payment_method,
           customer_name: input.customer_name ?? null,
+          customer_type: (input as any).customer_type ?? 'local',
+          service_charge_percentage: (input as any).service_charge_percentage !== undefined && (input as any).service_charge_percentage !== null
+            ? (typeof (input as any).service_charge_percentage === 'number' ? (input as any).service_charge_percentage : Number((input as any).service_charge_percentage))
+            : null,
+          service_charge_amount: (input as any).service_charge_amount !== undefined && (input as any).service_charge_amount !== null
+            ? (typeof (input as any).service_charge_amount === 'number' ? (input as any).service_charge_amount : Number((input as any).service_charge_amount))
+            : null,
           total: (typeof input.total === 'number' ? input.total : Number(input.total)).toFixed(2),
           cashier_name: input.cashier_name,
           item_count: input.item_count,
@@ -41,6 +41,53 @@ class BillService {
         },
       });
 
+      const finalBillNumber = formatBillNumber(createdBill.bill_seq);
+      const updatedBill = await tx.bill.update({
+        where: { id: createdBill.id },
+        data: { bill_number: finalBillNumber },
+      });
+
+      return updatedBill;
+    });
+
+    return bill as BillDTO;
+  }
+
+  async createBillWithItems(input: BillCreateWithItemsInput): Promise<{ bill: BillDTO; inventory: InventoryDTO[] }> {
+    const result = await (prisma as any).$transaction(async (tx: any) => {
+      const billNumber = input.bill_number && String(input.bill_number).trim().length > 0
+        ? String(input.bill_number)
+        : `TMP-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const createdBill = await tx.bill.create({
+        data: {
+          bill_number: billNumber,
+          date: new Date(input.date as any),
+          payment_method: input.payment_method,
+          customer_name: input.customer_name ?? null,
+          customer_type: (input as any).customer_type ?? 'local',
+          service_charge_percentage: (input as any).service_charge_percentage !== undefined && (input as any).service_charge_percentage !== null
+            ? (typeof (input as any).service_charge_percentage === 'number' ? (input as any).service_charge_percentage : Number((input as any).service_charge_percentage))
+            : null,
+          service_charge_amount: (input as any).service_charge_amount !== undefined && (input as any).service_charge_amount !== null
+            ? (typeof (input as any).service_charge_amount === 'number' ? (input as any).service_charge_amount : Number((input as any).service_charge_amount))
+            : null,
+          total: (typeof input.total === 'number' ? input.total : Number(input.total)).toFixed(2),
+          cashier_name: input.cashier_name,
+          item_count: input.item_count,
+          credit_note: input.credit_note ?? null,
+          cash_given: (typeof input.cash_given === 'number' ? input.cash_given : Number(input.cash_given)).toFixed(2),
+          balance_given: (typeof input.balance_given === 'number' ? input.balance_given : Number(input.balance_given)).toFixed(2),
+          tax: input.tax !== undefined && input.tax !== null ? (typeof input.tax === 'number' ? input.tax : Number(input.tax)).toFixed(2) : null,
+        },
+      });
+
+      // Replace placeholder/timestamp number with final sequential formatted number
+      const finalBillNumber = formatBillNumber(createdBill.bill_seq);
+      const billForInventory = await tx.bill.update({
+        where: { id: createdBill.id },
+        data: { bill_number: finalBillNumber },
+      });
+
       const inventoryRecords: InventoryDTO[] = [];
 
       for (const item of input.items) {
@@ -49,7 +96,7 @@ class BillService {
         const rec = await inventoryService.createMovement(
           {
             productId: item.productId,
-            billId: createdBill.id,
+            billId: billForInventory.id,
             quantity_moved: qty,
           },
           tx
@@ -57,7 +104,7 @@ class BillService {
         inventoryRecords.push(rec);
       }
 
-      return { bill: createdBill as BillDTO, inventory: inventoryRecords };
+      return { bill: billForInventory as BillDTO, inventory: inventoryRecords };
     });
 
     return result;
@@ -69,6 +116,8 @@ class BillService {
       include: { inventoryRecords: { include: { product: { include: { category: true } } } } },
     });
     if (!bill) return null;
+
+    const customerType: 'local' | 'foreigner' = (bill.customer_type === 'foreigner' ? 'foreigner' : 'local');
 
     // Map inventory records to item DTOs
     const items = (bill.inventoryRecords || []).map((rec: any) => ({
@@ -82,12 +131,13 @@ class BillService {
       quantity_moved: rec.quantity_moved,
     }));
 
-    // Try compute subtotal from item foreigner prices when available (default)
+    // Compute subtotal from the correct price list based on the persisted customer type
     let subtotalFromItems = 0;
     let computedFromItems = false;
     for (const it of items) {
-      if (it.foreigner_price !== null && it.foreigner_price !== undefined) {
-        const price = Number(it.foreigner_price);
+      const priceStr = customerType === 'local' ? it.local_price : it.foreigner_price;
+      if (priceStr !== null && priceStr !== undefined) {
+        const price = Number(priceStr);
         if (!Number.isNaN(price)) {
           subtotalFromItems += price * Math.abs(it.quantity_moved ?? 0);
           computedFromItems = true;
@@ -110,6 +160,10 @@ class BillService {
       PaymentMethod: bill.payment_method,
       customer: bill.customer_name ?? null,
       creditNote: bill.credit_note ?? null,
+      cash_given: bill.cash_given !== undefined && bill.cash_given !== null ? String(bill.cash_given) : '0',
+      balance_given: bill.balance_given !== undefined && bill.balance_given !== null ? String(bill.balance_given) : '0',
+      service_charge_percentage: bill.service_charge_percentage !== undefined && bill.service_charge_percentage !== null ? String(bill.service_charge_percentage) : null,
+      service_charge_amount: bill.service_charge_amount !== undefined && bill.service_charge_amount !== null ? String(bill.service_charge_amount) : null,
       Items: items,
       Subtotal: subtotalVal,
       Tax: taxVal,
