@@ -5,15 +5,13 @@ import { ProductSearch } from "@/components/pos/ProductSearch";
 import { BillCart } from "@/components/pos/BillCart";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import api from "@/api/client";
-import restaurantApi from "@/api/restaurantClient";
 import { Product, BillItem, Bill, StockWarning } from "@/types/pos";
 import { printBillNewWindow } from "@/lib/billPrinter";
 import { toast } from "sonner";
 import type { MyStockResponse, MyStockTableRow } from '@/types/mystock';
-import type { RestaurantItemsResponse, RestaurantItem } from '@/types/restaurant';
 import { Button } from "@/components/ui/button";
 import LocalLoader from "@/components/common/LocalLoader";
-import { Keyboard, Wine, UtensilsCrossed } from "lucide-react";
+import { Keyboard } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,7 +21,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const PAGE_SIZE = 50;
 
@@ -32,9 +29,6 @@ const POS = () => {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
-  const [restaurantProducts, setRestaurantProducts] = useState<Product[]>([]);
-  const [itemSource, setItemSource] = useState<'bar' | 'restaurant'>('bar');
-  const [customerType, setCustomerType] = useState<'local' | 'foreign'>('local');
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [taxRate, setTaxRate] = useState(0);
   const [discountRate, setDiscountRate] = useState(0);
@@ -60,86 +54,57 @@ const POS = () => {
     const fetchProducts = async () => {
       setLoadingProducts(true);
       try {
-        if (itemSource === 'bar') {
-          // Detect if search query looks like a barcode (numeric, >= 8 digits)
-          const isBarcode = debouncedSearchQuery && /^\d{8,}$/.test(debouncedSearchQuery.trim());
+        // Detect if search query looks like a barcode (numeric, >= 8 digits)
+        const isBarcode = debouncedSearchQuery && /^\d{8,}$/.test(debouncedSearchQuery.trim());
 
-          const res = await api.get<MyStockResponse>('/mystock', {
-            params: {
-              page,
-              pageSize: PAGE_SIZE,
-              // Use barcode param if it looks like a barcode, otherwise use productName
-              ...(isBarcode
-                ? { barcode: debouncedSearchQuery }
-                : { productName: debouncedSearchQuery || undefined }
-              )
-            },
-            meta: { showLoader: 'local', loaderKey: 'pos-products' }
-          });
-          if (cancelled) return;
-          const rows: MyStockTableRow[] = res.data.tableResponse?.data ?? [];
-          const mapped: Product[] = rows.map((r) => ({
-            id: r.productId,
-            name: r.productName,
-            category: r.category?.name ?? '',
-            price: r.sellingPrice ?? 0,
-            cost: r.sellingPrice ?? 0,
-            stock: r.availableQuantity,
-            minStock: r.minStock ?? 0,
-            bottleVolume: r.bottle_size ?? undefined,
-            barcode: r.barcode ?? undefined,
-            image: undefined,
-            description: undefined,
-            createdAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
-            updatedAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
-            source: 'bar',
-          }));
-          setProducts(mapped);
-          const pagination = res.data.tableResponse?.pagination;
-          setTotalPages(pagination?.totalPages ?? 1);
-        } else {
-          // Fetch restaurant items
-          const res = await restaurantApi.get<RestaurantItemsResponse>('/items', {
-            params: { page, pageSize: PAGE_SIZE },
-            meta: { showLoader: 'local', loaderKey: 'pos-products' }
-          });
-          if (cancelled) return;
-          const items: RestaurantItem[] = res.data.items ?? [];
-          const mapped: Product[] = items.map((item) => ({
-            id: item.id,
-            name: item.name,
-            category: item.category,
-            price: item.price,
-            cost: item.price,
-            stock: item.available ? 999 : 0, // Restaurant items don't have stock tracking
-            minStock: 0,
-            bottleVolume: undefined,
-            barcode: undefined,
-            image: item.image,
-            description: item.description,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            source: 'restaurant',
-          }));
-          setRestaurantProducts(mapped);
-          const pagination = res.data.pagination;
-          setTotalPages(pagination?.totalPages ?? 1);
-        }
+        const res = await api.get<MyStockResponse>('/mystock', {
+          params: {
+            page,
+            pageSize: PAGE_SIZE,
+            // Use barcode param if it looks like a barcode, otherwise use productName
+            ...(isBarcode
+              ? { barcode: debouncedSearchQuery }
+              : { productName: debouncedSearchQuery || undefined }
+            )
+          },
+          meta: { showLoader: 'local', loaderKey: 'pos-products' }
+        });
+        if (cancelled) return;
+        const rows: MyStockTableRow[] = res.data.tableResponse?.data ?? [];
+        const mapped: Product[] = rows.map((r) => ({
+          id: r.productId,
+          name: r.productName,
+          category: r.category?.name ?? '',
+          price: r.sellingPrice ?? 0,
+          cost: r.sellingPrice ?? 0,
+          stock: r.availableQuantity,
+          minStock: r.minStock ?? 0,
+          bottleVolume: r.bottle_size ?? undefined,
+          barcode: r.barcode ?? undefined,
+          image: undefined,
+          description: undefined,
+          createdAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
+          updatedAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
+          source: 'bar',
+        }));
+        setProducts(mapped);
+        const pagination = res.data.tableResponse?.pagination;
+        setTotalPages(pagination?.totalPages ?? 1);
       } catch (err) {
         console.error('Failed to load products for POS', err);
-        toast.error(`Failed to load ${itemSource} items`);
+        toast.error('Failed to load bar items');
       } finally {
         if (!cancelled) setLoadingProducts(false);
       }
     };
     fetchProducts();
     return () => { cancelled = true; };
-  }, [page, itemSource, debouncedSearchQuery]);
+  }, [page, debouncedSearchQuery]);
 
-  // Get the current list of products to display based on item source
+  // Get the current list of products to display
   const displayProducts = useMemo(() => {
-    return itemSource === 'bar' ? products : restaurantProducts;
-  }, [itemSource, products, restaurantProducts]);
+    return products;
+  }, [products]);
 
   // Calculate totals
   const subtotal = useMemo(() => {
@@ -254,20 +219,6 @@ const POS = () => {
           }
           break;
 
-        case 'r':
-        case 'w':
-          // Toggle between bar and restaurant items
-          e.preventDefault();
-          setItemSource((prev) => {
-            const newSource = prev === 'bar' ? 'restaurant' : 'bar';
-            setPage(1); // Reset to first page
-            toast.success(`Switched to ${newSource === 'bar' ? '🍷 Bar' : '🍴 Restaurant'} items`, {
-              description: `Now viewing ${newSource} products`
-            });
-            return newSource;
-          });
-          break;
-
         default:
           break;
       }
@@ -278,14 +229,8 @@ const POS = () => {
   }, [navigate, isPaymentDialogOpen, billItems.length, handleCompleteBill]);
 
   const handleAddProduct = (product: Product) => {
-    // For restaurant items, ensure customer type is selected first
-    if (product.source === 'restaurant' && !customerType) {
-      toast.error("Please select customer type (Local/Foreign) first!");
-      return;
-    }
-
-    // Restaurant items don't have stock checking
-    if (product.source === 'bar' && product.stock === 0) {
+    // Only check stock for bar items
+    if (product.stock === 0) {
       toast.error("Product is out of stock!");
       return;
     }
@@ -293,8 +238,8 @@ const POS = () => {
     const existingItem = billItems.find((item) => item.product.id === product.id);
 
     if (existingItem) {
-      // Check if we can add more (only for bar items)
-      if (product.source === 'bar' && existingItem.quantity >= product.stock) {
+      // Check if we can add more
+      if (existingItem.quantity >= product.stock) {
         toast.error("Cannot add more than available stock!");
         return;
       }
@@ -370,60 +315,51 @@ const POS = () => {
       }
     })();
 
-    // Separate bar and restaurant items
-    const barItems = billItems.filter(item => item.product.source === 'bar');
-    // Restaurant items are handled separately - no backend call needed for them
+    // Build payload for backend
+    const payload = {
+      date: now.toISOString(),
+      payment_method: paymentMethod.toUpperCase(),
+      customer_name: customerName ?? null,
+      total: Number(total.toFixed(2)),
+      cashier_name: cashierName,
+      item_count: billItems.length,
+      credit_note: creditDescription ?? null,
+      cash_given: Number(amountPaid.toFixed(2)),
+      balance_given: Number(change.toFixed(2)),
+      tax: Number(tax.toFixed(2)),
+      items: billItems.map((bi) => ({
+        productId: bi.product.id,
+        quantityMoved: bi.quantity,
+      })),
+    };
 
-    // Build payload for backend - only bar items go to our backend
-    if (barItems.length > 0) {
-      const payload = {
-        date: now.toISOString(),
-        payment_method: paymentMethod.toUpperCase(),
-        customer_name: customerName ?? null,
-        total: Number(total.toFixed(2)),
-        cashier_name: cashierName,
-        item_count: billItems.length,
-        credit_note: creditDescription ?? null,
-        cash_given: Number(amountPaid.toFixed(2)),
-        balance_given: Number(change.toFixed(2)),
-        tax: Number(tax.toFixed(2)),
-        items: barItems.map((bi) => ({
-          productId: bi.product.id,
-          quantityMoved: bi.quantity,
-        })),
-      };
-
-      // Call backend to persist bill and create inventory movements
-      api
-        .post('/bills', payload)
-        .then((res) => {
-          const createdBillNumber = res?.data?.data?.bill?.bill_number || res?.data?.data?.billNumber || res?.data?.data?.bill_number || billNumber;
-          // Update stock levels locally for bar items only
-          const updatedProducts = products.map((product) => {
-            const billItem = barItems.find((item) => item.product.id === product.id);
-            if (billItem) {
-              const newStock = product.stock - billItem.quantity;
-              return {
-                ...product,
-                stock: newStock,
-                updatedAt: now,
-              };
-            }
-            return product;
-          });
-          setProducts(updatedProducts);
-
-          completeBillProcess(createdBillNumber, now, paymentMethod, amountPaid, change, customerName, customerPhone, creditDescription, updatedProducts, customerType);
-        })
-        .catch((err) => {
-          console.error('Failed to complete bill', err);
-          const msg = err?.response?.data?.message ?? 'Failed to complete bill';
-          toast.error(msg);
+    // Call backend to persist bill and create inventory movements
+    api
+      .post('/bills', payload)
+      .then((res) => {
+        const createdBillNumber = res?.data?.data?.bill?.bill_number || res?.data?.data?.billNumber || res?.data?.data?.bill_number || billNumber;
+        // Update stock levels locally
+        const updatedProducts = products.map((product) => {
+          const billItem = billItems.find((item) => item.product.id === product.id);
+          if (billItem) {
+            const newStock = product.stock - billItem.quantity;
+            return {
+              ...product,
+              stock: newStock,
+              updatedAt: now,
+            };
+          }
+          return product;
         });
-    } else {
-      // Only restaurant items, no backend call needed for bar system
-      completeBillProcess(billNumber, now, paymentMethod, amountPaid, change, customerName, customerPhone, creditDescription, products, customerType);
-    }
+        setProducts(updatedProducts);
+
+        completeBillProcess(createdBillNumber, now, paymentMethod, amountPaid, change, customerName, customerPhone, creditDescription, updatedProducts);
+      })
+      .catch((err) => {
+        console.error('Failed to complete bill', err);
+        const msg = err?.response?.data?.message ?? 'Failed to complete bill';
+        toast.error(msg);
+      });
   };
 
   const completeBillProcess = (
@@ -435,8 +371,7 @@ const POS = () => {
     customerName?: string,
     customerPhone?: string,
     creditDescription?: string,
-    updatedProducts?: Product[],
-    customerType?: 'local' | 'foreign'
+    updatedProducts?: Product[]
   ) => {
     // Prepare printable bill object
     const bill: Bill = {
@@ -450,7 +385,6 @@ const POS = () => {
       total,
       customerName,
       customerPhone,
-      customerType,
       paymentMethod,
       amountPaid,
       change,
@@ -468,11 +402,11 @@ const POS = () => {
       description: `Bill #${billNumber} - Total: Rs. ${total.toFixed(2)}`,
     });
 
-    // Show low stock warnings after completing bill (only for bar items)
+    // Show low stock warnings after completing bill
     if (updatedProducts) {
       setTimeout(() => {
         const lowStockProducts = updatedProducts.filter(
-          (p) => p.stock > 0 && p.stock <= p.minStock && p.source === 'bar'
+          (p) => p.stock > 0 && p.stock <= p.minStock
         );
         if (lowStockProducts.length > 0) {
           toast.warning(`${lowStockProducts.length} product(s) are now low in stock!`, {
@@ -538,13 +472,6 @@ const POS = () => {
                 <Badge variant="secondary" className="justify-center text-lg font-mono">M</Badge>
                 <p className="text-sm">Open payment <strong>Method</strong> selection dialog</p>
               </div>
-              <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                <div className="flex gap-1">
-                  <Badge variant="secondary" className="justify-center text-lg font-mono flex-1">R</Badge>
-                  <Badge variant="secondary" className="justify-center text-lg font-mono flex-1">W</Badge>
-                </div>
-                <p className="text-sm">S<strong>w</strong>itch between <strong>Restaurant</strong> and Bar items</p>
-              </div>
             </div>
             <div className="text-xs text-muted-foreground pt-2 border-t">
               <p>💡 Tip: Use arrow keys (↑↓←→) after focusing search bar (press S) to navigate products like a 2D grid. Press Enter to add highlighted product to cart.</p>
@@ -553,57 +480,6 @@ const POS = () => {
         </Dialog>
       </div>
 
-      {/* Tabs for switching between Bar and Restaurant items */}
-      <Card>
-        <CardContent className="p-2 md:p-4">
-          <Tabs value={itemSource} onValueChange={(value) => {
-            setItemSource(value as 'bar' | 'restaurant');
-            setPage(1); // Reset to first page when switching
-            if (value === 'restaurant') {
-              setCustomerType('local'); // Default to local when switching to restaurant
-            }
-          }}>
-            <TabsList className="grid w-full max-w-md grid-cols-2 h-8 md:h-10">
-              <TabsTrigger value="bar" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
-                <Wine className="h-3 w-3 md:h-4 md:w-4" />
-                Bar Items
-              </TabsTrigger>
-              <TabsTrigger value="restaurant" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
-                <UtensilsCrossed className="h-3 w-3 md:h-4 md:w-4" />
-                Restaurant Items
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          {/* Customer Type Selection - Only show for Restaurant */}
-          {itemSource === 'restaurant' && (
-            <div className="mt-3 md:mt-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs md:text-sm font-medium text-muted-foreground">Customer Type:</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 max-w-md">
-                <Button
-                  variant={customerType === 'local' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setCustomerType('local')}
-                  className="h-8 md:h-10 text-xs md:text-sm font-medium"
-                >
-                  🇱🇰 Local
-                </Button>
-                <Button
-                  variant={customerType === 'foreign' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setCustomerType('foreign')}
-                  className="h-8 md:h-10 text-xs md:text-sm font-medium"
-                >
-                  🌍 Foreign
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 md:gap-4">
         {/* Product Search - Takes 2 columns on large screens */}
         <div className="lg:col-span-2">
@@ -611,7 +487,7 @@ const POS = () => {
             <CardContent className="p-2 md:p-4">
               <div className="flex items-center justify-between mb-2 md:mb-3">
                 <div className="text-xs md:text-sm text-muted-foreground">
-                  Showing {itemSource === 'bar' ? 'Bar' : 'Restaurant'} items - Page {page} of {totalPages}
+                  Showing Bar items - Page {page} of {totalPages}
                 </div>
                 <div className="flex items-center gap-1 md:gap-2">
                   <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="text-xs md:text-sm h-7 md:h-9 px-2 md:px-4">Prev</Button>
@@ -649,8 +525,6 @@ const POS = () => {
             onClearBill={handleClearBill}
             onCompleteBill={handleCompleteBill}
             stockWarnings={stockWarnings}
-            customerType={customerType}
-            itemSource={itemSource}
           />
         </div>
       </div>

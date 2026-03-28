@@ -3,11 +3,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Minus, Plus, AlertTriangle, Wine, UtensilsCrossed } from "lucide-react";
+import { Minus, Plus, AlertTriangle } from "lucide-react";
 import { BillItem, StockWarning } from "@/types/pos";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DeleteButton } from "@/components/common";
-import { Badge } from "@/components/ui/badge";
 
 interface BillCartProps {
   items: BillItem[];
@@ -24,8 +23,6 @@ interface BillCartProps {
   onClearBill: () => void;
   onCompleteBill: () => void;
   stockWarnings: StockWarning[];
-  customerType?: 'local' | 'foreign';
-  itemSource?: 'bar' | 'restaurant';
 }
 
 export function BillCart({
@@ -43,8 +40,6 @@ export function BillCart({
   onClearBill,
   onCompleteBill,
   stockWarnings,
-  customerType,
-  itemSource,
 }: BillCartProps) {
   return (
     <Card className="h-full flex flex-col">
@@ -52,11 +47,6 @@ export function BillCart({
         <CardTitle className="flex justify-between items-center text-base md:text-lg">
           <div className="flex items-center gap-2">
             <span>Current Bill</span>
-            {itemSource === 'restaurant' && customerType && (
-              <Badge variant={customerType === 'local' ? 'default' : 'secondary'} className="text-xs">
-                {customerType === 'local' ? '🇱🇰 Local' : '🌍 Foreign'}
-              </Badge>
-            )}
           </div>
           {items.length > 0 && (
             <Button variant="ghost" size="sm" onClick={onClearBill} className="text-xs md:text-sm h-7 md:h-9">
@@ -100,18 +90,6 @@ export function BillCart({
                   <div className="flex-1">
                     <div className="flex items-center gap-1.5 md:gap-2 mb-0.5 md:mb-1">
                       <h4 className="font-medium text-xs md:text-sm">{item.product.name}</h4>
-                      {item.product.source && (
-                        <Badge
-                          variant={item.product.source === 'bar' ? 'default' : 'secondary'}
-                          className="text-[10px] md:text-xs px-1 md:px-1.5 py-0 md:py-0.5 h-4 md:h-5"
-                        >
-                          {item.product.source === 'bar' ? (
-                            <><Wine className="h-2.5 w-2.5 md:h-3 md:w-3 mr-0.5 md:mr-1" /> Bar</>
-                          ) : (
-                            <><UtensilsCrossed className="h-2.5 w-2.5 md:h-3 md:w-3 mr-0.5 md:mr-1" /> Restaurant</>
-                          )}
-                        </Badge>
-                      )}
                     </div>
                     <p className="text-[10px] md:text-xs text-muted-foreground">
                       Rs. {item.product.price.toFixed(2)} each
@@ -145,7 +123,7 @@ export function BillCart({
                       onClick={() =>
                         onUpdateQuantity(item.product.id, item.quantity + 1)
                       }
-                      disabled={item.product.source === 'bar' && item.quantity >= item.product.stock}
+                      disabled={item.quantity >= item.product.stock}
                       className="h-6 w-6 md:h-7 md:w-7 p-0"
                     >
                       <Plus className="h-2.5 w-2.5 md:h-3 md:w-3" />
@@ -156,7 +134,7 @@ export function BillCart({
                   </span>
                 </div>
 
-                {item.product.source === 'bar' && item.quantity >= item.product.stock && (
+                {item.quantity >= item.product.stock && (
                   <p className="text-[10px] md:text-xs text-red-500">Max stock reached</p>
                 )}
               </div>
