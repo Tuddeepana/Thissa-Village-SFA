@@ -782,7 +782,10 @@ const POS = () => {
                             onClick={() =>
                               handleUpdateQuantity(item.product.id, item.quantity + 1)
                             }
-                            disabled={item.quantity >= item.product.stock}
+                            disabled={
+                              item.product.product_type !== 'HANDMADE' && 
+                              item.quantity >= item.product.stock
+                            }
                           >
                             <Plus className="h-3 w-3" />
                           </Button>

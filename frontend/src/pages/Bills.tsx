@@ -61,7 +61,7 @@ const Bills = () => {
   const [serverCard, setServerCard] = useState<any | null>(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [filterToday, setFilterToday] = useState(false);
+  const [filterToday, setFilterToday] = useState(true);
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
   const [terminalIdFilter, setTerminalIdFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
