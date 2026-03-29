@@ -33,11 +33,22 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
   const [selectedRooms, setSelectedRooms] = useState<Set<string>>(new Set());
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [pricePerNight] = useState(100); // Default price, can be made configurable
-  const [pricePerHour] = useState(20); // Default hourly price
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'CREDIT' | 'OTHER'>('CASH');
   const [cashGiven, setCashGiven] = useState(0);
   const [generateBill, setGenerateBill] = useState(true);
+
+  // Helper function to get average price for selected rooms
+  const getAveragePrice = (priceType: 'full_day' | 'short_time') => {
+    if (selectedRooms.size === 0) return 0;
+    let totalPrice = 0;
+    Array.from(selectedRooms).forEach(roomId => {
+      const room = availableRooms.find(r => r.id === roomId);
+      if (room) {
+        totalPrice += priceType === 'full_day' ? room.priceFullDay : room.priceShortTime;
+      }
+    });
+    return totalPrice / selectedRooms.size;
+  };
 
   // Set default check-in date to today
   useEffect(() => {
@@ -123,17 +134,31 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
 
   const calculateTotal = () => {
     if (bookingType === 'short_time') {
-      // Short time: rooms × hours × hourly price
-      return selectedRooms.size * shortTimeHours * pricePerHour;
+      // Short time: sum of (room hourly price × hours) for each room
+      let total = 0;
+      Array.from(selectedRooms).forEach(roomId => {
+        const room = availableRooms.find(r => r.id === roomId);
+        if (room) {
+          total += room.priceShortTime * shortTimeHours;
+        }
+      });
+      return total;
     } else {
-      // Full day: rooms × nights × nightly price
+      // Full day: sum of (room nightly price × nights) for each room
       if (!checkInDate || !checkOutDate) return 0;
 
       const checkIn = new Date(checkInDate);
       const checkOut = new Date(checkOutDate);
       const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
 
-      return selectedRooms.size * pricePerNight * nights;
+      let total = 0;
+      Array.from(selectedRooms).forEach(roomId => {
+        const room = availableRooms.find(r => r.id === roomId);
+        if (room) {
+          total += room.priceFullDay * nights;
+        }
+      });
+      return total;
     }
   };
 
@@ -184,7 +209,9 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
         return {
           roomId: room?.baseRoomId || roomId.split('-')[0],
           roomName: room?.displayName || '',
-          pricePerNight: bookingType === 'short_time' ? pricePerHour : pricePerNight,
+          pricePerNight: bookingType === 'short_time' 
+            ? (room?.priceShortTime || 0)
+            : (room?.priceFullDay || 0),
         };
       });
 
@@ -466,7 +493,7 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
                         <Badge className="text-xs bg-amber-100 text-amber-800 mt-1">VIP</Badge>
                       )}
                       <p className="text-xs text-muted-foreground mt-1">
-                        ${bookingType === 'short_time' ? pricePerHour : pricePerNight}/{bookingType === 'short_time' ? 'hour' : 'night'}
+                        Rs. {bookingType === 'short_time' ? room.priceShortTime : room.priceFullDay}/{bookingType === 'short_time' ? 'hour' : 'night'}
                       </p>
                       {selectedRooms.has(room.id) && (
                         <Badge className="mt-2 bg-green-100 text-green-700">Selected</Badge>
@@ -515,8 +542,8 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
                         <span>{shortTimeHours}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Price per hour:</span>
-                        <span>Rs. {pricePerHour}</span>
+                        <span>Average price per hour:</span>
+                        <span>Rs. {getAveragePrice('short_time').toFixed(2)}</span>
                       </div>
                     </>
                   ) : (
@@ -526,8 +553,8 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
                         <span>{calculateNights()}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Price per night:</span>
-                        <span>Rs. {pricePerNight}</span>
+                        <span>Average price per night:</span>
+                        <span>Rs. {getAveragePrice('full_day').toFixed(2)}</span>
                       </div>
                     </>
                   )}
