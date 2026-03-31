@@ -35,6 +35,7 @@ export interface Bill {
   total: number;
   customerName?: string;
   customerPhone?: string;
+  cashierName?: string; // Name of the cashier who created the bill
   paymentMethod: 'cash' | 'card' | 'credit' | 'other';
   amountPaid: number;
   change: number;

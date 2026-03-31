@@ -216,6 +216,8 @@ export const getAvailableRooms = async (checkInDate: Date, checkOutDate: Date) =
     displayName: string;
     room_type: string;
     baseRoomId: string;
+    priceFullDay: number;
+    priceShortTime: number;
   }> = [];
 
   allRooms.forEach(room => {
@@ -227,6 +229,8 @@ export const getAvailableRooms = async (checkInDate: Date, checkOutDate: Date) =
           displayName,
           room_type: room.room_type,
           baseRoomId: room.id,
+          priceFullDay: Number(room.price_full_day),
+          priceShortTime: Number(room.price_short_time),
         });
       }
     }
