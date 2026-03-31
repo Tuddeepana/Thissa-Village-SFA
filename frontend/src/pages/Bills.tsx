@@ -61,7 +61,7 @@ const Bills = () => {
   const [serverCard, setServerCard] = useState<any | null>(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [filterToday, setFilterToday] = useState(false);
+  const [filterToday, setFilterToday] = useState(true);
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
   const [terminalIdFilter, setTerminalIdFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -146,8 +146,9 @@ const Bills = () => {
           discount: 0,
           discountRate: 0,
           total: Number(b.total || 0),
-          customerName: b.cashier_name ?? b.customer_name ?? undefined,
+          customerName: b.customer_name || undefined,
           customerPhone: undefined,
+          cashierName: b.cashier_name || undefined,
           paymentMethod: (String(b.payment_method || 'other').toLowerCase() as any),
           amountPaid: b.cash_given !== undefined && b.cash_given !== null ? Number(b.cash_given) : Number(b.total || 0),
           change: b.balance_given !== undefined && b.balance_given !== null ? Number(b.balance_given) : 0,
@@ -245,8 +246,9 @@ const Bills = () => {
           serviceCharge: serviceChargeAmountNum,
           serviceChargeRate: serviceChargeRateNum,
           total: totalNum,
-          customerName: detailed.cashier_name ?? detailed.customer ?? undefined,
+          customerName: detailed.customer_name || detailed.customer || bill.customerName || undefined,
           customerPhone: undefined,
+          cashierName: detailed.cashier_name || bill.cashierName || undefined,
           paymentMethod: paymentMethodLower,
           amountPaid: paymentMethodLower === 'credit'
             ? 0
@@ -288,6 +290,58 @@ const Bills = () => {
   const handleOpenPayment = (bill: Bill) => {
     setBillForPayment(bill);
     setIsPaymentDialogOpen(true);
+  };
+
+  const handleExportToCSV = () => {
+    if (bills.length === 0) {
+      alert('No bills to export');
+      return;
+    }
+
+    // Prepare CSV headers
+    const headers = [
+      'Bill Number',
+      'Date',
+      'Customer Name',
+      'Cashier Name',
+      'Subtotal',
+      'Tax',
+      'Service Charge',
+      'Total',
+      'Payment Method',
+      'Items Count',
+    ];
+
+    // Prepare CSV rows
+    const rows = bills.map((bill) => [
+      bill.billNumber || '-',
+      format(new Date(bill.createdAt), 'dd/MM/yyyy HH:mm'),
+      bill.customerName || 'Not Provided',
+      bill.cashierName || '-',
+      bill.subtotal.toFixed(2),
+      bill.tax.toFixed(2),
+      (bill.serviceCharge || 0).toFixed(2),
+      bill.total.toFixed(2),
+      (bill.paymentMethod || '-').toUpperCase(),
+      bill.items?.length || 0,
+    ]);
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+    ].join('\n');
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `bills-export-${format(new Date(), 'dd-MM-yyyy-HH-mm')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleConfirmPayment = (
@@ -353,7 +407,7 @@ const Bills = () => {
             View and manage all sales bills
           </p>
         </div>
-        <Button variant="outline" className="gap-2">
+        <Button variant="outline" className="gap-2" onClick={handleExportToCSV}>
           <Download className="h-4 w-4" />
           Export Bills
         </Button>
@@ -600,7 +654,7 @@ const Bills = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {bill.customerName || <span className="text-muted-foreground">Walk-in</span>}
+                        {bill.customerName || <span className="text-muted-foreground">Not Provided</span>}
                       </TableCell>
                       <TableCell>{bill.items.length} items</TableCell>
                       <TableCell className="text-right font-semibold">
@@ -666,7 +720,7 @@ const Bills = () => {
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
                       <p className="text-muted-foreground text-xs">Customer</p>
-                      <p className="font-medium">{bill.customerName || "Walk-in"}</p>
+                      <p className="font-medium">{bill.customerName || "Not Provided"}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground text-xs">Total</p>
@@ -835,31 +889,32 @@ const Bills = () => {
               </div>
 
               {/* Customer Info */}
-              {(selectedBill.customerName || selectedBill.customerPhone) && (
-                <>
-                  <Separator />
-                  <div className="grid grid-cols-2 gap-4">
-                    {selectedBill.customerName && (
-                      <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <User className="h-4 w-4" />
-                          Customer Name
-                        </p>
-                        <p className="font-medium">{selectedBill.customerName}</p>
-                      </div>
-                    )}
-                    {selectedBill.customerPhone && (
-                      <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <Phone className="h-4 w-4" />
-                          Phone
-                        </p>
-                        <p className="font-medium">{selectedBill.customerPhone}</p>
-                      </div>
-                    )}
+              <Separator />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <User className="h-4 w-4" />
+                    Customer Name
+                  </p>
+                  <p className="font-medium">{selectedBill.customerName || "Not Provided"}</p>
+                </div>
+                {selectedBill.customerPhone && (
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                      <Phone className="h-4 w-4" />
+                      Phone
+                    </p>
+                    <p className="font-medium">{selectedBill.customerPhone}</p>
                   </div>
-                </>
-              )}
+                )}
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <User className="h-4 w-4" />
+                    Cashier Name
+                  </p>
+                  <p className="font-medium">{selectedBill.cashierName || "Not Available"}</p>
+                </div>
+              </div>
 
               {/* Credit Description */}
               {selectedBill.paymentMethod === 'credit' && selectedBill.creditDescription && (

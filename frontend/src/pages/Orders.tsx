@@ -525,14 +525,6 @@ const Orders = () => {
                   <div className="flex gap-2 ml-auto">
                     <Button 
                       size="sm" 
-                      variant="default"
-                      onClick={() => handleUpdateOrderStatus(selectedOrder.id, OrderStatus.COMPLETED)}
-                    >
-                      <Check className="h-4 w-4 mr-1" />
-                      Complete Order
-                    </Button>
-                    <Button 
-                      size="sm" 
                       variant="destructive"
                       onClick={() => handleUpdateOrderStatus(selectedOrder.id, OrderStatus.CANCELLED)}
                     >

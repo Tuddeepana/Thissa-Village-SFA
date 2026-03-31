@@ -72,6 +72,8 @@ export interface AvailableRoom {
   displayName: string;
   room_type: string;
   baseRoomId: string;
+  priceFullDay: number;
+  priceShortTime: number;
 }
 export interface RoomBookingListResponse {
   success: boolean;
