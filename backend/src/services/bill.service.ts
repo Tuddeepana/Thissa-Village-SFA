@@ -3,31 +3,24 @@ import type { BillCreateInput, BillDTO, BillCreateWithItemsInput, BillListQuery,
 import type { InventoryDTO } from '../types/inventory.types';
 import { inventoryService } from './inventory.service';
 
+function formatBillNumber(seq: number): string {
+  // B-000000000001 (12 digits)
+  return `B-${String(seq).padStart(12, '0')}`;
+}
+
+function placeholderBillNumber(): string {
+  // Must be unique and non-empty because DB column is NOT NULL and UNIQUE.
+  // We'll replace it immediately after creation within the same transaction.
+  return `TMP-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 class BillService {
   async createBill(input: BillCreateInput): Promise<BillDTO> {
-    const bill = await (prisma as any).bill.create({
-      data: {
-        bill_number: input.bill_number,
-        date: new Date(input.date as any),
-        payment_method: input.payment_method,
-        customer_name: input.customer_name ?? null,
-        total: (typeof input.total === 'number' ? input.total : Number(input.total)).toFixed(2),
-        cashier_name: input.cashier_name,
-        item_count: input.item_count,
-        credit_note: input.credit_note ?? null,
-        cash_given: (typeof input.cash_given === 'number' ? input.cash_given : Number(input.cash_given)).toFixed(2),
-        balance_given: (typeof input.balance_given === 'number' ? input.balance_given : Number(input.balance_given)).toFixed(2),
-        tax: input.tax !== undefined && input.tax !== null ? (typeof input.tax === 'number' ? input.tax : Number(input.tax)).toFixed(2) : null,
-      },
-    });
-    return bill as BillDTO;
-  }
-
-  async createBillWithItems(input: BillCreateWithItemsInput): Promise<{ bill: BillDTO; inventory: InventoryDTO[] }> {
-    const result = await (prisma as any).$transaction(async (tx: any) => {
-      const createdBill = await tx.bill.create({
+    // Create first to obtain bill_seq, then update bill_number derived from it.
+    const bill = await (prisma as any).$transaction(async (tx: any) => {
+      const created = await tx.bill.create({
         data: {
-          bill_number: input.bill_number,
+          bill_number: input.bill_number ?? placeholderBillNumber(),
           date: new Date(input.date as any),
           payment_method: input.payment_method,
           customer_name: input.customer_name ?? null,
@@ -41,6 +34,45 @@ class BillService {
         },
       });
 
+      // Always normalize to formatted bill number when client didn't specify bill_number.
+      if (!input.bill_number) {
+        return await tx.bill.update({
+          where: { id: created.id },
+          data: { bill_number: formatBillNumber(created.bill_seq) },
+        });
+      }
+
+      return created;
+    });
+    return bill as BillDTO;
+  }
+
+  async createBillWithItems(input: BillCreateWithItemsInput): Promise<{ bill: BillDTO; inventory: InventoryDTO[] }> {
+    const result = await (prisma as any).$transaction(async (tx: any) => {
+      const createdBill = await tx.bill.create({
+        data: {
+          bill_number: input.bill_number ?? placeholderBillNumber(),
+          date: new Date(input.date as any),
+          payment_method: input.payment_method,
+          customer_name: input.customer_name ?? null,
+          total: (typeof input.total === 'number' ? input.total : Number(input.total)).toFixed(2),
+          cashier_name: input.cashier_name,
+          item_count: input.item_count,
+          credit_note: input.credit_note ?? null,
+          cash_given: (typeof input.cash_given === 'number' ? input.cash_given : Number(input.cash_given)).toFixed(2),
+          balance_given: (typeof input.balance_given === 'number' ? input.balance_given : Number(input.balance_given)).toFixed(2),
+          tax: input.tax !== undefined && input.tax !== null ? (typeof input.tax === 'number' ? input.tax : Number(input.tax)).toFixed(2) : null,
+        },
+      });
+
+      // Fill in the formatted bill_number once we have bill_seq.
+      const billWithNumber = (!input.bill_number)
+        ? await tx.bill.update({
+            where: { id: createdBill.id },
+            data: { bill_number: formatBillNumber(createdBill.bill_seq) },
+          })
+        : createdBill;
+
       const inventoryRecords: InventoryDTO[] = [];
 
       for (const item of input.items) {
@@ -49,7 +81,7 @@ class BillService {
         const rec = await inventoryService.createMovement(
           {
             productId: item.productId,
-            billId: createdBill.id,
+            billId: billWithNumber.id,
             quantity_moved: qty,
           },
           tx
@@ -57,7 +89,7 @@ class BillService {
         inventoryRecords.push(rec);
       }
 
-      return { bill: createdBill as BillDTO, inventory: inventoryRecords };
+      return { bill: billWithNumber as BillDTO, inventory: inventoryRecords };
     });
 
     return result;
@@ -232,7 +264,7 @@ class BillService {
       updatedAt: b.updatedAt instanceof Date ? b.updatedAt.toISOString() : String(b.updatedAt),
     })) as BillDTO[];
 
-    return { data, page, pageSize, total, card: cardSummary } as any;
+    return { data, page, pageSize, limit: pageSize, total, card: cardSummary } as any;
   }
 
   async updatePayment(id: string, input: {

@@ -1,0 +1,17 @@
+{
+  "name": "Tissa Village - Wine Store Management System",
+  "short_name": "Tissa Village",
+  "description": "Professional wine store management system with SFA automation and POS billing",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "16x16 32x32",
+      "type": "image/x-icon"
+    }
+  ]
+}
+

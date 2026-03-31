@@ -21,7 +21,7 @@ export type BillItemInput = {
 };
 
 export type BillCreateInput = {
-  bill_number: string;
+  bill_number?: string;
   date: string | Date;
   payment_method: string;
   customer_name?: string | null;
@@ -53,6 +53,9 @@ export type BillListQuery = {
 export type PaginatedResult<T> = {
   data: T[];
   page: number;
+  // preferred name
+  pageSize: number;
+  // backward-compatible alias
   limit: number;
   total: number;
 };

@@ -1,9 +1,9 @@
 import { NavLink } from "@/components/NavLink";
+import logo from "@/assets/images/village-bar-logo.png";
 import { useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
     LayoutDashboard,
-    Wine,
     Package,
     FileText,
     ShoppingCart,
@@ -57,11 +57,11 @@ export function AppSidebar() {
       <SidebarContent>
         <div className="p-4 md:p-6 border-b">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <Wine className="w-6 h-6 text-primary-foreground" />
+            <div className="w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center">
+              <img src={logo} alt="Village Bar Logo" className="w-full h-full object-contain" />
             </div>
             <div>
-              <h1 className="font-bold text-base md:text-lg text-foreground">Tissa Village</h1>
+              <h1 className="font-bold text-base md:text-lg text-foreground">Village Bar</h1>
               <p className="text-xs text-muted-foreground">{moduleLabel}</p>
             </div>
           </div>

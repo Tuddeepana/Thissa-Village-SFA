@@ -110,17 +110,8 @@ export const userQuerySchema = z.object({
     .string()
     .optional(),
   
-  page: z
-    .string()
-    .regex(/^\d+$/, 'Page must be a positive number')
-    .transform(Number)
-    .optional(),
-  
-  limit: z
-    .string()
-    .regex(/^\d+$/, 'Limit must be a positive number')
-    .transform(Number)
-    .optional(),
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().optional(),
 });
 
 /**

@@ -53,6 +53,7 @@ interface AddInvoiceDialogProps {
 
 export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, invoiceToEdit }: AddInvoiceDialogProps) {
   const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [date, setDate] = useState<Date>(new Date());
   const [customerName, setCustomerName] = useState("");
@@ -255,6 +256,7 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
       items: items.map(i => ({ productId: i.productId, quantityMoved: i.quantity })),
     };
 
+    setIsSaving(true);
     try {
       if (invoiceToEdit && (invoiceToEdit.id || invoiceToEdit.invoiceNumber)) {
         // Try to use id if available, otherwise fall back to invoice number
@@ -279,6 +281,8 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const message = (err as any)?.response?.data?.message ?? 'Failed to save invoice';
       alert(message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -415,6 +419,7 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
                   <Button
                     className="mt-6"
                     onClick={handleAddItem}
+                    disabled={isSaving}
                   >
                     Add Item
                   </Button>
@@ -488,9 +493,11 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
         <DialogFooter>
           <Button
             onClick={handleSubmit}
-            disabled={!isValid}
+            disabled={!isValid || isSaving}
           >
-            {invoiceToEdit ? 'Update Invoice' : 'Save Invoice'}
+            {isSaving
+              ? (invoiceToEdit ? 'Updating...' : 'Saving...')
+              : (invoiceToEdit ? 'Update Invoice' : 'Save Invoice')}
           </Button>
         </DialogFooter>
       </DialogContent>

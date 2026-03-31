@@ -1,13 +1,39 @@
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { STORAGE_KEYS, ROLES } from "@/utils/constants";
-import { User } from "@/types/user.types";
+import { useAppSelector } from "@/store/hooks";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Wine, ShoppingCart, LayoutDashboard, Package, FileText, AlertCircle } from "lucide-react";
+import { ShoppingCart, LayoutDashboard, Package, FileText, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import logo from "@/assets/images/village-bar-logo.png";
 
 const ModuleSelection = () => {
   const navigate = useNavigate();
+
+  // Get user from Redux store
+  const reduxUser = useAppSelector((state) => state.auth.user);
+
+  // Fallback to localStorage if Redux state is not available
+  const authUser = useMemo(() => {
+    if (reduxUser) return reduxUser;
+
+    const raw = localStorage.getItem(STORAGE_KEYS.user);
+    try {
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, [reduxUser]);
+
+  // Debug logging
+  useEffect(() => {
+    console.log("ModuleSelection - Auth User:", authUser);
+    console.log("ModuleSelection - User Role:", authUser?.role);
+    console.log("ModuleSelection - Is Admin:", authUser?.role === ROLES.ADMIN);
+    console.log("ModuleSelection - Redux User:", reduxUser);
+  }, [authUser, reduxUser]);
+
+  const isAdmin = authUser?.role === ROLES.ADMIN;
 
   const handleModuleSelect = (module: string) => {
     localStorage.setItem(STORAGE_KEYS.selectedModule, module);
@@ -26,22 +52,17 @@ const ModuleSelection = () => {
     navigate("/auth");
   };
 
-  const authUser = useMemo<User | null>(() => {
-    const raw = localStorage.getItem(STORAGE_KEYS.user);
-    try { return raw ? (JSON.parse(raw) as User) : null; } catch { return null; }
-  }, []);
-  const isAdmin = authUser?.role === ROLES.ADMIN;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/20 to-background p-4">
       <div className="w-full max-w-4xl space-y-8">
         <div className="text-center space-y-2">
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center">
-              <Wine className="w-8 h-8 text-primary-foreground" />
+            <div className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center bg-background border shadow-sm">
+              <img src={logo} alt="Village Bar Logo" className="w-full h-full object-contain p-1" />
             </div>
           </div>
-          <h1 className="text-4xl font-bold text-primary">Welcome to Tissa Village</h1>
+          <h1 className="text-4xl font-bold text-primary">Welcome to Village Bar</h1>
           <p className="text-muted-foreground text-lg">Select a module to continue</p>
         </div>
 
