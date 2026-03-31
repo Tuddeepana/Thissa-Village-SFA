@@ -48,12 +48,17 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { Bill } from "@/types/pos";
-import api from '@/api/client';
+import {
+  useGetBillsQuery,
+  useGetBillByIdQuery,
+  useUpdateBillPaymentMutation
+} from "@/store/api/billsApi";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import { printBillNewWindow } from "@/lib/billPrinter";
 import { STORAGE_KEYS } from "@/utils/constants";
-import LocalLoader from "@/components/common/LocalLoader";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LoadingState } from "@/components/common/LoadingState";
+import LocalLoader from "@/components/common/LocalLoader";
 
 const Bills = () => {
   const navigate = useNavigate();
@@ -61,23 +66,56 @@ const Bills = () => {
   // Default date to today (YYYY-MM-DD format for input[type="date"])
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Server-driven state
-  const [bills, setBills] = useState<Bill[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [serverCard, setServerCard] = useState<any | null>(null);
+  // Filter state
   const [dateFrom, setDateFrom] = useState(todayStr);
   const [dateTo, setDateTo] = useState(todayStr);
-  const [filterToday, setFilterToday] = useState(false);
+  const [filterToday, setFilterToday] = useState(true);
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedBill, setSelectedBill] = useState<any | null>(null);
+  const itemsPerPage = 15;
+
+  // RTK Query hooks
+  const {
+    data: billsData,
+    isLoading,
+    isFetching,
+    refetch
+  } = useGetBillsQuery({
+    page: currentPage,
+    pageSize: itemsPerPage, // Changed from 'limit' to match backend
+    dateFrom: filterToday ? undefined : dateFrom,
+    dateTo: filterToday ? undefined : dateTo,
+    today: filterToday ? true : undefined, // Added to match backend
+    paymentMethod: paymentMethodFilter === "all" ? undefined : paymentMethodFilter,
+    search: searchQuery || undefined,
+  });
+
+  const [updateBillPayment] = useUpdateBillPaymentMutation();
+
+  // Extract data from RTK Query response and memoize
+  const bills = useMemo(() => billsData?.items ?? [], [billsData?.items]);
+  const totalRecords = billsData?.total ?? 0;
+
+  // Dialog state
+  const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
+  const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-  const [isLoadingBill, setIsLoadingBill] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [billForPayment, setBillForPayment] = useState<Bill | null>(null);
-  const itemsPerPage = 15;
+
+  // Fetch detailed bill when selectedBillId is set
+  const { data: detailedBill, isLoading: isLoadingBill } = useGetBillByIdQuery(
+    selectedBillId || '',
+    { skip: !selectedBillId }
+  );
+
+  // Update selectedBill when detailed bill is loaded
+  useEffect(() => {
+    if (detailedBill && !isLoadingBill) {
+      setSelectedBill(detailedBill);
+    }
+  }, [detailedBill, isLoadingBill]);
 
   // Determine selected module safely (default to 'pos')
   const selectedModule = (() => {
@@ -93,19 +131,19 @@ const Bills = () => {
     setCurrentPage(1);
   }, [searchQuery, filterToday, dateFrom, dateTo, paymentMethodFilter]);
 
-  // Pagination values from server
+  // Pagination values from RTK Query
   const totalPages = Math.max(1, Math.ceil((totalRecords || 0) / itemsPerPage));
-  const paginatedBills = bills; // server already returns paginated page
+  const paginatedBills = bills; // RTK Query already returns paginated results
 
-  // Statistics - prefer server card summary when available
+  // Statistics - memoized to avoid recalculation
   const stats = useMemo(() => {
-    const totalRevenue = serverCard ? Number(serverCard.totalRevenue || 0) : bills.reduce((sum, b) => sum + b.total, 0);
-    const totalBills = serverCard ? serverCard.totalBills || totalRecords : totalRecords || bills.length;
+    const totalRevenue = bills.reduce((sum, b) => sum + b.total, 0);
+    const totalBills = totalRecords || bills.length;
     const cashBills = bills.filter((b) => b.paymentMethod === 'cash').length;
     const cardBills = bills.filter((b) => b.paymentMethod === 'card').length;
     const creditBills = bills.filter((b) => b.paymentMethod === 'credit').length;
     return { totalRevenue, totalBills, cashBills, cardBills, creditBills };
-  }, [serverCard, bills, totalRecords]);
+  }, [bills, totalRecords]);
 
   // Clear all filters
   const clearFilters = () => {
@@ -117,146 +155,11 @@ const Bills = () => {
     setCurrentPage(1);
   };
 
-  // Fetch bills from server (debounced for search)
-  useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-    const timeout = setTimeout(async () => {
-      setIsLoading(true);
-      try {
-        const params: any = {
-          page: currentPage,
-          pageSize: itemsPerPage,
-        };
-        if (searchQuery) params.search = searchQuery;
-        if (paymentMethodFilter && paymentMethodFilter !== 'all') params.paymentMethod = paymentMethodFilter.toUpperCase();
-        if (filterToday) params.today = true;
-        if (dateFrom) params.dateFrom = dateFrom;
-        if (dateTo) params.dateTo = dateTo;
-
-  const resp = await api.get('/bills', { params, signal: controller.signal, meta: { showLoader: 'local', loaderKey: 'bills' } });
-        const respData = resp.data;
-        const list = respData?.billsResponse?.data ?? respData?.data ?? [];
-        const pagination = respData?.billsResponse?.pagination ?? {};
-        const card = respData?.card ?? null;
-
-        // Map backend DTOs to frontend Bill shape (shallow - items will be fetched when viewing)
-        const mapped: Bill[] = (list as any[]).map((b: any) => ({
-          id: b.id,
-          billNumber: b.bill_number ?? b.billNo ?? undefined,
-          items: new Array(b.item_count || 0).fill({} as any),
-          subtotal: Number(b.total || 0) - Number(b.tax || 0),
-          tax: b.tax !== undefined && b.tax !== null ? Number(b.tax) : 0,
-          taxRate: 0,
-          discount: 0,
-          discountRate: 0,
-          total: Number(b.total || 0),
-          customerName: b.customer_name ?? undefined,
-          customerPhone: undefined,
-          paymentMethod: (String(b.payment_method || 'other').toLowerCase() as any),
-          amountPaid: b.cash_given !== undefined && b.cash_given !== null ? Number(b.cash_given) : Number(b.total || 0),
-          change: b.balance_given !== undefined && b.balance_given !== null ? Number(b.balance_given) : 0,
-          creditDescription: b.credit_note ?? undefined,
-          createdAt: b.date ? new Date(b.date) : new Date(b.createdAt),
-        }));
-
-        if (!cancelled) {
-          setBills(mapped);
-          setTotalRecords(pagination.totalRecords ?? respData?.total ?? 0);
-          setServerCard(card);
-        }
-      } catch (err) {
-        if (!cancelled) console.error('Failed to fetch bills', err);
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    }, 300);
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-      clearTimeout(timeout);
-    };
-  }, [searchQuery, filterToday, dateFrom, dateTo, paymentMethodFilter, currentPage]);
-
-  // Fetch bill details from backend and map to local shape used by this page
-  const handleViewBill = async (bill: Bill) => {
-    setIsLoadingBill(true);
-    setSelectedBill(null);
+  // Fetch bill details using RTK Query
+  const handleViewBill = (bill: Bill) => {
+    setSelectedBill(null); // Clear previous bill
+    setSelectedBillId(bill.id); // Trigger fetch
     setIsViewDialogOpen(true);
-
-    try {
-      const resp = await api.get(`/bills/${encodeURIComponent(bill.id)}`);
-      const data = resp.data?.data ?? resp.data;
-
-      // If backend returns the detailed shape (dateTime, PaymentMethod, customer, creditNote, Items, Subtotal, Tax, Total)
-      const detailed = data;
-
-      if (detailed && detailed.Items) {
-        // Map to the frontend Bill shape used in the modal
-        const mappedItems = (detailed.Items || []).map((it: any) => {
-          const qty = Math.abs(Number(it.quantity_moved || 0));
-          const price = it.selling_price !== undefined && it.selling_price !== null ? Number(it.selling_price) : 0;
-          // Build bottle volume label from litres and unit (ML/L)
-          const litresRaw = it.litres !== undefined && it.litres !== null ? Number(it.litres) : undefined;
-          const unitKey = String(it.bottle_volume ?? '').toUpperCase();
-          const bottleVolume = litresRaw !== undefined && !isNaN(litresRaw)
-            ? `${litresRaw} ${unitKey.toLowerCase()}`
-            : undefined;
-          return {
-            product: {
-              id: it.productId || it.productId || 'unknown',
-              name: it.name || it.productName || 'Unknown Product',
-              category: it.categoryName || it.category || 'General',
-              price: price,
-              cost: it.cost_price !== undefined && it.cost_price !== null ? Number(it.cost_price) : price * 0.7,
-              stock: 0,
-              minStock: 0,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              // Attach bottle volume for display
-              bottleVolume,
-            },
-            quantity: qty,
-            subtotal: +(price * qty),
-          };
-        });
-
-        const subtotalNum = Number(detailed.Subtotal ?? mappedItems.reduce((s: number, it: any) => s + it.subtotal, 0));
-        const taxNum = Number(detailed.Tax ?? 0);
-        const totalNum = Number(detailed.Total ?? (subtotalNum + taxNum));
-
-        const mappedBill = {
-          id: detailed.id || bill.id,
-          billNumber: detailed.bill_number || detailed.billNo || bill.billNumber,
-          items: mappedItems,
-          subtotal: subtotalNum,
-          tax: taxNum,
-          taxRate: mappedItems.length ? Math.round((taxNum / (subtotalNum || 1)) * 100) : 0,
-          discount: 0,
-          discountRate: 0,
-          total: totalNum,
-          customerName: detailed.customer ?? undefined,
-          customerPhone: undefined,
-          paymentMethod: (String(detailed.PaymentMethod || bill.paymentMethod || '').toLowerCase()),
-          amountPaid: detailed.PaymentMethod && String(detailed.PaymentMethod).toLowerCase() === 'credit' ? 0 : totalNum,
-          change: 0,
-          creditDescription: detailed.creditNote ?? undefined,
-          createdAt: detailed.dateTime ? new Date(detailed.dateTime) : bill.createdAt,
-        };
-
-        setSelectedBill(mappedBill);
-      } else {
-        // Fallback - use the existing mock bill data
-        setSelectedBill(bill);
-      }
-    } catch (err) {
-      console.error('Failed to fetch bill details', err);
-      // Fallback to mock bill
-      setSelectedBill(bill);
-    } finally {
-      setIsLoadingBill(false);
-    }
   };
 
   const getPaymentMethodBadge = (method: string) => {
@@ -277,7 +180,7 @@ const Bills = () => {
     setIsPaymentDialogOpen(true);
   };
 
-  const handleConfirmPayment = (
+  const handleConfirmPayment = async (
     paymentMethod: 'cash' | 'card' | 'credit' | 'other',
     amountPaid: number,
     customerName?: string,
@@ -285,31 +188,20 @@ const Bills = () => {
     creditDescription?: string
   ) => {
     if (!billForPayment) return;
+
     const now = new Date();
     const change = paymentMethod === 'credit' ? 0 : amountPaid - billForPayment.total;
-    // Persist payment update to backend
-    (async () => {
-      try {
-        const payload: any = {
-          payment_method: paymentMethod.toUpperCase(),
-          cash_given: paymentMethod === 'credit' ? 0 : amountPaid,
-          balance_given: paymentMethod === 'credit' ? 0 : Math.max(0, change),
-          credit_note: paymentMethod === 'credit' ? (creditDescription || null) : null,
-          customer_name: customerName || null,
-        };
-        await api.patch(`/bills/${encodeURIComponent(billForPayment.id)}/payment`, payload);
-        // Optimistically update list UI
-        setBills((prev) => prev.map((b) => b.id === billForPayment.id ? {
-          ...b,
-          paymentMethod,
-          amountPaid,
-          change: Math.max(0, change),
-          creditDescription: paymentMethod === 'credit' ? (creditDescription || null as any) : null as any,
-          customerName: customerName || b.customerName,
-        } : b));
-      } catch (e) {
-        console.error('Failed updating bill payment, proceeding to print locally', e);
-      }
+
+    try {
+      // Update payment using RTK Query mutation
+      await updateBillPayment({
+        id: billForPayment.id,
+        paymentMethod,
+        amountPaid: paymentMethod === 'credit' ? 0 : amountPaid,
+        creditDescription: paymentMethod === 'credit' ? creditDescription : undefined,
+      }).unwrap();
+
+      // Create printable bill
       const printable: Bill = {
         id: billForPayment.id,
         items: billForPayment.items,
@@ -327,10 +219,16 @@ const Bills = () => {
         creditDescription,
         createdAt: now,
       };
+
       printBillNewWindow(printable);
       setIsPaymentDialogOpen(false);
       setBillForPayment(null);
-    })();
+
+      // Refetch bills to update the list
+      refetch();
+    } catch (error) {
+      console.error('Failed to update bill payment:', error);
+    }
   };
 
   // Keyboard shortcuts handler
@@ -408,78 +306,75 @@ const Bills = () => {
       </div>
 
       {/* Statistics Cards with Loader */}
-      <LocalLoader
-        loaderKey="bills"
-        renderSkeleton={() => (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Card key={i}>
-                <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
-                  <Skeleton className="h-4 w-24" />
-                </CardHeader>
-                <CardContent className="p-3 md:p-4 pt-0">
-                  <Skeleton className="h-6 w-20" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      >
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
-        <Card>
-          <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
-              Total Bills
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-xl md:text-2xl font-bold">{stats.totalBills}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
-              Total Revenue
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-xl md:text-2xl font-bold text-green-600">
-              Rs.{stats.totalRevenue.toFixed(0)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
-              Cash
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-xl md:text-2xl font-bold">{stats.cashBills}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
-              Card
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-xl md:text-2xl font-bold">{stats.cardBills}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
-              Credit
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-xl md:text-2xl font-bold text-yellow-600">{stats.creditBills}</div>
-          </CardContent>
-        </Card>
-      </div>
-      </LocalLoader>
+      {isLoading ? (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+                <Skeleton className="h-4 w-24" />
+              </CardHeader>
+              <CardContent className="p-3 md:p-4 pt-0">
+                <Skeleton className="h-6 w-20" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
+          <Card>
+            <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+                Total Bills
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-xl md:text-2xl font-bold">{stats.totalBills}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+                Total Revenue
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-xl md:text-2xl font-bold text-green-600">
+                Rs.{stats.totalRevenue.toFixed(0)}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+                Cash
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-xl md:text-2xl font-bold">{stats.cashBills}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+                Card
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-xl md:text-2xl font-bold">{stats.cardBills}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+                Credit
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-xl md:text-2xl font-bold text-yellow-600">{stats.creditBills}</div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Filters */}
       <Card>
@@ -593,22 +488,25 @@ const Bills = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
-          <LocalLoader loaderKey="bills">
-          {/* Desktop Table */}
-          <div className="hidden md:block rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Bill ID</TableHead>
-                  <TableHead>Date & Time</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-center">Payment</TableHead>
-                  <TableHead className="text-center">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+          {isLoading ? (
+            <LoadingState message="Loading bills..." />
+          ) : (
+            <LocalLoader loading={isFetching}>
+              {/* Desktop Table */}
+              <div className="hidden md:block rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Bill ID</TableHead>
+                      <TableHead>Date & Time</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Items</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-center">Payment</TableHead>
+                      <TableHead className="text-center">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                 {paginatedBills.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
@@ -670,68 +568,69 @@ const Bills = () => {
                     </TableRow>
                   ))
                 )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Mobile Card View */}
-          <div className="md:hidden space-y-3">
-            {paginatedBills.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 text-muted-foreground py-8">
-                <Receipt className="h-12 w-12" />
-                <p>No bills found</p>
-                <p className="text-sm">Try adjusting your filters</p>
+                  </TableBody>
+                </Table>
               </div>
-            ) : (
-              paginatedBills.map((bill) => (
-                <div
-                  key={bill.id}
-                  className="border rounded-lg p-3 space-y-2 bg-card"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-mono text-sm font-medium">{bill.billNumber || bill.id}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(bill.createdAt, "MMM dd, yyyy hh:mm a")}
-                      </p>
-                    </div>
-                    {getPaymentMethodBadge(bill.paymentMethod)}
+
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-3">
+                {paginatedBills.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground py-8">
+                    <Receipt className="h-12 w-12" />
+                    <p>No bills found</p>
+                    <p className="text-sm">Try adjusting your filters</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <p className="text-muted-foreground text-xs">Customer</p>
-                      <p className="font-medium">{bill.customerName || "Walk-in"}</p>
+                ) : (
+                  paginatedBills.map((bill) => (
+                    <div
+                      key={bill.id}
+                      className="border rounded-lg p-3 space-y-2 bg-card"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-mono text-sm font-medium">{bill.billNumber || bill.id}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(bill.createdAt, "MMM dd, yyyy hh:mm a")}
+                          </p>
+                        </div>
+                        {getPaymentMethodBadge(bill.paymentMethod)}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <p className="text-muted-foreground text-xs">Customer</p>
+                          <p className="font-medium">{bill.customerName || "Walk-in"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs">Total</p>
+                          <p className="font-semibold text-green-600">Rs.{bill.total.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 border-t">
+                        <span className="text-xs text-muted-foreground">{bill.items.length} items</span>
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleViewBill(bill)}>
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                          {selectedModule === 'pos' && bill.paymentMethod === 'credit' && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleOpenPayment(bill)}
+                              aria-label="Collect Payment"
+                              title="Collect Payment"
+                              className="p-2"
+                            >
+                              <Banknote className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Total</p>
-                      <p className="font-semibold text-green-600">Rs.{bill.total.toFixed(2)}</p>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center pt-2 border-t">
-                    <span className="text-xs text-muted-foreground">{bill.items.length} items</span>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleViewBill(bill)}>
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
-                      {selectedModule === 'pos' && bill.paymentMethod === 'credit' && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleOpenPayment(bill)}
-                          aria-label="Collect Payment"
-                          title="Collect Payment"
-                          className="p-2"
-                        >
-                          <Banknote className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-          </LocalLoader>
+                  ))
+                )}
+              </div>
+            </LocalLoader>
+          )}
 
           {/* Pagination */}
           {totalPages > 1 && (
@@ -833,7 +732,13 @@ const Bills = () => {
       </Card>
 
       {/* Bill Details Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+      <Dialog open={isViewDialogOpen} onOpenChange={(open) => {
+        setIsViewDialogOpen(open);
+        if (!open) {
+          setSelectedBillId(null); // Clear selected bill ID when closing
+          setSelectedBill(null);
+        }
+      }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -841,15 +746,15 @@ const Bills = () => {
               Bill Details
             </DialogTitle>
             <DialogDescription>
-              {selectedBill?.billNumber || selectedBill?.id}
+              {selectedBill?.billNumber || selectedBill?.id || 'Loading...'}
             </DialogDescription>
           </DialogHeader>
 
-          {isLoadingBill ? (
+          {isLoadingBill || !selectedBill ? (
             <div className="py-8 flex items-center justify-center">
-              <div>Loading bill...</div>
+              <div>Loading bill details...</div>
             </div>
-          ) : selectedBill ? (
+          ) : (
              <div className="space-y-4">
               {/* Bill Info */}
               <div className="grid grid-cols-2 gap-4">
@@ -923,7 +828,7 @@ const Bills = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedBill.items.map((item: any, index: number) => (
+                      {selectedBill.items.map((item, index: number) => (
                         <TableRow key={index}>
                           <TableCell>{item.product.name}</TableCell>
                           <TableCell className="text-center">{item.quantity}</TableCell>
@@ -942,7 +847,7 @@ const Bills = () => {
               {/* Totals */}
               <div className="space-y-2">
                 {(() => {
-                  const totalLiters = (selectedBill.items || []).reduce((sum: number, item: { product?: { bottleVolume?: string }; quantity?: number }) => {
+                  const totalLiters = (selectedBill.items || []).reduce((sum: number, item) => {
                     const label: string | undefined = item?.product?.bottleVolume;
                     if (!label) return sum;
                     const parts = String(label).trim().toLowerCase().split(/\s+/);
@@ -996,8 +901,6 @@ const Bills = () => {
                 )}
               </div>
             </div>
-          ) : (
-            <div className="py-8 text-center text-muted-foreground">No bill selected</div>
           )}
          </DialogContent>
        </Dialog>

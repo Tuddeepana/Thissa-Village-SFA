@@ -1,17 +1,16 @@
 import React from 'react';
-import { useLocalLoader } from '@/state/loadingProvider';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**
- * LocalLoader wraps children and shows a skeleton while the loader key is active.
+ * LocalLoader shows skeleton while loading prop is true.
  * Pass a custom skeleton via renderSkeleton for specialized layouts.
  */
 const LocalLoader: React.FC<{
-  loaderKey: string;
+  loading?: boolean;
+  loaderKey?: string; // kept for backward compatibility, but ignored
   renderSkeleton?: () => React.ReactNode;
   children: React.ReactNode;
-}> = ({ loaderKey, renderSkeleton, children }) => {
-  const loading = useLocalLoader(loaderKey);
+}> = ({ loading = false, renderSkeleton, children }) => {
 
   if (!loading) return <>{children}</>;
 

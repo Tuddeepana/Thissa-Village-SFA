@@ -15,9 +15,9 @@ export const list = async (req: Request, res: Response) => {
       data: result.data,
       pagination: {
         currentPage: result.page,
-        pageSize: result.limit,
+        pageSize: result.pageSize,
         totalRecords: result.total,
-        totalPages: Math.max(1, Math.ceil(result.total / result.limit || 1)),
+        totalPages: Math.max(1, Math.ceil(result.total / result.pageSize || 1)),
       },
     },
   });

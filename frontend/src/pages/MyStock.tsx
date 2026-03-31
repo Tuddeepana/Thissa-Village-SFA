@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Download, Search, Package, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import api from "@/api/client";
 import LocalLoader from "@/components/common/LocalLoader";
+import { LoadingState } from "@/components/common";
 import { Skeleton } from "@/components/ui/skeleton";
 import { categoryService } from '@/api/services/categoryService';
 import type { Category } from '@/types/category.types';
@@ -42,11 +43,13 @@ const MyStock = () => {
   const [rows, setRows] = useState<MyStockTableRow[]>([]);
   const [cards, setCards] = useState<MyStockResponse['cardResponse'] | null>(null);
   const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Fetch data from server when filters/pagination change
   useEffect(() => {
     let cancelled = false;
     const fetchData = async () => {
+      setIsLoading(true);
       // fetch
       try {
         const res = await api.get<MyStockResponse>(
@@ -72,7 +75,7 @@ const MyStock = () => {
       } catch (err) {
         console.error('Failed to fetch mystock', err);
       } finally {
-        // done
+        if (!cancelled) setIsLoading(false);
       }
     };
     fetchData();
@@ -382,7 +385,13 @@ const MyStock = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedItems.length === 0 ? (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-12">
+                      <LoadingState message="Loading stock data..." />
+                    </TableCell>
+                  </TableRow>
+                ) : paginatedItems.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
                       <div className="flex flex-col items-center gap-2 text-muted-foreground">
@@ -436,7 +445,9 @@ const MyStock = () => {
 
           {/* Mobile Card View */}
           <div className="md:hidden space-y-3">
-            {paginatedItems.length === 0 ? (
+            {isLoading ? (
+              <LoadingState message="Loading stock data..." />
+            ) : paginatedItems.length === 0 ? (
               <div className="flex flex-col items-center gap-2 text-muted-foreground py-8">
                 <Package className="h-12 w-12" />
                 <p>No stock items found</p>

@@ -20,7 +20,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Download, Filter, TrendingUp, DollarSign, Package } from "lucide-react";
-import { format } from "date-fns";
+import { format } from 'date-fns';
+import { LoadingState, TableLoadingState } from '@/components/common/LoadingState';
 import LocalLoader from '@/components/common/LocalLoader';
 import { Skeleton } from '@/components/ui/skeleton';
 import { salesSummaryService } from '@/api/services/salesSummaryService';
@@ -42,7 +43,7 @@ const SalesSummary = () => {
   // Filters
   const [dateFrom, setDateFrom] = useState(todayStr);
   const [dateTo, setDateTo] = useState(todayStr);
-  const [filterToday, setFilterToday] = useState(false);
+  const [filterToday, setFilterToday] = useState(true);
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedProduct, setSelectedProduct] = useState<string>("all");

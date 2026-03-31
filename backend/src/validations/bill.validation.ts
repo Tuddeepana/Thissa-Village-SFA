@@ -6,7 +6,8 @@ export const billItemSchema = z.object({
 });
 
 export const createBillSchema = z.object({
-  bill_number: z.string().min(1),
+  // bill_number is now generated server-side (B-000000000001 style)
+  bill_number: z.string().min(1).optional(),
   date: z.union([z.string(), z.date()]),
   payment_method: z.string().min(1),
   customer_name: z.string().optional().nullable(),
