@@ -75,6 +75,7 @@ model Product {
   updatedAt DateTime @updatedAt
 
   @@map("products")
+  @@index([name])
 }
 
 model Invoice {
