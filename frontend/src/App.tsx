@@ -19,6 +19,7 @@ import SalesSummary from "./pages/SalesSummary";
 import Users from "./pages/Users";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import Backup from "./pages/Backup";
 import NotFound from "./pages/NotFound";
 import { STORAGE_KEYS } from "./utils/constants";
 
@@ -74,6 +75,7 @@ const App = () => (
             <Route path="users" element={<Users />} />
             <Route path="profile" element={<Profile />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="backup" element={<Backup />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
