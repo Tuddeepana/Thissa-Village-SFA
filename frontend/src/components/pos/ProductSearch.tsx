@@ -34,7 +34,7 @@ export const ProductSearch = forwardRef<HTMLInputElement, ProductSearchProps>(
 
   // Extract unique categories
   const categories = useMemo(() => {
-    const categorySet = new Set(products.map((p) => p.category));
+    const categorySet = new Set(products.map((p) => p.category).filter(c => c && c.trim() !== ""));
     return ["all", ...Array.from(categorySet).sort()];
   }, [products]);
 
