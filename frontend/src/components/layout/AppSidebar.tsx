@@ -12,6 +12,7 @@ import {
     Receipt,
     Users,
     TrendingUp,
+    Database,
 } from "lucide-react";
 import {
   Sidebar,
@@ -33,6 +34,7 @@ const sfaItems = [
   { title: "Bills", url: "/bills", icon: Receipt },
   { title: "Sales Summary", url: "/sales-summary", icon: TrendingUp },
   { title: "Users", url: "/users", icon: Users },
+  { title: "Database Backup", url: "/backup", icon: Database },
 ];
 
 const posItems = [
