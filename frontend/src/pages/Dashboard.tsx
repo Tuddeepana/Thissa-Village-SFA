@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, Package, AlertCircle } from "lucide-react";
+import { DollarSign, TrendingUp, Package, AlertCircle, Search, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import {
   BarChart,
   Bar,
@@ -36,6 +37,9 @@ const Dashboard = () => {
   // Use RTK Query to fetch dashboard data
   const { data: dashboardData, isLoading, error } = useGetDashboardSummaryQuery();
 
+  // State for category search/filter
+  const [categorySearchQuery, setCategorySearchQuery] = useState('');
+
   // Memoize computed values
   const weeklyData = useMemo(() => {
     if (!dashboardData?.weeklyIncomeResponse) return [];
@@ -63,6 +67,14 @@ const Dashboard = () => {
       color: COLOR_VARS[i % COLOR_VARS.length],
     }));
   }, [dashboardData?.categoryDistribution]);
+
+  // Filter category data based on search query
+  const filteredCategoryData = useMemo(() => {
+    if (!categorySearchQuery.trim()) return categoryData;
+    return categoryData.filter(category =>
+      category.name.toLowerCase().includes(categorySearchQuery.toLowerCase())
+    );
+  }, [categoryData, categorySearchQuery]);
 
   const weeklyIncome = dashboardData?.weeklyIncome ?? '0';
   const monthlyIncome = dashboardData?.monthlyIncome ?? '0';
@@ -264,9 +276,31 @@ const Dashboard = () => {
             <p className="text-xs md:text-sm text-muted-foreground mt-1">Detailed breakdown</p>
           </CardHeader>
           <CardContent className="px-2 md:px-6">
+            {/* Search/Filter Input */}
+            <div className="mb-4 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search categories..."
+                value={categorySearchQuery}
+                onChange={(e) => setCategorySearchQuery(e.target.value)}
+                className="pl-10 pr-10 h-9"
+              />
+              {categorySearchQuery && (
+                <button
+                  onClick={() => setCategorySearchQuery('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Category List */}
             <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
-              {categoryData.length > 0 ? (
-                categoryData.map((category, index) => (
+              {filteredCategoryData.length > 0 ? (
+                filteredCategoryData.map((category, index) => (
                   <div key={index} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors">
                     <div className="flex items-center gap-3">
                       <div
@@ -283,7 +317,7 @@ const Dashboard = () => {
                 ))
               ) : (
                 <div className="text-center py-8 text-muted-foreground text-sm">
-                  No category data available
+                  {categorySearchQuery ? 'No categories match your search' : 'No category data available'}
                 </div>
               )}
             </div>
