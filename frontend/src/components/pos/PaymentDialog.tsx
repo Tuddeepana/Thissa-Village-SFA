@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,6 +24,7 @@ interface PaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   total: number;
+  isLoading?: boolean;
   onConfirmPayment: (
     paymentMethod: 'cash' | 'card' | 'credit' | 'other',
     amountPaid: number,
@@ -37,13 +38,25 @@ export function PaymentDialog({
   open,
   onOpenChange,
   total,
+  isLoading = false,
   onConfirmPayment,
 }: PaymentDialogProps) {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'credit' | 'other'>('cash');
-  const [amountPaid, setAmountPaid] = useState(total.toString());
+  const [amountPaid, setAmountPaid] = useState("0");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [creditDescription, setCreditDescription] = useState("");
+
+  // Reset form when dialog opens or total changes
+  useEffect(() => {
+    if (open) {
+      setPaymentMethod('cash');
+      setAmountPaid("0");
+      setCustomerName("");
+      setCustomerPhone("");
+      setCreditDescription("");
+    }
+  }, [open, total]);
 
   const amountPaidNum = parseFloat(amountPaid) || 0;
   const change = Math.max(0, amountPaidNum - total);
@@ -61,7 +74,7 @@ export function PaymentDialog({
         isCredit ? creditDescription || undefined : undefined
       );
       // Reset form
-      setAmountPaid(total.toString());
+      setAmountPaid("0");
       setCustomerName("");
       setCustomerPhone("");
       setCreditDescription("");
@@ -71,6 +84,14 @@ export function PaymentDialog({
 
   const handleQuickAmount = (amount: number) => {
     setAmountPaid(amount.toString());
+  };
+
+  const handlePaymentMethodChange = (value: 'cash' | 'card' | 'credit' | 'other') => {
+    setPaymentMethod(value);
+    // Automatically set amount to exact bill amount when card is selected
+    if (value === 'card') {
+      setAmountPaid(total.toString());
+    }
   };
 
   return (
@@ -114,7 +135,7 @@ export function PaymentDialog({
             <Label htmlFor="paymentMethod" className="text-xs md:text-sm">Payment Method</Label>
             <Select
               value={paymentMethod}
-              onValueChange={(value) => setPaymentMethod(value as 'cash' | 'card' | 'credit' | 'other')}
+              onValueChange={handlePaymentMethodChange}
             >
               <SelectTrigger id="paymentMethod" className="text-xs md:text-sm h-8 md:h-9">
                 <SelectValue />
@@ -230,16 +251,30 @@ export function PaymentDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="text-xs md:text-sm h-8 md:h-9">
+          <Button 
+            variant="outline" 
+            onClick={() => onOpenChange(false)} 
+            className="text-xs md:text-sm h-8 md:h-9"
+            disabled={isLoading}
+          >
             Cancel
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={(!isCredit && amountPaidNum < total) || creditMissing}
-            aria-disabled={(!isCredit && amountPaidNum < total) || creditMissing}
+            disabled={(!isCredit && amountPaidNum < total) || creditMissing || isLoading}
+            aria-disabled={(!isCredit && amountPaidNum < total) || creditMissing || isLoading}
             className="text-xs md:text-sm h-8 md:h-9"
           >
-            {isCredit ? "Confirm Credit Sale" : "Confirm & Print Bill"}
+            {isLoading ? (
+              <>
+                <span className="inline-block animate-spin mr-2">
+                  ⏳
+                </span>
+                {isCredit ? "Processing..." : "Printing Bill..."}
+              </>
+            ) : (
+              isCredit ? "Confirm Credit Sale" : "Confirm & Print Bill"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
