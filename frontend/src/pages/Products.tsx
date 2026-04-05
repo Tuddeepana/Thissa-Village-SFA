@@ -346,6 +346,58 @@ const Products = () => {
                 </Dialog>
             </div>
 
+            {/* Filters Section */}
+            <Card>
+                <CardContent className="p-4">
+                    <div className="flex flex-col md:flex-row gap-4">
+                        <div className="flex-1">
+                            <Label htmlFor="search" className="sr-only">Search</Label>
+                            <Input
+                                id="search"
+                                placeholder="Search by product name..."
+                                value={search}
+                                onChange={(e) => {
+                                    setSearch(e.target.value);
+                                    setPage(1);
+                                }}
+                            />
+                        </div>
+                        <div className="w-full md:w-64">
+                            <Label htmlFor="category-filter" className="sr-only">Category</Label>
+                            <Select
+                                value={selectedCategory || "all"}
+                                onValueChange={(val) => {
+                                    setSelectedCategory(val === "all" ? "" : val);
+                                    setPage(1);
+                                }}
+                            >
+                                <SelectTrigger id="category-filter">
+                                    <SelectValue placeholder="All Categories" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Categories</SelectItem>
+                                    {categories.map((c) => (
+                                        <SelectItem key={c.id} value={c.id!}>{c.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        {(search || selectedCategory) && (
+                            <Button 
+                                variant="outline" 
+                                onClick={() => {
+                                    setSearch("");
+                                    setSelectedCategory("");
+                                    setPage(1);
+                                }}
+                            >
+                                Clear Filters
+                            </Button>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
             <Card>
                 <CardHeader>
                     <CardTitle className="text-base md:text-lg">
