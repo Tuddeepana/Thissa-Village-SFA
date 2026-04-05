@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, Package, AlertCircle, Search, X } from "lucide-react";
+import { DollarSign, TrendingUp, Package, AlertCircle, Search, X, RefreshCw, Clock } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   BarChart,
   Bar,
@@ -35,10 +36,13 @@ const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct
 
 const Dashboard = () => {
   // Use RTK Query to fetch dashboard data
-  const { data: dashboardData, isLoading, error } = useGetDashboardSummaryQuery();
+  const { data: dashboardData, isLoading, error, refetch } = useGetDashboardSummaryQuery();
 
   // State for category search/filter
   const [categorySearchQuery, setCategorySearchQuery] = useState('');
+  
+  // State for refresh
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Memoize computed values
   const weeklyData = useMemo(() => {
@@ -81,11 +85,61 @@ const Dashboard = () => {
   const totalProducts = dashboardData?.TotalProduct ?? 0;
   const lowStockCount = dashboardData?.lowStockItems?.length ?? 0;
 
+  // Handle manual refresh
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Format last updated timestamp
+  const formatLastUpdated = (isoString: string | undefined): string => {
+    if (!isoString) return 'Never';
+    try {
+      const date = new Date(isoString);
+      const options: Intl.DateTimeFormatOptions = {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+      };
+      return date.toLocaleString('en-US', options);
+    } catch {
+      return 'Invalid date';
+    }
+  };
+
   return (
     <div className="space-y-4 md:space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-sm md:text-base text-muted-foreground">Overview of your store performance</p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Overview of your store performance</p>
+        </div>
+        
+        {/* Last Updated DateTime and Refresh Button */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground px-3 py-2 rounded-lg bg-muted/50">
+            <Clock className="h-4 w-4 flex-shrink-0" />
+            <span className="whitespace-nowrap">Last updated: {formatLastUpdated(dashboardData?.lastUpdatedAt)}</span>
+          </div>
+          <Button
+            onClick={handleRefresh}
+            disabled={isRefreshing || isLoading}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
+        </div>
       </div>
 
       {error && (
