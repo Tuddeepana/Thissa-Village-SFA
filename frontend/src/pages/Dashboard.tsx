@@ -1,6 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, Package, AlertCircle } from "lucide-react";
+import { DollarSign, TrendingUp, Package, AlertCircle, Search, X, RefreshCw, Clock } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   BarChart,
   Bar,
@@ -34,7 +36,13 @@ const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct
 
 const Dashboard = () => {
   // Use RTK Query to fetch dashboard data
-  const { data: dashboardData, isLoading, error } = useGetDashboardSummaryQuery();
+  const { data: dashboardData, isLoading, error, refetch } = useGetDashboardSummaryQuery();
+
+  // State for category search/filter
+  const [categorySearchQuery, setCategorySearchQuery] = useState('');
+  
+  // State for refresh
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Memoize computed values
   const weeklyData = useMemo(() => {
@@ -64,16 +72,74 @@ const Dashboard = () => {
     }));
   }, [dashboardData?.categoryDistribution]);
 
+  // Filter category data based on search query
+  const filteredCategoryData = useMemo(() => {
+    if (!categorySearchQuery.trim()) return categoryData;
+    return categoryData.filter(category =>
+      category.name.toLowerCase().includes(categorySearchQuery.toLowerCase())
+    );
+  }, [categoryData, categorySearchQuery]);
+
   const weeklyIncome = dashboardData?.weeklyIncome ?? '0';
   const monthlyIncome = dashboardData?.monthlyIncome ?? '0';
   const totalProducts = dashboardData?.TotalProduct ?? 0;
   const lowStockCount = dashboardData?.lowStockItems?.length ?? 0;
 
+  // Handle manual refresh
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Format last updated timestamp
+  const formatLastUpdated = (isoString: string | undefined): string => {
+    if (!isoString) return 'Never';
+    try {
+      const date = new Date(isoString);
+      const options: Intl.DateTimeFormatOptions = {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+      };
+      return date.toLocaleString('en-US', options);
+    } catch {
+      return 'Invalid date';
+    }
+  };
+
   return (
     <div className="space-y-4 md:space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-sm md:text-base text-muted-foreground">Overview of your store performance</p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Overview of your store performance</p>
+        </div>
+        
+        {/* Last Updated DateTime and Refresh Button */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground px-3 py-2 rounded-lg bg-muted/50">
+            <Clock className="h-4 w-4 flex-shrink-0" />
+            <span className="whitespace-nowrap">Last updated: {formatLastUpdated(dashboardData?.lastUpdatedAt)}</span>
+          </div>
+          <Button
+            onClick={handleRefresh}
+            disabled={isRefreshing || isLoading}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -264,9 +330,31 @@ const Dashboard = () => {
             <p className="text-xs md:text-sm text-muted-foreground mt-1">Detailed breakdown</p>
           </CardHeader>
           <CardContent className="px-2 md:px-6">
+            {/* Search/Filter Input */}
+            <div className="mb-4 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search categories..."
+                value={categorySearchQuery}
+                onChange={(e) => setCategorySearchQuery(e.target.value)}
+                className="pl-10 pr-10 h-9"
+              />
+              {categorySearchQuery && (
+                <button
+                  onClick={() => setCategorySearchQuery('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Category List */}
             <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
-              {categoryData.length > 0 ? (
-                categoryData.map((category, index) => (
+              {filteredCategoryData.length > 0 ? (
+                filteredCategoryData.map((category, index) => (
                   <div key={index} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors">
                     <div className="flex items-center gap-3">
                       <div
@@ -283,7 +371,7 @@ const Dashboard = () => {
                 ))
               ) : (
                 <div className="text-center py-8 text-muted-foreground text-sm">
-                  No category data available
+                  {categorySearchQuery ? 'No categories match your search' : 'No category data available'}
                 </div>
               )}
             </div>

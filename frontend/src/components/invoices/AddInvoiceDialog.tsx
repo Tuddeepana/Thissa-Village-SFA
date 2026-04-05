@@ -24,7 +24,6 @@ import { CalendarIcon, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Invoice } from "@/types/invoice";
-import { generateProducts } from "@/lib/productData";
 import { productService } from '@/api/services/productService';
 import api from '@/api/client';
 import type { Product } from '@/types/product.types';
@@ -68,14 +67,12 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'other'>('cash');
   const [status, setStatus] = useState<'paid' | 'pending' | 'cancelled'>('pending');
 
-  const products = useMemo(() => generateProducts(), []);
-
-  const selectedProduct = useMemo(() => {
-    return products.find(p => p.id === selectedProductId) as unknown as Product | undefined;
-  }, [products, selectedProductId]);
-
   // fetched products from backend
   const [fetchedProducts, setFetchedProducts] = useState<Product[] | null>(null);
+
+  const selectedProduct = useMemo(() => {
+    return fetchedProducts?.find(p => p.id === selectedProductId);
+  }, [fetchedProducts, selectedProductId]);
 
   // unit price state (number)
   const [unitPrice, setUnitPrice] = useState<number>(0);
@@ -91,8 +88,9 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
         setFetchedProducts(res.items ?? []);
       } catch (err) {
         if (!mounted) return;
-        // fallback to generateProducts if API fails
-        setFetchedProducts(generateProducts() as unknown as Product[]);
+        console.error('Failed to fetch products:', err);
+        // Show empty list on error, don't use dummy data
+        setFetchedProducts([]);
       }
     })();
     return () => { mounted = false; };
@@ -124,8 +122,8 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
     }
   }, [invoiceToEdit]);
 
-  // choose source products: prefer fetchedProducts
-  const productOptions = fetchedProducts && fetchedProducts.length > 0 ? fetchedProducts : (products as unknown as Product[]);
+  // Use only fetched products from API
+  const productOptions = fetchedProducts ?? [];
 
   // Handle barcode scanning - find and select product by barcode
   useEffect(() => {
