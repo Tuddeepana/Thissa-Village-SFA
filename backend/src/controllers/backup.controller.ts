@@ -29,21 +29,36 @@ export class BackupController {
 
       // Use pg_dump to create a backup
       // Assuming the database is PostgreSQL as suggested by the project structure
-      const dump = spawn('pg_dump', [databaseUrl]);
+
+      // Parse DATABASE_URL to get password if possible for PGPASSWORD env var
+      let env = { ...process.env };
+      try {
+        const url = new URL(databaseUrl);
+        if (url.password) {
+          env.PGPASSWORD = decodeURIComponent(url.password);
+        }
+      } catch (e) {
+        console.error('Failed to parse DATABASE_URL for password:', e);
+      }
+
+      const dump = spawn('pg_dump', [databaseUrl], { env });
 
       dump.stdout.pipe(res);
 
+      let errorOutput = '';
       dump.stderr.on('data', (data) => {
+        errorOutput += data.toString();
         console.error(`pg_dump error: ${data}`);
       });
 
       dump.on('close', (code) => {
         if (code !== 0) {
-          console.error(`pg_dump process exited with code ${code}`);
+          console.error(`pg_dump process exited with code ${code}. Error: ${errorOutput}`);
           if (!res.headersSent) {
             res.status(500).json({
               status: 'error',
               message: 'Database backup failed',
+              error: errorOutput
             });
           }
         }
