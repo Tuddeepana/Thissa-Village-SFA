@@ -14,8 +14,7 @@ import { tableService } from "@/api/services/tableService";
 import { orderService } from "@/api/services/orderService";
 import { serviceChargeService } from "@/api/services/serviceChargeService";
 import { Product, BillItem, Bill, StockWarning } from "@/types/pos";
-import { OrderType } from "@/types/order.types";
-import { printBillNewWindow } from "@/lib/billPrinter";
+import { printBillNewWindow, printKitchenOrder } from "@/lib/billPrinter";
 import { toast } from "sonner";
 import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
 import type { ExpandedTableItem } from "@/types/table.types";
@@ -38,16 +37,16 @@ import {
   Globe,
   Users,
 } from "lucide-react";
+import {OrderType} from "@/types/order.types.ts";
 
 const PAGE_SIZE = 50;
 
-// Table status for dine-in
 interface TableInfo {
   id: string;
   displayName: string;
   baseName: string;
   tableNumber: number;
-  table_type: 'VIP' | 'NORMAL';
+  table_type: string;
   status: "free" | "occupied";
   orderId?: string;
 }
@@ -74,6 +73,7 @@ const POS = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   // Get current user info
   const currentUser = {
@@ -441,48 +441,88 @@ const POS = () => {
       })),
     };
 
-    // Call backend to persist bill and create inventory movements
+    setIsProcessingPayment(true);
     api
-      .post('/bills', payload)
-      .then((res) => {
-        const createdBillNumber = res?.data?.data?.bill?.bill_number || res?.data?.data?.billNumber || res?.data?.data?.bill_number || billNumber;
-        // Prepare printable bill object
-        const bill: Bill = {
-          id: createdBillNumber,
-          items: billItems,
-          subtotal,
-          tax,
-          taxRate,
-          discount,
-          discountRate,
-          // @ts-ignore - optional extra fields used by printer/UI
-          serviceCharge: serviceChargeAmount,
-          // @ts-ignore
-          serviceChargeRate: serviceCharge?.isActive ? Number(serviceCharge.percentage || 0) : 0,
-          total,
-          customerName: currentUser.name,  // Cashier name shown on receipt
-          customerPhone,
+      .post("/bills", payload)
+      .then(async (response) => {
+        const { bill_number, created_at } = response.data.data;
+
+        // Fetch settings to check if kitchen printing is enabled
+        let isKitchenPrintEnabled = false;
+        try {
+          const settings = await serviceChargeService.get();
+          isKitchenPrintEnabled = settings.isKitchenPrintEnabled;
+        } catch (error) {
+          console.error("Failed to fetch settings for kitchen print:", error);
+        }
+
+        completeBillProcess(
+          bill_number,
+          new Date(created_at),
           paymentMethod,
           amountPaid,
           change,
+          customerName, // This is table name if module is restaurant
+          customerPhone,
           creditDescription,
-          createdAt: now,
-        };
-        printBillNewWindow(bill);
-
-        // Clear order & close dialog
-        handleClearOrder();
-        setIsPaymentDialogOpen(false);
-
-        toast.success('Bill completed successfully!', {
-          description: `Bill #${createdBillNumber} - Total: Rs. ${total.toFixed(2)}`,
-        });
+          response.data.data.updatedProducts,
+          isKitchenPrintEnabled
+        );
       })
       .catch((err) => {
         console.error('Failed to complete bill', err);
         const msg = err?.response?.data?.message ?? 'Failed to complete bill';
         toast.error(msg);
+      })
+      .finally(() => {
+        setIsProcessingPayment(false);
       });
+  };
+
+  const completeBillProcess = (
+    billNumber: string,
+    now: Date,
+    paymentMethod: 'cash' | 'card' | 'credit' | 'other',
+    amountPaid: number,
+    change: number,
+    customerName?: string,
+    customerPhone?: string,
+    creditDescription?: string,
+    updatedProducts?: Product[],
+    isKitchenPrintEnabled: boolean = false
+  ) => {
+    // Prepare printable bill object
+    const bill: Bill = {
+      id: billNumber,
+      items: billItems,
+      subtotal,
+      tax,
+      taxRate,
+      discount,
+      discountRate,
+      total,
+      customerName,
+      customerPhone,
+      paymentMethod,
+      amountPaid,
+      change,
+      creditDescription,
+      createdAt: now,
+    };
+    printBillNewWindow(bill);
+
+    // Automatically print to kitchen if enabled
+    if (isKitchenPrintEnabled) {
+      printKitchenOrder(bill);
+    }
+
+    // Clear bill & close dialog
+    handleClearOrder();
+    setIsPaymentDialogOpen(false);
+
+    toast.success('Bill completed successfully!', {
+      description: `Bill #${billNumber} - Total: Rs. ${total.toFixed(2)}`,
+    });
   };
 
   return (
