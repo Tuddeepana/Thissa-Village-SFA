@@ -14,8 +14,6 @@ class ServiceChargeService {
         id: 'default',
         percentage: '10.00',
         isActive: true,
-        isKitchenPrintEnabled: false,
-        kitchenPrinterIp: null,
       },
     });
 
@@ -23,8 +21,6 @@ class ServiceChargeService {
       id: serviceCharge.id,
       percentage: Number(serviceCharge.percentage),
       isActive: serviceCharge.isActive,
-      isKitchenPrintEnabled: serviceCharge.isKitchenPrintEnabled,
-      kitchenPrinterIp: serviceCharge.kitchenPrinterIp,
       createdAt: serviceCharge.createdAt,
       updatedAt: serviceCharge.updatedAt,
     };
@@ -44,14 +40,6 @@ class ServiceChargeService {
       data.isActive = input.isActive;
     }
 
-    if (input.isKitchenPrintEnabled !== undefined) {
-      data.isKitchenPrintEnabled = input.isKitchenPrintEnabled;
-    }
-
-    if (input.kitchenPrinterIp !== undefined) {
-      data.kitchenPrinterIp = input.kitchenPrinterIp;
-    }
-
     const updated = await (prisma as any).serviceCharge.upsert({
       where: { id: 'default' },
       update: data,
@@ -59,8 +47,6 @@ class ServiceChargeService {
         id: 'default',
         percentage: input.percentage?.toFixed(2) ?? '10.00',
         isActive: input.isActive ?? true,
-        isKitchenPrintEnabled: input.isKitchenPrintEnabled ?? false,
-        kitchenPrinterIp: input.kitchenPrinterIp ?? null,
       },
     });
 
@@ -68,8 +54,6 @@ class ServiceChargeService {
       id: updated.id,
       percentage: Number(updated.percentage),
       isActive: updated.isActive,
-      isKitchenPrintEnabled: updated.isKitchenPrintEnabled,
-      kitchenPrinterIp: updated.kitchenPrinterIp,
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
     };
