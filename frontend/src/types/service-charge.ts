@@ -2,6 +2,8 @@ export interface ServiceCharge {
   id: string;
   percentage: number;
   isActive: boolean;
+  isKitchenPrintEnabled: boolean;
+  kitchenPrinterIp?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -9,5 +11,6 @@ export interface ServiceCharge {
 export interface UpdateServiceChargeInput {
   percentage?: number;
   isActive?: boolean;
+  isKitchenPrintEnabled?: boolean;
+  kitchenPrinterIp?: string | null;
 }
-
