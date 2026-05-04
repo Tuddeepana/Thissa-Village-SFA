@@ -24,6 +24,8 @@ export const updateServiceCharge = async (req: Request, res: Response) => {
     const input: UpdateServiceChargeInput = {
       percentage: req.body.percentage !== undefined ? Number(req.body.percentage) : undefined,
       isActive: req.body.isActive !== undefined ? Boolean(req.body.isActive) : undefined,
+      isKitchenPrintEnabled: req.body.isKitchenPrintEnabled !== undefined ? Boolean(req.body.isKitchenPrintEnabled) : undefined,
+      kitchenPrinterIp: req.body.kitchenPrinterIp,
     };
 
     // Validate percentage
@@ -51,4 +53,3 @@ export const updateServiceCharge = async (req: Request, res: Response) => {
     });
   }
 };
-
