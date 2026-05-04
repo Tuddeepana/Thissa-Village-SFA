@@ -149,27 +149,7 @@ const BILL_CSS = `
     border: 1px dashed #000;
     font-size: 10.5px;
   }
-
-  /* ── Kitchen specific ───────────────────────────────────── */
-  .kitchen-header {
-    text-align: center;
-    border-bottom: 2px solid #000;
-    margin-bottom: 5px;
-    padding-bottom: 5px;
-  }
-  .kitchen-title {
-    font-size: 18px;
-    font-weight: 900;
-    text-transform: uppercase;
-  }
-  .kitchen-table {
-    font-size: 20px;
-    font-weight: 900;
-    margin: 5px 0;
-    text-align: center;
-    border: 2px solid #000;
-    padding: 4px;
-  }
+  .credit-note-title { font-weight: 700; margin-bottom: 1px; }
 
   /* ── Footer ──────────────────────────────────────────────── */
   .footer {
@@ -324,82 +304,6 @@ const buildBillBody = (
   </div>
 `;
 
-export const printKitchenOrder = async (bill: Bill) => {
-  const printFrame = document.createElement('iframe');
-  printFrame.style.position = 'absolute';
-  printFrame.style.width = '0';
-  printFrame.style.height = '0';
-  printFrame.style.border = 'none';
-  document.body.appendChild(printFrame);
-
-  const printDocument = printFrame.contentWindow?.document;
-  if (!printDocument) return;
-
-  const billHTML = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <title>Kitchen Order #${bill.id}</title>
-      <style>
-        ${BILL_CSS}
-        /* Override/Add kitchen specific styles */
-        .items-table th.col-price, .items-table td.col-price,
-        .items-table th.col-total, .items-table td.col-total,
-        .totals, .payment-section { display: none !important; }
-      </style>
-    </head>
-    <body>
-      <div class="kitchen-header">
-        <div class="kitchen-title">KITCHEN ORDER</div>
-        <div class="info-row">
-          <span>Date: ${format(new Date(bill.createdAt), "yyyy-MM-dd HH:mm")}</span>
-        </div>
-      </div>
-
-      <div class="kitchen-table">
-        TABLE: ${bill.customerName || "WALK-IN"}
-      </div>
-
-      <table class="items-table">
-        <thead>
-          <tr>
-            <th class="col-qty">QTY</th>
-            <th class="col-name">ITEM</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${bill.items.map(item => `
-            <tr>
-              <td class="col-qty">${item.quantity}</td>
-              <td class="col-name">${item.product.name}</td>
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
-
-      <div class="div-thick"></div>
-      <div style="text-align:center; font-size: 10px; margin-top: 10px;">
-        Order #${bill.id.slice(-6).toUpperCase()}
-      </div>
-
-      <script>
-        window.onload = function() {
-          window.print();
-          setTimeout(function() {
-            window.parent.document.body.removeChild(window.frameElement);
-          }, 100);
-        };
-      </script>
-    </body>
-    </html>
-  `;
-
-  printDocument.open();
-  printDocument.write(billHTML);
-  printDocument.close();
-};
-
 export const printBill = async (bill: Bill, _storeName?: string) => {
   const logoDataUrl = await toDataURL(logoUrl);
 
@@ -415,7 +319,7 @@ export const printBill = async (bill: Bill, _storeName?: string) => {
 
   const billHTML = `
     <!DOCTYPE html>
-    <html lang="en">
+    <html>
     <head>
       <meta charset="UTF-8">
       <title>Bill #${bill.id}</title>
@@ -430,7 +334,7 @@ export const printBill = async (bill: Bill, _storeName?: string) => {
             window.parent.document.body.removeChild(window.frameElement);
           }, 100);
         };
-      </script>
+      <\/script>
     </body>
     </html>
   `;
@@ -446,11 +350,11 @@ export const printBillNewWindow = async (bill: Bill, _storeName?: string) => {
   const printWindow = window.open('', '_blank', 'width=320,height=620');
   if (!printWindow) return;
 
-  const billNo = (bill as { billNumber?: string; id: string }).billNumber || bill.id;
+  const billNo = (bill as any).billNumber || bill.id;
 
   const billHTML = `
     <!DOCTYPE html>
-    <html lang="en">
+    <html>
     <head>
       <meta charset="UTF-8">
       <title>Bill #${billNo}</title>
