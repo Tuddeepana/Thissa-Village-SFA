@@ -7,16 +7,13 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { serviceChargeService } from "@/api/services/serviceChargeService";
 import type { ServiceCharge } from "@/types/service-charge";
-import { Percent, Save, Loader2, Printer } from "lucide-react";
+import { Percent, Save, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
 
 const Settings = () => {
   const [serviceCharge, setServiceCharge] = useState<ServiceCharge | null>(null);
   const [percentage, setPercentage] = useState<number>(10);
   const [isActive, setIsActive] = useState<boolean>(true);
-  const [isKitchenPrintEnabled, setIsKitchenPrintEnabled] = useState<boolean>(false);
-  const [kitchenPrinterIp, setKitchenPrinterIp] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -29,8 +26,6 @@ const Settings = () => {
         setServiceCharge(data);
         setPercentage(data.percentage);
         setIsActive(data.isActive);
-        setIsKitchenPrintEnabled(data.isKitchenPrintEnabled);
-        setKitchenPrinterIp(data.kitchenPrinterIp || "");
       } catch (error: any) {
         console.error("Failed to fetch service charge:", error);
         toast.error("Failed to load service charge configuration");
@@ -48,11 +43,11 @@ const Settings = () => {
       const updated = await serviceChargeService.update({
         percentage,
         isActive,
-        isKitchenPrintEnabled,
-        kitchenPrinterIp,
       });
       setServiceCharge(updated);
-      toast.success("Settings updated successfully!");
+      toast.success("Service charge updated successfully!", {
+        description: `Set to ${percentage}% (${isActive ? "Active" : "Inactive"})`,
+      });
     } catch (error: any) {
       console.error("Failed to update service charge:", error);
       toast.error(error.response?.data?.message || "Failed to update service charge");
@@ -63,10 +58,7 @@ const Settings = () => {
 
   const hasChanges =
     serviceCharge &&
-    (serviceCharge.percentage !== percentage ||
-     serviceCharge.isActive !== isActive ||
-     serviceCharge.isKitchenPrintEnabled !== isKitchenPrintEnabled ||
-     serviceCharge.kitchenPrinterIp !== kitchenPrinterIp);
+    (serviceCharge.percentage !== percentage || serviceCharge.isActive !== isActive);
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -204,83 +196,6 @@ const Settings = () => {
         </CardContent>
       </Card>
 
-      {/* Kitchen Printer Configuration */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg md:text-xl flex items-center gap-2">
-            <Printer className="h-5 w-5" />
-            Kitchen Printer Configuration
-          </CardTitle>
-          <CardDescription>
-            Configure the automated kitchen printout settings
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {loading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-20 w-full" />
-            </div>
-          ) : (
-            <>
-              {/* Kitchen Print Toggle */}
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="space-y-0.5">
-                  <Label htmlFor="kitchen-print-active" className="text-base font-medium">
-                    Enable Kitchen Printing
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Automatically print orders to the kitchen when "Print & Pay" is clicked
-                  </p>
-                </div>
-                <Switch
-                  id="kitchen-print-active"
-                  checked={isKitchenPrintEnabled}
-                  onCheckedChange={setIsKitchenPrintEnabled}
-                />
-              </div>
-
-              {/* Printer IP/Name */}
-              <div className="space-y-2">
-                <Label htmlFor="kitchen-printer-ip" className="text-base font-medium">
-                  Kitchen Printer (IP / Device Name)
-                </Label>
-                <Input
-                  id="kitchen-printer-ip"
-                  placeholder="e.g., 192.168.1.100 or Kitchen-Printer"
-                  value={kitchenPrinterIp}
-                  onChange={(e) => setKitchenPrinterIp(e.target.value)}
-                  disabled={!isKitchenPrintEnabled}
-                />
-                <p className="text-xs text-muted-foreground">
-                  The system will attempt to send kitchen-only receipts to this printer.
-                </p>
-              </div>
-
-              {/* Save Button */}
-              <div className="flex items-center gap-3 pt-4">
-                <Button
-                  onClick={handleSave}
-                  disabled={!hasChanges || saving}
-                  className="w-full sm:w-auto"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Changes
-                    </>
-                  )}
-                </Button>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 };
