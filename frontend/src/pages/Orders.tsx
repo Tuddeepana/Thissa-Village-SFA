@@ -51,6 +51,8 @@ import api from "@/api/client";
 import { OrderStatus } from "@/types/order.types";
 import type { Order, OrderStatus as OrderStatusType, OrderStats } from "@/types/order.types";
 import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
+import { printBillNewWindow } from "@/lib/billPrinter";
+import type { Bill } from "@/types/pos";
 
 const Orders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -207,86 +209,51 @@ const Orders = () => {
     }
   };
 
-  const handlePrintBill = (order: Order) => {
-    // Create print content
-    const printContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Bill - ${order.order_number}</title>
-        <style>
-          body { font-family: 'Courier New', monospace; padding: 20px; max-width: 300px; margin: 0 auto; }
-          .header { text-align: center; margin-bottom: 20px; }
-          .header h1 { margin: 0; font-size: 20px; }
-          .header p { margin: 5px 0; font-size: 12px; }
-          .divider { border-top: 1px dashed #000; margin: 10px 0; }
-          .info { font-size: 12px; margin-bottom: 10px; }
-          .items { width: 100%; font-size: 12px; }
-          .items th, .items td { text-align: left; padding: 3px 0; }
-          .items .qty { width: 30px; }
-          .items .price { text-align: right; }
-          .total { font-size: 14px; font-weight: bold; margin-top: 10px; }
-          .footer { text-align: center; margin-top: 20px; font-size: 10px; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>Tissa Village</h1>
-          <p>Restaurant</p>
-          <p>Tel: 011-1234567</p>
-        </div>
-        <div class="divider"></div>
-        <div class="info">
-          <p><strong>Order:</strong> ${order.order_number}</p>
-          <p><strong>Date:</strong> ${format(new Date(order.createdAt), "dd/MM/yyyy HH:mm")}</p>
-          <p><strong>Customer:</strong> ${order.customer_name}</p>
-          <p><strong>Phone:</strong> ${order.customer_phone}</p>
-          <p><strong>Type:</strong> ${order.order_type === "DINE_IN" ? `Dine In - Table ${order.table_number}` : "Take Away"}</p>
-          <p><strong>Terminal:</strong> ${order.terminal_id}</p>
-          <p><strong>Cashier:</strong> ${order.cashier_name}</p>
-        </div>
-        <div class="divider"></div>
-        <table class="items">
-          <tr>
-            <th class="qty">Qty</th>
-            <th>Item</th>
-            <th class="price">Price</th>
-          </tr>
-          ${order.items
-            .map(
-              (item) => `
-            <tr>
-              <td class="qty">${item.quantity}</td>
-              <td>${item.product_name}</td>
-              <td class="price">Rs.${item.total.toFixed(0)}</td>
-            </tr>
-          `
-            )
-            .join("")}
-        </table>
-        <div class="divider"></div>
-        <div class="total">
-          <p>Subtotal: Rs.${order.subtotal.toFixed(0)}</p>
-          ${order.tax > 0 ? `<p>Tax: Rs.${order.tax.toFixed(0)}</p>` : ""}
-          ${order.discount > 0 ? `<p>Discount: -Rs.${order.discount.toFixed(0)}</p>` : ""}
-          <p>TOTAL: Rs.${order.total.toFixed(0)}</p>
-        </div>
-        <div class="divider"></div>
-        <div class="footer">
-          <p>Thank you for dining with us!</p>
-          <p>Please come again</p>
-        </div>
-      </body>
-      </html>
-    `;
+  const handlePrintBill = async (order: Order) => {
+    try {
+      // Convert Order to Bill format for printing with new format (with image)
+      const bill: Bill = {
+        id: order.order_number,
+        billNumber: order.order_number,
+        items: order.items.map(item => ({
+          product: {
+            id: item.id,
+            name: item.product_name,
+            category: '',
+            product_type: undefined,
+            unit: null,
+            foreignerPrice: item.unit_price,
+            localPrice: item.unit_price,
+            cost: 0,
+            stock: 0,
+            minStock: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          quantity: item.quantity,
+          subtotal: item.total,
+        })),
+        subtotal: order.subtotal,
+        tax: order.tax,
+        taxRate: order.tax > 0 ? (order.tax / order.subtotal) * 100 : 0,
+        discount: order.discount,
+        discountRate: order.discount > 0 ? (order.discount / order.subtotal) * 100 : 0,
+        total: order.total,
+        customerName: order.customer_name,
+        customerPhone: order.customer_phone,
+        paymentMethod: 'cash',
+        amountPaid: 0,
+        change: 0,
+        createdAt: new Date(order.createdAt),
+      };
 
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      printWindow.print();
+      // Use the new bill format (with image at top) same as POS "Print & Pay"
+      await printBillNewWindow(bill);
+      toast.success("Bill sent to printer");
+    } catch (error) {
+      console.error('Error printing bill:', error);
+      toast.error("Failed to print bill");
     }
-    toast.success("Bill sent to printer");
   };
 
   const handleCompletePayment = async () => {
@@ -442,7 +409,7 @@ const Orders = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {order.table_number ? `Table ${order.table_number}` : "-"}
+                        {order.table_name ? order.table_name : order.order_type === "DINE_IN" ? "Table -" : "-"}
                       </TableCell>
                       <TableCell>{order.items.length} items</TableCell>
                       <TableCell className="font-medium">Rs.{order.total.toFixed(0)}</TableCell>
