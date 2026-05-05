@@ -70,6 +70,7 @@ const Bills = () => {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isLoadingBill, setIsLoadingBill] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [billForPayment, setBillForPayment] = useState<Bill | null>(null);
   const itemsPerPage = 15;
 
@@ -354,6 +355,7 @@ const Bills = () => {
     const change = paymentMethod === 'credit' ? 0 : amountPaid - billForPayment.total;
     // Persist payment update to backend
     (async () => {
+      setIsPrinting(true);
       try {
         const payload: any = {
           payment_method: paymentMethod.toUpperCase(),
@@ -394,6 +396,7 @@ const Bills = () => {
       printBillNewWindow(printable);
       setIsPaymentDialogOpen(false);
       setBillForPayment(null);
+      setIsPrinting(false);
     })();
   };
 
@@ -741,6 +744,7 @@ const Bills = () => {
                           aria-label="Collect Payment"
                           title="Collect Payment"
                           className="p-2"
+                          disabled={isPrinting}
                         >
                           <Banknote className="h-4 w-4" />
                         </Button>
@@ -1030,6 +1034,7 @@ const Bills = () => {
         onOpenChange={setIsPaymentDialogOpen}
         total={billForPayment?.total || 0}
         onConfirmPayment={handleConfirmPayment}
+        isPrinting={isPrinting}
       />
      </div>
    );

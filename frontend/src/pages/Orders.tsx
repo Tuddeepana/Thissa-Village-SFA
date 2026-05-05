@@ -43,6 +43,7 @@ import {
   RefreshCw,
   Check,
   X,
+  Trash2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -63,6 +64,7 @@ const Orders = () => {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isAddItemDialogOpen, setIsAddItemDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [stats, setStats] = useState<OrderStats>({
     pending: 0,
     completed: 0,
@@ -139,14 +141,27 @@ const Orders = () => {
     fetchProducts();
   }, [statusFilter]);
 
-  // Filter orders (client-side for search)
+  // Filter orders (client-side for search) and sort pending to top
   const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
+    const filtered = orders.filter((order) => {
       const matchesSearch =
         order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
         order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         order.customer_phone.includes(searchQuery);
       return matchesSearch;
+    });
+
+    // Sort: PENDING status first, then by creation time (newest first)
+    return filtered.sort((a, b) => {
+      // If one is PENDING and the other isn't, PENDING comes first
+      if (a.status === OrderStatus.PENDING && b.status !== OrderStatus.PENDING) {
+        return -1;
+      }
+      if (a.status !== OrderStatus.PENDING && b.status === OrderStatus.PENDING) {
+        return 1;
+      }
+      // If both are PENDING or both are non-PENDING, sort by creation time (newest first)
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
   }, [orders, searchQuery]);
 
@@ -169,13 +184,17 @@ const Orders = () => {
     if (!product) return;
 
     try {
+      // Get the price based on the order's customer type
+      const customerType = selectedOrder.customer_type as "local" | "foreigner";
+      const priceToUse = customerType === "local" ? (product.localPrice ?? 0) : (product.foreignerPrice ?? 0);
+
       const updatedOrder = await orderService.addItemsToOrder(selectedOrder.id, {
         items: [
           {
             productId: product.productId,
             product_name: product.productName,
             quantity,
-            unit_price: product.foreignerPrice ?? 0,
+            unit_price: priceToUse,
           },
         ],
       });
@@ -189,6 +208,21 @@ const Orders = () => {
     } catch (error: any) {
       console.error("Failed to add item", error);
       const msg = error?.response?.data?.message ?? "Failed to add item";
+      toast.error(msg);
+    }
+  };
+
+  const handleDeleteItemFromOrder = async (itemId: string) => {
+    if (!selectedOrder) return;
+
+    try {
+      const updatedOrder = await orderService.deleteItemFromOrder(selectedOrder.id, itemId);
+      setOrders(orders.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)));
+      setSelectedOrder(updatedOrder);
+      toast.success("Item removed from order");
+    } catch (error: any) {
+      console.error("Failed to delete item", error);
+      const msg = error?.response?.data?.message ?? "Failed to delete item";
       toast.error(msg);
     }
   };
@@ -211,6 +245,7 @@ const Orders = () => {
 
   const handlePrintBill = async (order: Order) => {
     try {
+      setIsPrinting(true);
       // Convert Order to Bill format for printing with new format (with image)
       const bill: Bill = {
         id: order.order_number,
@@ -253,6 +288,8 @@ const Orders = () => {
     } catch (error) {
       console.error('Error printing bill:', error);
       toast.error("Failed to print bill");
+    } finally {
+      setIsPrinting(false);
     }
   };
 
@@ -433,6 +470,7 @@ const Orders = () => {
                             size="sm"
                             variant="ghost"
                             onClick={() => handlePrintBill(order)}
+                            disabled={isPrinting}
                           >
                             <Printer className="h-4 w-4" />
                           </Button>
@@ -522,6 +560,7 @@ const Orders = () => {
                         <TableHead className="text-center">Qty</TableHead>
                         <TableHead className="text-right">Price</TableHead>
                         <TableHead className="text-right">Total</TableHead>
+                        {selectedOrder.status === "PENDING" && <TableHead className="text-right">Action</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -531,6 +570,17 @@ const Orders = () => {
                           <TableCell className="text-center">{item.quantity}</TableCell>
                           <TableCell className="text-right">Rs.{item.unit_price.toFixed(0)}</TableCell>
                           <TableCell className="text-right">Rs.{item.total.toFixed(0)}</TableCell>
+                          {selectedOrder.status === "PENDING" && (
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDeleteItemFromOrder(item.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -571,11 +621,11 @@ const Orders = () => {
           )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => handlePrintBill(selectedOrder!)}>
-              <Printer className="h-4 w-4 mr-2" /> Print Bill
+            <Button variant="outline" onClick={() => handlePrintBill(selectedOrder!)} disabled={isPrinting}>
+              <Printer className="h-4 w-4 mr-2" /> {isPrinting ? "Printing..." : "Print Bill"}
             </Button>
             {selectedOrder?.status === "PENDING" && (
-              <Button onClick={() => { setAmountPaid(selectedOrder.total); setIsPaymentDialogOpen(true); }}>
+              <Button onClick={() => { setAmountPaid(selectedOrder.total); setIsPaymentDialogOpen(true); }} disabled={isPrinting}>
                 <CreditCard className="h-4 w-4 mr-2" /> Complete Payment
               </Button>
             )}
@@ -601,11 +651,15 @@ const Orders = () => {
                   <SelectValue placeholder="Choose a product" />
                 </SelectTrigger>
                 <SelectContent>
-                  {products.map((product) => (
-                    <SelectItem key={product.productId} value={product.productId}>
-                      {product.productName} - Rs.{product.foreignerPrice?.toFixed(0) ?? 0}
-                    </SelectItem>
-                  ))}
+                  {products.map((product) => {
+                    const customerType = selectedOrder?.customer_type as "local" | "foreigner";
+                    const priceToShow = customerType === "local" ? (product.localPrice ?? 0) : (product.foreignerPrice ?? 0);
+                    return (
+                      <SelectItem key={product.productId} value={product.productId}>
+                        {product.productName} - Rs.{priceToShow.toFixed(0)}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -675,11 +729,11 @@ const Orders = () => {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)} disabled={isPrinting}>
               Cancel
             </Button>
-            <Button onClick={handleCompletePayment}>
-              Complete Payment
+            <Button onClick={handleCompletePayment} disabled={isPrinting}>
+              {isPrinting ? "Processing..." : "Complete Payment"}
             </Button>
           </DialogFooter>
         </DialogContent>

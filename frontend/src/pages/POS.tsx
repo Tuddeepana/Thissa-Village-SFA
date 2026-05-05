@@ -74,6 +74,7 @@ const POS = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   // Get current user info
   const currentUser = {
@@ -399,6 +400,7 @@ const POS = () => {
       const order = await orderService.createOrder({
         customer_name: customerName,
         customer_phone: customerPhone,
+        customer_type: customerType,
         order_type: orderType === "dine_in" ? OrderType.DINE_IN : OrderType.TAKE_AWAY,
         table_id: selectedTableInfo?.id ?? null,
         table_name: selectedTableInfo?.displayName ?? null,
@@ -494,6 +496,7 @@ const POS = () => {
     };
 
     // Call backend to persist bill and create inventory movements
+    setIsPrinting(true);
     api
       .post('/bills', payload)
       .then((res) => {
@@ -534,6 +537,9 @@ const POS = () => {
         console.error('Failed to complete bill', err);
         const msg = err?.response?.data?.message ?? 'Failed to complete bill';
         toast.error(msg);
+      })
+      .finally(() => {
+        setIsPrinting(false);
       });
   };
 
@@ -927,19 +933,19 @@ const POS = () => {
                   <div className="space-y-2 pt-2">
                     {orderType === "dine_in" ? (
                       <div className="grid grid-cols-2 gap-2">
-                        <Button className="w-full" size="lg" variant="outline" onClick={handleCreateOrder}>
+                        <Button className="w-full" size="lg" variant="outline" onClick={handleCreateOrder} disabled={isPrinting}>
                           <Send className="h-4 w-4 mr-2" />
                           Send
                         </Button>
-                        <Button className="w-full" size="lg" onClick={handleDineInPayment}>
+                        <Button className="w-full" size="lg" onClick={handleDineInPayment} disabled={isPrinting}>
                           <Printer className="h-4 w-4 mr-2" />
-                          Print & Pay
+                          {isPrinting ? "Printing..." : "Print & Pay"}
                         </Button>
                       </div>
                     ) : (
-                      <Button className="w-full" size="lg" onClick={handleTakeAwayPayment}>
+                      <Button className="w-full" size="lg" onClick={handleTakeAwayPayment} disabled={isPrinting}>
                         <Printer className="h-4 w-4 mr-2" />
-                        Print & Pay
+                        {isPrinting ? "Printing..." : "Print & Pay"}
                       </Button>
                     )}
                   </div>
@@ -956,6 +962,7 @@ const POS = () => {
         onOpenChange={setIsPaymentDialogOpen}
         total={total}
         onConfirmPayment={handleConfirmPayment}
+        isPrinting={isPrinting}
       />
 
       {/* Room Booking Dialog */}
