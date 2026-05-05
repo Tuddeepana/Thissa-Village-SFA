@@ -90,21 +90,62 @@ const POS = () => {
     terminalId: "T-001", // Hardcoded terminal ID
   };
 
+  // Function to refresh table status from server
+  const refreshTableStatus = async () => {
+    try {
+      // Get table status which includes occupancy information
+      const statusResponse = await orderService.getTableStatus({ status: 'all' });
+
+      // Extract table info from status response
+      const tableStatusMap = new Map(
+        (statusResponse.tables || []).map((t: any) => [t.table_id, t.status])
+      );
+
+      // Also get the base table structure
+      const baseResponse = await tableService.getExpanded();
+      
+      const expandedTables: ExpandedTableItem[] = baseResponse.tables || [];
+      const mappedTables: TableInfo[] = expandedTables.map((t) => ({
+        id: t.id,
+        displayName: t.displayName,
+        baseName: t.baseName,
+        tableNumber: t.tableNumber,
+        table_type: t.table_type,
+        status: (tableStatusMap.get(t.id) === 'occupied' ? 'occupied' : 'free') as 'free' | 'occupied',
+        orderId: undefined,
+      }));
+      setTables(mappedTables);
+    } catch (err) {
+      console.error("Failed to refresh tables", err);
+    }
+  };
+
   // Fetch tables from API
   useEffect(() => {
     let cancelled = false;
     const fetchTables = async () => {
       try {
-        const response = await tableService.getExpanded();
+        // Get table status which includes occupancy information
+        const statusResponse = await orderService.getTableStatus({ status: 'all' });
         if (cancelled) return;
-        const expandedTables: ExpandedTableItem[] = response.tables || [];
+
+        // Extract table info from status response
+        const tableStatusMap = new Map(
+          (statusResponse.tables || []).map((t: any) => [t.table_id, t.status])
+        );
+
+        // Also get the base table structure
+        const baseResponse = await tableService.getExpanded();
+        if (cancelled) return;
+        
+        const expandedTables: ExpandedTableItem[] = baseResponse.tables || [];
         const mappedTables: TableInfo[] = expandedTables.map((t) => ({
           id: t.id,
           displayName: t.displayName,
           baseName: t.baseName,
           tableNumber: t.tableNumber,
           table_type: t.table_type,
-          status: "free" as const,
+          status: (tableStatusMap.get(t.id) === 'occupied' ? 'occupied' : 'free') as 'free' | 'occupied',
           orderId: undefined,
         }));
         setTables(mappedTables);
@@ -114,7 +155,13 @@ const POS = () => {
       }
     };
     fetchTables();
-    return () => { cancelled = true; };
+    
+    // Set up interval to refresh table status every 30 seconds to catch status changes
+    const interval = setInterval(fetchTables, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   // Fetch products from /api/mystock and map to POS Product shape
@@ -384,6 +431,11 @@ const POS = () => {
           description: `Take Away - ${customerName}. Sent to kitchen.`,
         });
       }
+
+      // Refresh table status from server to ensure it's up-to-date
+      setTimeout(() => {
+        refreshTableStatus();
+      }, 500);
 
       // Navigate to orders page
       navigate("/orders");

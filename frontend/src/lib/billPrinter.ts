@@ -2,18 +2,36 @@ import { Bill } from '@/types/pos';
 import { format } from 'date-fns';
 import logoUrl from '@/assets/images/resturent_logo.png';
 
+// Cache logo data URL to avoid repeated fetches
+let cachedLogoDataUrl: string | null = null;
+
 /** Fetches the logo and converts it to a base64 data-URI so it renders
- *  correctly inside the isolated iframe / new-window print context. */
-const toDataURL = (url: string): Promise<string> =>
-  fetch(url)
-    .then(r => r.blob())
-    .then(blob => new Promise<string>((resolve, reject) => {
+ *  correctly inside the isolated iframe / new-window print context.
+ *  Uses caching to improve performance on subsequent calls. */
+const toDataURL = async (url: string): Promise<string> => {
+  if (cachedLogoDataUrl) {
+    return cachedLogoDataUrl;
+  }
+  
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    
+    return new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        cachedLogoDataUrl = result; // Cache the result
+        resolve(result);
+      };
       reader.onerror = reject;
       reader.readAsDataURL(blob);
-    }))
-    .catch(() => '');
+    });
+  } catch (error) {
+    console.error('Failed to load logo:', error);
+    return '';
+  }
+};
 
 /* ─────────────────────────────────────────────────────────────────
    Shared CSS — used by both printBill and printBillNewWindow
@@ -344,7 +362,7 @@ export const printBill = async (bill: Bill, _storeName?: string) => {
   printDocument.close();
 };
 
-// Alternative: open in a new window (shows preview + print button)
+// Direct print: open window, auto-print, and close automatically
 export const printBillNewWindow = async (bill: Bill, _storeName?: string) => {
   const logoDataUrl = await toDataURL(logoUrl);
   const printWindow = window.open('', '_blank', 'width=320,height=620');
@@ -362,10 +380,17 @@ export const printBillNewWindow = async (bill: Bill, _storeName?: string) => {
     </head>
     <body>
       ${buildBillBody(bill, billNo, logoDataUrl)}
-      <div class="no-print">
-        <button onclick="window.print()">&#128438;&nbsp; Print Bill</button>
-        <button onclick="window.close()">&#10005;&nbsp; Close</button>
-      </div>
+      <script>
+        window.onload = function() {
+          setTimeout(function() {
+            window.print();
+            // Close window after print dialog opens
+            setTimeout(function() {
+              window.close();
+            }, 500);
+          }, 100);
+        };
+      <\/script>
     </body>
     </html>
   `;
