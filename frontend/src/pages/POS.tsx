@@ -399,6 +399,7 @@ const POS = () => {
       const order = await orderService.createOrder({
         customer_name: customerName,
         customer_phone: customerPhone,
+        customer_type: customerType,
         order_type: orderType === "dine_in" ? OrderType.DINE_IN : OrderType.TAKE_AWAY,
         table_id: selectedTableInfo?.id ?? null,
         table_name: selectedTableInfo?.displayName ?? null,

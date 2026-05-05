@@ -169,13 +169,17 @@ const Orders = () => {
     if (!product) return;
 
     try {
+      // Get the price based on the order's customer type
+      const customerType = selectedOrder.customer_type as "local" | "foreigner";
+      const priceToUse = customerType === "local" ? (product.localPrice ?? 0) : (product.foreignerPrice ?? 0);
+
       const updatedOrder = await orderService.addItemsToOrder(selectedOrder.id, {
         items: [
           {
             productId: product.productId,
             product_name: product.productName,
             quantity,
-            unit_price: product.foreignerPrice ?? 0,
+            unit_price: priceToUse,
           },
         ],
       });
@@ -601,11 +605,15 @@ const Orders = () => {
                   <SelectValue placeholder="Choose a product" />
                 </SelectTrigger>
                 <SelectContent>
-                  {products.map((product) => (
-                    <SelectItem key={product.productId} value={product.productId}>
-                      {product.productName} - Rs.{product.foreignerPrice?.toFixed(0) ?? 0}
-                    </SelectItem>
-                  ))}
+                  {products.map((product) => {
+                    const customerType = selectedOrder?.customer_type as "local" | "foreigner";
+                    const priceToShow = customerType === "local" ? (product.localPrice ?? 0) : (product.foreignerPrice ?? 0);
+                    return (
+                      <SelectItem key={product.productId} value={product.productId}>
+                        {product.productName} - Rs.{priceToShow.toFixed(0)}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>

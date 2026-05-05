@@ -11,6 +11,7 @@ export const orderItemSchema = z.object({
 export const createOrderSchema = z.object({
   customer_name: z.string().optional().default("Guest").transform(val => val || "Guest"),
   customer_phone: z.string().optional().default("0000000000").transform(val => val || "0000000000"),
+  customer_type: z.enum(['local', 'foreigner']).default('local'),
   order_type: z.nativeEnum(OrderType, { message: 'Invalid order type' }),
   table_id: z.any().optional(),
   table_name: z.any().optional(),
