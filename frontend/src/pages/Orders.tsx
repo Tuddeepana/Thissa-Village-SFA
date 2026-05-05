@@ -64,6 +64,7 @@ const Orders = () => {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isAddItemDialogOpen, setIsAddItemDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [stats, setStats] = useState<OrderStats>({
     pending: 0,
     completed: 0,
@@ -244,6 +245,7 @@ const Orders = () => {
 
   const handlePrintBill = async (order: Order) => {
     try {
+      setIsPrinting(true);
       // Convert Order to Bill format for printing with new format (with image)
       const bill: Bill = {
         id: order.order_number,
@@ -286,6 +288,8 @@ const Orders = () => {
     } catch (error) {
       console.error('Error printing bill:', error);
       toast.error("Failed to print bill");
+    } finally {
+      setIsPrinting(false);
     }
   };
 
@@ -466,6 +470,7 @@ const Orders = () => {
                             size="sm"
                             variant="ghost"
                             onClick={() => handlePrintBill(order)}
+                            disabled={isPrinting}
                           >
                             <Printer className="h-4 w-4" />
                           </Button>
@@ -616,11 +621,11 @@ const Orders = () => {
           )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => handlePrintBill(selectedOrder!)}>
-              <Printer className="h-4 w-4 mr-2" /> Print Bill
+            <Button variant="outline" onClick={() => handlePrintBill(selectedOrder!)} disabled={isPrinting}>
+              <Printer className="h-4 w-4 mr-2" /> {isPrinting ? "Printing..." : "Print Bill"}
             </Button>
             {selectedOrder?.status === "PENDING" && (
-              <Button onClick={() => { setAmountPaid(selectedOrder.total); setIsPaymentDialogOpen(true); }}>
+              <Button onClick={() => { setAmountPaid(selectedOrder.total); setIsPaymentDialogOpen(true); }} disabled={isPrinting}>
                 <CreditCard className="h-4 w-4 mr-2" /> Complete Payment
               </Button>
             )}
@@ -724,11 +729,11 @@ const Orders = () => {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)} disabled={isPrinting}>
               Cancel
             </Button>
-            <Button onClick={handleCompletePayment}>
-              Complete Payment
+            <Button onClick={handleCompletePayment} disabled={isPrinting}>
+              {isPrinting ? "Processing..." : "Complete Payment"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -28,6 +28,7 @@ interface PaymentDialogProps {
     amountPaid: number,
     creditDescription?: string
   ) => void;
+  isPrinting?: boolean;
 }
 
 export function PaymentDialog({
@@ -35,6 +36,7 @@ export function PaymentDialog({
   onOpenChange,
   total,
   onConfirmPayment,
+  isPrinting = false,
 }: PaymentDialogProps) {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'credit' | 'other'>('cash');
   const [amountPaid, setAmountPaid] = useState(total.toString());
@@ -192,15 +194,15 @@ export function PaymentDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPrinting}>
             Cancel
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={(!isCredit && amountPaidNum < total) || creditMissing}
-            aria-disabled={(!isCredit && amountPaidNum < total) || creditMissing}
+            disabled={(!isCredit && amountPaidNum < total) || creditMissing || isPrinting}
+            aria-disabled={(!isCredit && amountPaidNum < total) || creditMissing || isPrinting}
           >
-            {isCredit ? "Confirm Credit Sale" : "Confirm & Print Bill"}
+            {isPrinting ? "Printing..." : (isCredit ? "Confirm Credit Sale" : "Confirm & Print Bill")}
           </Button>
         </DialogFooter>
       </DialogContent>
