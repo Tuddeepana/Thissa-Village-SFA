@@ -139,14 +139,27 @@ const Orders = () => {
     fetchProducts();
   }, [statusFilter]);
 
-  // Filter orders (client-side for search)
+  // Filter orders (client-side for search) and sort pending to top
   const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
+    const filtered = orders.filter((order) => {
       const matchesSearch =
         order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
         order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         order.customer_phone.includes(searchQuery);
       return matchesSearch;
+    });
+
+    // Sort: PENDING status first, then by creation time (newest first)
+    return filtered.sort((a, b) => {
+      // If one is PENDING and the other isn't, PENDING comes first
+      if (a.status === OrderStatus.PENDING && b.status !== OrderStatus.PENDING) {
+        return -1;
+      }
+      if (a.status !== OrderStatus.PENDING && b.status === OrderStatus.PENDING) {
+        return 1;
+      }
+      // If both are PENDING or both are non-PENDING, sort by creation time (newest first)
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
   }, [orders, searchQuery]);
 
