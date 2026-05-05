@@ -5,6 +5,7 @@ import {
   listOrders,
   updateOrderStatus,
   addItemsToOrder,
+  deleteItemFromOrder,
   cancelOrder,
   getOrderStats,
   getTableStatus,
@@ -64,6 +65,12 @@ router.patch('/:id/status', validate(updateOrderStatusSchema), updateOrderStatus
  * Add items to existing order
  */
 router.post('/:id/items', validate(addItemsToOrderSchema), addItemsToOrder);
+
+/**
+ * DELETE /api/orders/:id/items/:itemId
+ * Delete item from order
+ */
+router.delete('/:id/items/:itemId', deleteItemFromOrder);
 
 /**
  * DELETE /api/orders/:id

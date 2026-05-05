@@ -24,6 +24,7 @@ export interface Order {
   order_number: string;
   customer_name: string;
   customer_phone: string;
+  customer_type: string;
   order_type: OrderType;
   table_id?: string;
   table_name?: string;
@@ -51,6 +52,7 @@ export interface CreateOrderItemInput {
 export interface CreateOrderInput {
   customer_name: string;
   customer_phone: string;
+  customer_type: "local" | "foreigner";
   order_type: OrderType;
   table_id?: string | null;
   table_name?: string | null;

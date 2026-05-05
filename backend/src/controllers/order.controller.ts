@@ -76,6 +76,15 @@ export const addItemsToOrder = async (req: Request, res: Response) => {
 };
 
 /**
+ * Delete item from order
+ */
+export const deleteItemFromOrder = async (req: Request, res: Response) => {
+  const { id, itemId } = req.params;
+  const order = await orderService.deleteItemFromOrder(id, itemId);
+  res.json({ message: 'Item deleted from order successfully', order });
+};
+
+/**
  * Cancel order
  */
 export const cancelOrder = async (req: Request, res: Response) => {

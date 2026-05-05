@@ -31,6 +31,7 @@ export class OrderService {
         order_number: orderNumber,
         customer_name: input.customer_name,
         customer_phone: input.customer_phone,
+        customer_type: input.customer_type,
         order_type: input.order_type,
         table_id: input.table_id,
         table_name: input.table_name,
@@ -257,6 +258,80 @@ export class OrderService {
   }
 
   /**
+   * Delete item from order
+   * Recalculates totals
+   */
+  async deleteItemFromOrder(orderId: string, itemId: string): Promise<OrderDTO> {
+    // Get existing order
+    const existingOrder = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+
+    if (!existingOrder) {
+      throw new Error('Order not found');
+    }
+
+    // Find the item to delete
+    const itemToDelete = existingOrder.items.find((item) => item.id === itemId);
+    if (!itemToDelete) {
+      throw new Error('Order item not found');
+    }
+
+    // Delete the item
+    await prisma.orderItem.delete({
+      where: { id: itemId },
+    });
+
+    // Recalculate totals
+    const remainingItems = existingOrder.items.filter((item) => item.id !== itemId);
+    
+    if (remainingItems.length === 0) {
+      // If no items left, just update totals to 0
+      const order = await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          subtotal: new Prisma.Decimal(0),
+          tax: new Prisma.Decimal(0),
+          discount: new Prisma.Decimal(0),
+          total: new Prisma.Decimal(0),
+        },
+        include: { items: true },
+      });
+      return this.mapToDTO(order);
+    }
+
+    // Calculate new subtotal
+    const newSubtotal = remainingItems.reduce(
+      (sum, item) => sum + Number(item.unit_price) * item.quantity,
+      0
+    );
+
+    // Recalculate tax and discount proportionally
+    const oldSubtotal = Number(existingOrder.subtotal);
+    const taxPercentage = oldSubtotal > 0 ? Number(existingOrder.tax) / oldSubtotal : 0;
+    const discountPercentage = oldSubtotal > 0 ? Number(existingOrder.discount) / oldSubtotal : 0;
+
+    const newTax = newSubtotal * taxPercentage;
+    const newDiscount = newSubtotal * discountPercentage;
+    const newTotal = newSubtotal + newTax - newDiscount;
+
+    // Update order with recalculated totals
+    const order = await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        subtotal: new Prisma.Decimal(newSubtotal),
+        tax: new Prisma.Decimal(newTax),
+        discount: new Prisma.Decimal(newDiscount),
+        total: new Prisma.Decimal(newTotal),
+      },
+      include: { items: true },
+    });
+
+    return this.mapToDTO(order);
+  }
+
+  /**
    * Delete order (cancel)
    */
   async cancelOrder(orderId: string): Promise<OrderDTO> {
@@ -395,6 +470,7 @@ export class OrderService {
       order_number: order.order_number,
       customer_name: order.customer_name,
       customer_phone: order.customer_phone,
+      customer_type: order.customer_type || 'local',
       order_type: order.order_type,
       table_id: order.table_id,
       table_name: order.table_name,
