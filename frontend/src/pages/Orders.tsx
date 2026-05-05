@@ -43,6 +43,7 @@ import {
   RefreshCw,
   Check,
   X,
+  Trash2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -206,6 +207,21 @@ const Orders = () => {
     } catch (error: any) {
       console.error("Failed to add item", error);
       const msg = error?.response?.data?.message ?? "Failed to add item";
+      toast.error(msg);
+    }
+  };
+
+  const handleDeleteItemFromOrder = async (itemId: string) => {
+    if (!selectedOrder) return;
+
+    try {
+      const updatedOrder = await orderService.deleteItemFromOrder(selectedOrder.id, itemId);
+      setOrders(orders.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)));
+      setSelectedOrder(updatedOrder);
+      toast.success("Item removed from order");
+    } catch (error: any) {
+      console.error("Failed to delete item", error);
+      const msg = error?.response?.data?.message ?? "Failed to delete item";
       toast.error(msg);
     }
   };
@@ -539,6 +555,7 @@ const Orders = () => {
                         <TableHead className="text-center">Qty</TableHead>
                         <TableHead className="text-right">Price</TableHead>
                         <TableHead className="text-right">Total</TableHead>
+                        {selectedOrder.status === "PENDING" && <TableHead className="text-right">Action</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -548,6 +565,17 @@ const Orders = () => {
                           <TableCell className="text-center">{item.quantity}</TableCell>
                           <TableCell className="text-right">Rs.{item.unit_price.toFixed(0)}</TableCell>
                           <TableCell className="text-right">Rs.{item.total.toFixed(0)}</TableCell>
+                          {selectedOrder.status === "PENDING" && (
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDeleteItemFromOrder(item.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>

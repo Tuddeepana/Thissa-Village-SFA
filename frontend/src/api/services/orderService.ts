@@ -58,6 +58,16 @@ export const orderService = {
   },
 
   /**
+   * Delete item from order
+   */
+  async deleteItemFromOrder(orderId: string, itemId: string): Promise<Order> {
+    const response = await api.delete<{ order: Order }>(
+      `${ENDPOINTS.orders.byId(orderId)}/items/${itemId}`
+    );
+    return response.data.order;
+  },
+
+  /**
    * Cancel order
    */
   async cancelOrder(id: string): Promise<Order> {

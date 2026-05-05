@@ -44,6 +44,10 @@ export const addItemsToOrderSchema = z.object({
   items: z.array(orderItemSchema).min(1, 'At least one item is required'),
 });
 
+export const deleteOrderItemSchema = z.object({
+  itemId: z.string().uuid('Invalid item ID'),
+});
+
 export const orderQuerySchema = z.object({
   status: z.nativeEnum(OrderStatus).optional(),
   order_type: z.nativeEnum(OrderType).optional(),
