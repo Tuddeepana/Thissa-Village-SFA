@@ -1,7 +1,7 @@
 # Order Management System Implementation
 
 ## Overview
-Complete order management system for restaurant operations with table assignments, customer information , kitchen order tracking, and status management (PENDING → PREPARING → READY → COMPLETED).
+Complete order management system for restaurant operations with table assignments, customer information, kitchen order tracking, and status management (PENDING → PREPARING → READY → COMPLETED).
 
 ## Implementation Date
 February 18, 2026
