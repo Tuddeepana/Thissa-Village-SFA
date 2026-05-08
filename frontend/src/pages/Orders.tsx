@@ -799,12 +799,12 @@ const Orders = () => {
 
           <DialogFooter className="gap-2">
             {selectedOrder?.status === "PENDING" && (
-              <Button 
-                className="bg-green-600 hover:bg-green-700 text-white disabled:bg-orange-500 disabled:opacity-100" 
-                onClick={handleSendOrderKot} 
+              <Button
+                className="bg-green-600 hover:bg-green-700 text-white disabled:bg-orange-500 disabled:opacity-100"
+                onClick={handleSendOrderKot}
                 disabled={isPrinting || !hasUnsentOrderItems}
               >
-                <UtensilsCrossed className="h-4 w-4 mr-2" /> 
+                <UtensilsCrossed className="h-4 w-4 mr-2" />
                 {hasUnsentOrderItems ? "Send KOT" : "KOT Sent ✓"}
               </Button>
             )}
