@@ -319,3 +319,22 @@ model OrderItem {
 
   @@map("order_items")
 }
+
+enum PrinterType {
+  KOT
+}
+
+model Printer {
+  id           String      @id @default(uuid())
+  name         String
+  ipAddress    String      @map("ip_address")
+  port         Int         @default(9100)
+  type         PrinterType @default(KOT)
+  isActive     Boolean     @default(true) @map("is_active")
+  lastTestedAt DateTime?   @map("last_tested_at")
+  lastTestOk   Boolean     @default(false) @map("last_test_ok")
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@map("printers")
+}
