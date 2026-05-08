@@ -5,7 +5,7 @@ import { User } from "@/types/user.types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShoppingCart, LayoutDashboard, Package, FileText, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import logoSvg from "@/img/logo.svg";
+import villageLogo from "@/assets/images/village-bar-logo.png";
 
 const ModuleSelection = () => {
   const navigate = useNavigate();
@@ -38,8 +38,8 @@ const ModuleSelection = () => {
       <div className="w-full max-w-4xl space-y-8">
         <div className="text-center space-y-2">
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center">
-              <img src={logoSvg} alt="Tissa Village Logo" className="w-8 h-8" />
+            <div className="w-20 h-20 flex items-center justify-center">
+              <img src={villageLogo} alt="Tissa Village Logo" className="w-full h-full object-contain" />
             </div>
           </div>
           <h1 className="text-4xl font-bold text-primary">Welcome to Tissa Village</h1>

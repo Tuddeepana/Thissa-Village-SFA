@@ -31,5 +31,10 @@ export const ENDPOINTS = {
 		status: (id: string) => `/orders/${id}/status`,
 		addItems: (id: string) => `/orders/${id}/items`,
 	},
+	printers: {
+		base: '/printers',
+		byId: (id: string) => `/printers/${id}`,
+		test: (id: string) => `/printers/${id}/test`,
+	},
 };
 
