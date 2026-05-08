@@ -32,7 +32,7 @@ const MyStock = () => {
   const [searchProduct, setSearchProduct] = useState("");
   const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
   const [categories, setCategories] = useState<Category[]>([]);
-  const ALL_CATEGORY_VALUE = 'ALL_CATEGORIES';
+  const ALL_CATEGORY_VALUE = '__ALL__';
   const ALL_STOCK_VALUE = 'ALL_STOCK';
   const [stockFilter, setStockFilter] = useState<string>(ALL_STOCK_VALUE);
    const [currentPage, setCurrentPage] = useState(1);
@@ -314,7 +314,7 @@ const MyStock = () => {
             </div>
             <div className="space-y-2 col-span-2 md:col-span-1">
               <Label htmlFor="categorySelect" className="text-xs md:text-sm">Category</Label>
-              <Select value={categoryId ?? ALL_CATEGORY_VALUE} onValueChange={(val) => setCategoryId(val === ALL_CATEGORY_VALUE ? undefined : val)}>
+              <Select value={categoryId || ALL_CATEGORY_VALUE} onValueChange={(val) => setCategoryId(val === ALL_CATEGORY_VALUE ? undefined : val)}>
                 <SelectTrigger id="categorySelect" className="h-9 md:h-10">
                   <SelectValue placeholder="All categories" />
                 </SelectTrigger>

@@ -65,6 +65,8 @@ const Users = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [isAddSubmitting, setIsAddSubmitting] = useState(false);
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
 
   // Dialog states
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);

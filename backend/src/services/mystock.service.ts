@@ -20,21 +20,20 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
   const useNoPagination = !!query.noPagination;
 
   // ── Build dynamic WHERE fragments & params ────────────────────────
-  // Params: $1 = pageSize (int), $2 = offset (int), then dynamic filters
-  const baseParams: any[] = [pageSize, skip];
+  const filterParams: any[] = [];
   const filterClauses: string[] = [];
-  let paramIdx = 3; // next param index
+  let filterParamIdx = 1; // parameter index for filters only
 
   if (query.productName) {
-    filterClauses.push(`p."name" ILIKE $${paramIdx}`);
-    baseParams.push(`%${query.productName}%`);
-    paramIdx++;
+    filterClauses.push(`p."name" ILIKE $${filterParamIdx}`);
+    filterParams.push(`%${query.productName}%`);
+    filterParamIdx++;
   }
 
   if (query.categoryId) {
-    filterClauses.push(`p."categoryId" = $${paramIdx}`);
-    baseParams.push(query.categoryId);
-    paramIdx++;
+    filterClauses.push(`p."categoryId" = $${filterParamIdx}`);
+    filterParams.push(query.categoryId);
+    filterParamIdx++;
   }
 
   const productFilter = filterClauses.length > 0
@@ -95,7 +94,7 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
         COUNT(*) FILTER (WHERE s."status" = 'LowStock')::int                  AS "lowStockItems",
         COUNT(*) FILTER (WHERE s."status" = 'OutOfStock')::int                AS "outOfStockItems"
       FROM stock s
-    `, ...baseParams.slice(2)),  // card query doesn't need $1/$2 (limit/offset)
+    `, ...filterParams),
 
     // 2. Paginated table rows (with optional status filter)
     (prisma as any).$queryRawUnsafe(`
@@ -104,8 +103,8 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
       FROM stock s
       ${statusFilter}
       ORDER BY s."productName" ASC
-      ${useNoPagination ? '' : 'LIMIT $1 OFFSET $2'}
-    `, ...baseParams),
+      ${useNoPagination ? '' : `LIMIT ${pageSize} OFFSET ${skip}`}
+    `, ...filterParams),
 
     // 3. Total count for pagination (with status filter applied)
     (prisma as any).$queryRawUnsafe(`
@@ -113,7 +112,7 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
       SELECT COUNT(*)::int AS "total"
       FROM stock s
       ${statusFilter}
-    `, ...baseParams.slice(2)),
+    `, ...filterParams),
   ]);
 
   // ── Post-process results ───────────────────────────────────────────
