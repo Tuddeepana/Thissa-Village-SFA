@@ -21,6 +21,7 @@ import {
     LucideIcon,
     ShoppingCart,
     ClipboardList,
+    Wrench,
 } from "lucide-react";
 import {
     Sidebar,
@@ -91,6 +92,7 @@ const hotelMenuGroups: MenuGroup[] = [
         items: [
             { title: "Users", url: "/users", icon: Users },
             { title: "Service Fees", url: "/settings", icon: Settings },
+            { title: "Tools", url: "/tools", icon: Wrench },
         ],
     },
 ];

@@ -24,6 +24,7 @@ import ProfitAndLoss from "./pages/ProfitAndLoss";
 import Users from "./pages/Users";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import Tools from "./pages/Tools";
 import NotFound from "./pages/NotFound";
 import { STORAGE_KEYS } from "./utils/constants";
 import { LoadingProvider } from "@/state/loadingProvider";
@@ -91,6 +92,7 @@ const App = () => (
             <Route path="users" element={<Users />} />
             <Route path="profile" element={<Profile />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="tools" element={<Tools />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
