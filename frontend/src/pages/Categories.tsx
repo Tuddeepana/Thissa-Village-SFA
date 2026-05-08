@@ -25,6 +25,8 @@ import { format } from "date-fns";
 const Categories = () => {
   const { toast } = useToast();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({ name: "", description: "" });
   const [open, setOpen] = useState(false);
@@ -47,6 +49,7 @@ const Categories = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       await categoryService.create({ name: formData.name, description: formData.description || undefined });
       toast({ title: "Success", description: "Category added successfully" });
@@ -55,6 +58,8 @@ const Categories = () => {
       refetch();
     } catch (err: any) {
       toast({ title: "Error", description: err?.response?.data?.message ?? "Failed to add category" });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -77,6 +82,7 @@ const Categories = () => {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCategory) return;
+    setIsEditSubmitting(true);
     try {
       await categoryService.update(selectedCategory.id, {
         name: editForm.name,
@@ -88,6 +94,8 @@ const Categories = () => {
       refetch();
     } catch (err: any) {
       toast({ title: "Error", description: err?.response?.data?.message ?? "Failed to update category" });
+    } finally {
+      setIsEditSubmitting(false);
     }
   };
 
@@ -128,7 +136,9 @@ const Categories = () => {
                   placeholder="Optional"
                 />
               </div>
-              <Button type="submit" className="w-full">Add Category</Button>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? "Adding..." : "Add Category"}
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -209,8 +219,10 @@ const Categories = () => {
               />
             </div>
             <div className="flex gap-2 justify-end">
-              <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-              <Button type="submit">Save Changes</Button>
+              <Button type="button" variant="outline" onClick={() => setEditOpen(false)} disabled={isEditSubmitting}>Cancel</Button>
+              <Button type="submit" disabled={isEditSubmitting}>
+                {isEditSubmitting ? "Saving..." : "Save Changes"}
+              </Button>
             </div>
           </form>
         </DialogContent>

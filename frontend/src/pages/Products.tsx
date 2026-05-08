@@ -45,6 +45,11 @@ const Products = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [units, setUnits] = useState<Unit[]>([]);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
+    const [isAddSubmitting, setIsAddSubmitting] = useState(false);
+    const [isEditSubmitting, setIsEditSubmitting] = useState(false);
+    const ALL_CATEGORY_VALUE = '__ALL__';
     const categoryNameById = useMemo(() => {
         const map: Record<string, string> = {};
         categories.forEach(c => { if (c.id) map[c.id] = c.name; });
@@ -131,14 +136,25 @@ const Products = () => {
         setNewLocalPrice("");
     };
 
+    const clearFilters = () => {
+        setSearchQuery("");
+        setSelectedCategory(undefined);
+        setCurrentPage(1);
+    };
+
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
-    // Fetch products with pagination
+    // Fetch products with pagination and filters
     const { data: productResult, refetch: refetchProducts, isFetching } = useQuery<ProductListResult, Error, ProductListResult>({
-        queryKey: ["products", { page: currentPage, limit: itemsPerPage }],
-        queryFn: async () => productService.list({ page: currentPage, limit: itemsPerPage }),
+        queryKey: ["products", { page: currentPage, limit: itemsPerPage, search: searchQuery, categoryId: selectedCategory }],
+        queryFn: async () => productService.list({ 
+            page: currentPage, 
+            limit: itemsPerPage,
+            search: searchQuery || undefined,
+            categoryId: selectedCategory || undefined,
+        }),
         staleTime: 10_000,
         keepPreviousData: true,
     });
@@ -199,6 +215,7 @@ const Products = () => {
         const foreignerPrice = typeof newForeignerPrice === "number" ? newForeignerPrice : Number.parseFloat(String(newForeignerPrice || "0"));
         const localPrice = typeof newLocalPrice === "number" ? newLocalPrice : Number.parseFloat(String(newLocalPrice || "0"));
 
+        setIsAddSubmitting(true);
         try {
             await productService.create({
                 name: newName.trim(),
@@ -217,6 +234,8 @@ const Products = () => {
             refetchProducts();
         } catch (e: any) {
             toast({ title: "Error", description: e?.response?.data?.message ?? "Failed to add product" });
+        } finally {
+            setIsAddSubmitting(false);
         }
     };
 
@@ -360,11 +379,66 @@ const Products = () => {
                                 />
                             </div>
 
-                            <Button type="submit" className="w-full">Add Product</Button>
+                            <Button type="submit" className="w-full" disabled={isAddSubmitting}>
+                                {isAddSubmitting ? "Adding..." : "Add Product"}
+                            </Button>
                         </form>
                     </DialogContent>
                 </Dialog>
             </div>
+
+            {/* Filters */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                        Filters
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="searchInput" className="text-xs md:text-sm">Search Product Name</Label>
+                            <Input
+                                id="searchInput"
+                                placeholder="Search by product name..."
+                                value={searchQuery}
+                                onChange={(e) => {
+                                    setSearchQuery(e.target.value);
+                                    setCurrentPage(1);
+                                }}
+                                className="h-9 md:h-10"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="categoryFilter" className="text-xs md:text-sm">Category</Label>
+                            <Select value={selectedCategory || ALL_CATEGORY_VALUE} onValueChange={(val) => {
+                                setSelectedCategory(val === ALL_CATEGORY_VALUE ? undefined : val);
+                                setCurrentPage(1);
+                            }}>
+                                <SelectTrigger id="categoryFilter" className="h-9 md:h-10">
+                                    <SelectValue placeholder="All categories" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={ALL_CATEGORY_VALUE}>All categories</SelectItem>
+                                    {categories.map((c) => (
+                                        <SelectItem key={c.id} value={c.id!}>{c.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs md:text-sm hidden md:block">&nbsp;</Label>
+                            <Button
+                                variant="outline"
+                                onClick={clearFilters}
+                                className="w-full h-9 md:h-10"
+                            >
+                                Clear Filters
+                            </Button>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
             <Card>
                 <CardHeader>
