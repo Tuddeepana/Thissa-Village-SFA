@@ -1,40 +1,91 @@
 import prisma from '../lib/prisma';
 
 const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wensday', 'thursday', 'friday', 'saturday'];
-const MONTH_NAMES = ['jan','feb','march','april','may','june','july','aug','sep','oct','nov','dec'];
+const MONTH_NAMES = ['jan', 'feb', 'march', 'april', 'may', 'june', 'july', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
 class DashboardService {
   /**
    * Return aggregated dashboard metrics
+   * Optimised: uses groupBy, raw SQL, and Promise.all to minimise round-trips.
    */
   async getSummary() {
     const now = new Date();
 
-    // Weekly window: last 7 days (including today)
-    const days: { date: Date; start: Date; end: Date }[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(now.getDate() - i);
-      d.setHours(0, 0, 0, 0);
-      const start = new Date(d);
-      const end = new Date(d);
-      end.setHours(23, 59, 59, 999);
-      days.push({ date: d, start, end });
-    }
+    // ── date boundaries ────────────────────────────────────────────
+    // Weekly: last 7 days (including today)
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - 6);
+    weekStart.setHours(0, 0, 0, 0);
 
-    // Monthly window: months of current year
+    const weekEnd = new Date(now);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    // Monthly: full current year
     const year = now.getFullYear();
-    const months: { monthIndex: number; start: Date; end: Date }[] = [];
-    for (let m = 0; m < 12; m++) {
-      const start = new Date(year, m, 1, 0, 0, 0, 0);
-      const end = new Date(year, m + 1, 0, 23, 59, 59, 999); // last day of month
-      months.push({ monthIndex: m, start, end });
-    }
+    const yearStart = new Date(year, 0, 1, 0, 0, 0, 0);
+    const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999);
 
-    // Basic aggregates
-    const totalProducts = await (prisma as any).product.count();
+    // ── fire ALL independent queries in parallel ───────────────────
+    const [
+      totalProducts,
+      weeklyGrouped,
+      monthlyGrouped,
+      lowStockRaw,
+      categories,
+    ] = await Promise.all([
+      // 1. Total product count
+      (prisma as any).product.count(),
 
-    // Compute weekly sums per day
+      // 2. Weekly income grouped by date (1 query instead of 7 + 1)
+      (prisma as any).bill.groupBy({
+        by: ['date'],
+        where: { date: { gte: weekStart, lte: weekEnd } },
+        _sum: { total: true },
+      }),
+
+      // 3. Monthly income grouped by month using raw SQL (1 query instead of 12 + 1)
+      //    EXTRACT(MONTH ...) returns 1-12
+      (prisma as any).$queryRaw`
+        SELECT
+          EXTRACT(MONTH FROM "date")::int AS month_num,
+          COALESCE(SUM("total"), 0)       AS total
+        FROM "bills"
+        WHERE "date" >= ${yearStart} AND "date" <= ${yearEnd}
+        GROUP BY month_num
+        ORDER BY month_num
+      `,
+
+      // 4. Low-stock check in ONE query using a lateral / sub-query via raw SQL
+      //    For each product, get the latest inventory row's available_quantity
+      //    and filter where available_quantity <= low_stock.
+      (prisma as any).$queryRaw`
+        SELECT
+          p."id",
+          p."name",
+          p."low_stock",
+          COALESCE(latest_inv."available_quantity", 0)::int AS "available_quantity"
+        FROM "products" p
+        LEFT JOIN LATERAL (
+          SELECT i."available_quantity"
+          FROM "inventory" i
+          WHERE i."productId" = p."id"
+          ORDER BY i."createdAt" DESC
+          LIMIT 1
+        ) latest_inv ON true
+        WHERE COALESCE(latest_inv."available_quantity", 0) <= COALESCE(p."low_stock", 0)
+      `,
+
+      // 5. Category distribution (already efficient, just one query)
+      (prisma as any).category.findMany({
+        select: {
+          id: true,
+          name: true,
+          _count: { select: { products: true } },
+        },
+      }),
+    ]);
+
+    // ── post-process weekly data ───────────────────────────────────
     const weeklySums: Record<string, string> = {
       monday: '0',
       tuesday: '0',
@@ -44,68 +95,53 @@ class DashboardService {
       saturday: '0',
       sunday: '0',
     };
+    let weeklyTotal = 0;
 
-    for (const d of days) {
-      const agg = await (prisma as any).bill.aggregate({ where: { date: { gte: d.start, lte: d.end } }, _sum: { total: true } });
-      const sum = agg?._sum?.total ? Number(agg._sum.total) : 0;
-      const dayName = DAY_NAMES[d.date.getDay()];
-      // normalize spelling for wednesday -> 'wensday' per user's request (they typed 'wensday')
-      const key = dayName === 'wednesday' ? 'wensday' : dayName;
-      weeklySums[key] = String(sum.toFixed(2));
+    for (const row of weeklyGrouped) {
+      const d = new Date(row.date);
+      const dayName = DAY_NAMES[d.getDay()];
+      const sum = row._sum?.total ? Number(row._sum.total) : 0;
+      weeklySums[dayName] = sum.toFixed(2);
+      weeklyTotal += sum;
     }
 
-    // Compute monthly sums per month (current year)
-    const monthlySums: Record<string, string> = {} as any;
-    for (const m of months) {
-      const agg = await (prisma as any).bill.aggregate({ where: { date: { gte: m.start, lte: m.end } }, _sum: { total: true } });
-      const sum = agg?._sum?.total ? Number(agg._sum.total) : 0;
-      const key = MONTH_NAMES[m.monthIndex] || `m${m.monthIndex + 1}`;
-      monthlySums[key] = String(sum.toFixed(2));
+    // ── post-process monthly data ──────────────────────────────────
+    const monthlySums: Record<string, string> = {};
+    let monthlyTotal = 0;
+
+    // Initialise all months to 0
+    for (let m = 0; m < 12; m++) {
+      monthlySums[MONTH_NAMES[m]] = '0';
     }
 
-    // Low stock items (reuse existing logic)
-    const products = await (prisma as any).product.findMany({ select: { id: true, low_stock: true, name: true } });
-    const lowStockItems: Array<{ id: string; name?: string; available_quantity: number; low_stock: number }> = [];
-
-    for (const p of products) {
-      const inv = await (prisma as any).inventory.findFirst({
-        where: { productId: p.id },
-        orderBy: { createdAt: 'desc' },
-        select: { available_quantity: true },
-      });
-      const available = inv?.available_quantity ?? 0;
-      if (available <= (p.low_stock ?? 0)) {
-        lowStockItems.push({ id: p.id, name: p.name, available_quantity: available, low_stock: p.low_stock });
-      }
+    for (const row of monthlyGrouped) {
+      const monthIndex = Number(row.month_num) - 1; // 1-based → 0-based
+      const sum = Number(row.total);
+      const key = MONTH_NAMES[monthIndex] || `m${monthIndex + 1}`;
+      monthlySums[key] = sum.toFixed(2);
+      monthlyTotal += sum;
     }
 
-    // Product category distribution (by product count)
-    const categories = await (prisma as any).category.findMany({
-      select: {
-        id: true,
-        name: true,
-        _count: {
-          select: { products: true },
-        },
-      },
-    });
+    // ── post-process low stock ─────────────────────────────────────
+    const lowStockItems = (lowStockRaw as any[]).map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      available_quantity: Number(r.available_quantity),
+      low_stock: r.low_stock,
+    }));
 
+    // ── post-process category distribution ─────────────────────────
     const categoryDistribution = categories.map((c: any) => {
       const count = c._count?.products ?? 0;
-      const percentage = totalProducts > 0 ? Number(((count / totalProducts) * 100).toFixed(2)) : 0;
+      const percentage = totalProducts > 0
+        ? Number(((count / totalProducts) * 100).toFixed(2))
+        : 0;
       return { categoryId: c.id, categoryName: c.name, productCount: count, percentage };
     });
 
-    // Weekly and monthly totals (overall)
-    const weeklyTotalAgg = await (prisma as any).bill.aggregate({ where: { date: { gte: days[0].start, lte: days[6].end } }, _sum: { total: true } });
-    const monthlyTotalAgg = await (prisma as any).bill.aggregate({ where: { date: { gte: months[0].start, lte: months[11].end } }, _sum: { total: true } });
-
-    const weeklyIncome = weeklyTotalAgg?._sum?.total ? String(Number(weeklyTotalAgg._sum.total).toFixed(2)) : '0';
-    const monthlyIncome = monthlyTotalAgg?._sum?.total ? String(Number(monthlyTotalAgg._sum.total).toFixed(2)) : '0';
-
     return {
-      weeklyIncome,
-      monthlyIncome,
+      weeklyIncome: weeklyTotal.toFixed(2),
+      monthlyIncome: monthlyTotal.toFixed(2),
       weeklyIncomeResponse: weeklySums,
       monthlyIncomeResponse: monthlySums,
       TotalProduct: totalProducts,

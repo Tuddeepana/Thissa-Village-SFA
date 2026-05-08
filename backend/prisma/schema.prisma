@@ -197,6 +197,7 @@ model Inventory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([productId, createdAt(sort: Desc)], name: "idx_inventory_product_latest")
   @@map("inventory")
 }
 
@@ -224,6 +225,7 @@ model Bill {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([date], name: "idx_bill_date")
   @@map("bills")
 }
 
