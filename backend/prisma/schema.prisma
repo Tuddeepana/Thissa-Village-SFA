@@ -303,6 +303,8 @@ model Order {
   // Relations
   items OrderItem[]
 
+  @@index([status, order_type, table_id], name: "idx_order_status_type_table")
+  @@index([status, createdAt], name: "idx_order_status_created")
   @@map("orders")
 }
 
@@ -319,6 +321,7 @@ model OrderItem {
   // Relations
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
+  @@index([orderId], name: "idx_order_item_order")
   @@map("order_items")
 }
 

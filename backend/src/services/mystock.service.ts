@@ -5,89 +5,146 @@ import type { MyStockQuery, MyStockResponse, MyStockTableRow } from '../types/my
 // - latest available quantity per product is obtained by ordering Inventory by createdAt desc and taking the first record for that product
 // - status: OutOfStock = availableQuantity <= 0, LowStock = availableQuantity > 0 && availableQuantity <= product.low_stock, InStock = availableQuantity > product.low_stock
 
+/**
+ * Optimised mystock query using raw SQL with LATERAL JOIN.
+ *
+ * Previous approach: fetch ALL products → fetch ALL inventory rows → JS filter/paginate.
+ * New approach:      two parallel SQL queries (card metrics + paginated rows) that use
+ *                    LATERAL JOIN to grab only the latest inventory row per product.
+ *                    The existing idx_inventory_product_latest index supports this.
+ */
 export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> => {
   const page = query.page && query.page > 0 ? query.page : 1;
   const pageSize = query.pageSize && query.pageSize > 0 ? query.pageSize : 10;
   const skip = (page - 1) * pageSize;
+  const useNoPagination = !!query.noPagination;
 
-  // Build product where filter - include all products (PURCHASE and HANDMADE)
-  const productWhere: any = {
-    AND: [
-      query.productName ? { name: { contains: query.productName, mode: 'insensitive' } } : {},
-      query.categoryId ? { categoryId: query.categoryId } : {},
-    ],
-  };
+  // ── Build dynamic WHERE fragments & params ────────────────────────
+  // Params: $1 = pageSize (int), $2 = offset (int), then dynamic filters
+  const baseParams: any[] = [pageSize, skip];
+  const filterClauses: string[] = [];
+  let paramIdx = 3; // next param index
 
-  // Fetch all products matching filters (we need full set to compute cards and filtering)
-  const products = await (prisma as any).product.findMany({
-    where: productWhere,
-    include: { category: true },
-    orderBy: { name: 'asc' },
-  });
-
-  const productIds = products.map((p: any) => p.id);
-
-  // Get latest inventory records for all matching products in one query, ordered so we can pick first per product
-  const inventories = productIds.length
-    ? await (prisma as any).inventory.findMany({
-        where: { productId: { in: productIds } },
-        orderBy: [{ productId: 'asc' }, { createdAt: 'desc' }],
-      })
-    : [];
-
-  const latestMap: Record<string, any> = {};
-  for (const inv of inventories) {
-    if (!latestMap[inv.productId]) latestMap[inv.productId] = inv;
+  if (query.productName) {
+    filterClauses.push(`p."name" ILIKE $${paramIdx}`);
+    baseParams.push(`%${query.productName}%`);
+    paramIdx++;
   }
 
-  // Build rows for all products
-  const allRows: MyStockTableRow[] = products.map((p: any) => {
-    const inv = latestMap[p.id];
-    // For HANDMADE products, always show quantity as 0 (they're not tracked in inventory)
-    const available = p.product_type === 'HANDMADE' ? 0 : (inv ? inv.available_quantity : 0);
-    let status: 'InStock' | 'LowStock' | 'OutOfStock' = 'InStock';
-    if (available <= 0) status = 'OutOfStock';
-    else if (p.low_stock && available <= p.low_stock) status = 'LowStock';
+  if (query.categoryId) {
+    filterClauses.push(`p."categoryId" = $${paramIdx}`);
+    baseParams.push(query.categoryId);
+    paramIdx++;
+  }
 
-    return {
-      productId: p.id,
-      productName: p.name,
-      productType: p.product_type,
-      unitType: p.unit_type,
-      category: p.category ? { id: p.category.id, name: p.category.name } : null,
-      availableQuantity: available,
-      minStock: p.low_stock ?? 0,
-      foreignerPrice: p.foreigner_price ? Number(p.foreigner_price) : undefined,
-      localPrice: p.local_price ? Number(p.local_price) : undefined,
-      status,
-      lastUpdatedAt: inv ? inv.updatedAt?.toISOString?.() ?? inv.updatedAt : null,
-    } as MyStockTableRow;
-  });
+  const productFilter = filterClauses.length > 0
+    ? 'AND ' + filterClauses.join(' AND ')
+    : '';
 
-  // Apply status filter if provided
-  const filteredRows = query.status ? allRows.filter((r) => r.status === query.status) : allRows;
+  // Status is computed, so it's filtered in an outer WHERE on the CTE
+  const statusFilter = query.status
+    ? `WHERE s."status" = '${query.status === 'InStock' ? 'InStock' : query.status === 'LowStock' ? 'LowStock' : 'OutOfStock'}'`
+    : '';
 
-  // Pagination
-  const totalRecords = filteredRows.length;
-  const useNoPagination = !!query.noPagination;
+  // ── CTE: core stock view (shared by both queries) ─────────────────
+  const stockCTE = `
+    WITH stock AS (
+      SELECT
+        p."id"              AS "productId",
+        p."name"            AS "productName",
+        p."product_type"    AS "productType",
+        p."unit_type"       AS "unitType",
+        p."low_stock"       AS "minStock",
+        p."foreigner_price" AS "foreignerPrice",
+        p."local_price"     AS "localPrice",
+        c."id"              AS "categoryId",
+        c."name"            AS "categoryName",
+        CASE
+          WHEN p."product_type" = 'HANDMADE' THEN 0
+          ELSE COALESCE(latest_inv."available_quantity", 0)
+        END                 AS "availableQuantity",
+        latest_inv."updatedAt" AS "lastUpdatedAt",
+        CASE
+          WHEN p."product_type" = 'HANDMADE' THEN 'OutOfStock'
+          WHEN COALESCE(latest_inv."available_quantity", 0) <= 0 THEN 'OutOfStock'
+          WHEN p."low_stock" IS NOT NULL
+               AND COALESCE(latest_inv."available_quantity", 0) <= p."low_stock" THEN 'LowStock'
+          ELSE 'InStock'
+        END                 AS "status"
+      FROM "products" p
+      LEFT JOIN "categories" c ON c."id" = p."categoryId"
+      LEFT JOIN LATERAL (
+        SELECT i."available_quantity", i."updatedAt"
+        FROM "inventory" i
+        WHERE i."productId" = p."id"
+        ORDER BY i."createdAt" DESC
+        LIMIT 1
+      ) latest_inv ON true
+      WHERE 1=1 ${productFilter}
+    )
+  `;
+
+  // ── Fire both queries in parallel ──────────────────────────────────
+  const [cardRows, tableRows, countRows] = await Promise.all([
+    // 1. Card metrics (aggregates over ALL matching products, ignoring status filter & pagination)
+    (prisma as any).$queryRawUnsafe(`
+      ${stockCTE}
+      SELECT
+        COUNT(*)::int                                                         AS "totalItems",
+        COALESCE(SUM(s."availableQuantity"), 0)::int                          AS "totalQuantity",
+        COUNT(*) FILTER (WHERE s."status" = 'LowStock')::int                  AS "lowStockItems",
+        COUNT(*) FILTER (WHERE s."status" = 'OutOfStock')::int                AS "outOfStockItems"
+      FROM stock s
+    `, ...baseParams.slice(2)),  // card query doesn't need $1/$2 (limit/offset)
+
+    // 2. Paginated table rows (with optional status filter)
+    (prisma as any).$queryRawUnsafe(`
+      ${stockCTE}
+      SELECT s.*
+      FROM stock s
+      ${statusFilter}
+      ORDER BY s."productName" ASC
+      ${useNoPagination ? '' : 'LIMIT $1 OFFSET $2'}
+    `, ...baseParams),
+
+    // 3. Total count for pagination (with status filter applied)
+    (prisma as any).$queryRawUnsafe(`
+      ${stockCTE}
+      SELECT COUNT(*)::int AS "total"
+      FROM stock s
+      ${statusFilter}
+    `, ...baseParams.slice(2)),
+  ]);
+
+  // ── Post-process results ───────────────────────────────────────────
+  const card = cardRows[0] || { totalItems: 0, totalQuantity: 0, lowStockItems: 0, outOfStockItems: 0 };
+
+  const totalRecords: number = countRows[0]?.total ?? 0;
   const totalPages = useNoPagination ? 1 : Math.max(1, Math.ceil(totalRecords / pageSize));
-  const pageRows = useNoPagination ? filteredRows : filteredRows.slice(skip, skip + pageSize);
 
-  // Compute card metrics from allRows (not just paginated)
-  let totalItems = allRows.length;
-  let totalQuantity = allRows.reduce((s, r) => s + (r.availableQuantity || 0), 0);
-  let lowStockItems = allRows.filter((r) => r.status === 'LowStock').length;
-  let outOfStockItems = allRows.filter((r) => r.status === 'OutOfStock').length;
+  const data: MyStockTableRow[] = tableRows.map((r: any) => ({
+    productId: r.productId,
+    productName: r.productName,
+    productType: r.productType,
+    unitType: r.unitType,
+    category: r.categoryId ? { id: r.categoryId, name: r.categoryName } : null,
+    availableQuantity: Number(r.availableQuantity),
+    minStock: r.minStock ?? 0,
+    foreignerPrice: r.foreignerPrice ? Number(r.foreignerPrice) : undefined,
+    localPrice: r.localPrice ? Number(r.localPrice) : undefined,
+    status: r.status as 'InStock' | 'LowStock' | 'OutOfStock',
+    lastUpdatedAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt).toISOString() : null,
+  }));
 
   return {
     cardResponse: {
-      totalItems,
-      totalQuantity,
-      lowStockItems,
-      outOfStockItems,
+      totalItems: Number(card.totalItems),
+      totalQuantity: Number(card.totalQuantity),
+      lowStockItems: Number(card.lowStockItems),
+      outOfStockItems: Number(card.outOfStockItems),
     },
     tableResponse: {
-      data: pageRows,
+      data,
       pagination: {
         currentPage: useNoPagination ? 1 : page,
         pageSize: useNoPagination ? totalRecords : pageSize,
