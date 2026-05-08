@@ -13,6 +13,14 @@ import type { MyStockQuery, MyStockResponse, MyStockTableRow } from '../types/my
  *                    LATERAL JOIN to grab only the latest inventory row per product.
  *                    The existing idx_inventory_product_latest index supports this.
  */
+/**
+ * Optimised mystock query using raw SQL with LATERAL JOIN.
+ *
+ * Previous approach: fetch ALL products → fetch ALL inventory rows → JS filter/paginate.
+ * New approach:      two parallel SQL queries (card metrics + paginated rows) that use
+ *                    LATERAL JOIN to grab only the latest inventory row per product.
+ *                    The existing idx_inventory_product_latest index supports this.
+ */
 export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> => {
   const page = query.page && query.page > 0 ? query.page : 1;
   const pageSize = query.pageSize && query.pageSize > 0 ? query.pageSize : 10;
@@ -20,20 +28,21 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
   const useNoPagination = !!query.noPagination;
 
   // ── Build dynamic WHERE fragments & params ────────────────────────
-  const filterParams: any[] = [];
+  // Params: $1 = pageSize (int), $2 = offset (int), then dynamic filters
+  const baseParams: any[] = [pageSize, skip];
   const filterClauses: string[] = [];
-  let filterParamIdx = 1; // parameter index for filters only
+  let paramIdx = 3; // next param index
 
   if (query.productName) {
-    filterClauses.push(`p."name" ILIKE $${filterParamIdx}`);
-    filterParams.push(`%${query.productName}%`);
-    filterParamIdx++;
+    filterClauses.push(`p."name" ILIKE $${paramIdx}`);
+    baseParams.push(`%${query.productName}%`);
+    paramIdx++;
   }
 
   if (query.categoryId) {
-    filterClauses.push(`p."categoryId" = $${filterParamIdx}`);
-    filterParams.push(query.categoryId);
-    filterParamIdx++;
+    filterClauses.push(`p."categoryId" = $${paramIdx}`);
+    baseParams.push(query.categoryId);
+    paramIdx++;
   }
 
   const productFilter = filterClauses.length > 0
@@ -94,7 +103,7 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
         COUNT(*) FILTER (WHERE s."status" = 'LowStock')::int                  AS "lowStockItems",
         COUNT(*) FILTER (WHERE s."status" = 'OutOfStock')::int                AS "outOfStockItems"
       FROM stock s
-    `, ...filterParams),
+    `, ...baseParams.slice(2)),  // card query doesn't need $1/$2 (limit/offset)
 
     // 2. Paginated table rows (with optional status filter)
     (prisma as any).$queryRawUnsafe(`
@@ -103,8 +112,8 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
       FROM stock s
       ${statusFilter}
       ORDER BY s."productName" ASC
-      ${useNoPagination ? '' : `LIMIT ${pageSize} OFFSET ${skip}`}
-    `, ...filterParams),
+      ${useNoPagination ? '' : 'LIMIT $1 OFFSET $2'}
+    `, ...baseParams),
 
     // 3. Total count for pagination (with status filter applied)
     (prisma as any).$queryRawUnsafe(`
@@ -112,7 +121,7 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
       SELECT COUNT(*)::int AS "total"
       FROM stock s
       ${statusFilter}
-    `, ...filterParams),
+    `, ...baseParams.slice(2)),
   ]);
 
   // ── Post-process results ───────────────────────────────────────────
