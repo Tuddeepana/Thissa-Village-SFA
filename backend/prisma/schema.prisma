@@ -197,6 +197,7 @@ model Inventory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([productId, createdAt(sort: Desc)], name: "idx_inventory_product_latest")
   @@map("inventory")
 }
 
@@ -224,6 +225,7 @@ model Bill {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([date], name: "idx_bill_date")
   @@map("bills")
 }
 
@@ -301,6 +303,8 @@ model Order {
   // Relations
   items OrderItem[]
 
+  @@index([status, order_type, table_id], name: "idx_order_status_type_table")
+  @@index([status, createdAt], name: "idx_order_status_created")
   @@map("orders")
 }
 
@@ -317,5 +321,25 @@ model OrderItem {
   // Relations
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
+  @@index([orderId], name: "idx_order_item_order")
   @@map("order_items")
+}
+
+enum PrinterType {
+  KOT
+}
+
+model Printer {
+  id           String      @id @default(uuid())
+  name         String
+  ipAddress    String      @map("ip_address")
+  port         Int         @default(9100)
+  type         PrinterType @default(KOT)
+  isActive     Boolean     @default(true) @map("is_active")
+  lastTestedAt DateTime?   @map("last_tested_at")
+  lastTestOk   Boolean     @default(false) @map("last_test_ok")
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@map("printers")
 }

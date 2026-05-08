@@ -33,6 +33,8 @@ const Rooms = () => {
   const { toast } = useToast();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [expandedRooms, setExpandedRooms] = useState<ExpandedRoomItem[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -80,6 +82,7 @@ const Rooms = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       await roomService.create({
         name: formData.name,
@@ -96,6 +99,8 @@ const Rooms = () => {
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
       toast({ title: "Error", description: error?.response?.data?.message ?? "Failed to add room" });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -117,8 +122,8 @@ const Rooms = () => {
       name: room.name,
       room_type: room.room_type,
       quantity: room.quantity,
-      price_full_day: room.price_full_day,
-      price_short_time: room.price_short_time
+      price_full_day: typeof room.price_full_day === 'string' ? parseFloat(room.price_full_day) : room.price_full_day,
+      price_short_time: typeof room.price_short_time === 'string' ? parseFloat(room.price_short_time) : room.price_short_time
     });
     setEditOpen(true);
   };
@@ -126,6 +131,7 @@ const Rooms = () => {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRoom) return;
+    setIsEditSubmitting(true);
     try {
       await roomService.update(selectedRoom.id, {
         name: editForm.name,
@@ -142,6 +148,8 @@ const Rooms = () => {
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
       toast({ title: "Error", description: error?.response?.data?.message ?? "Failed to update room" });
+    } finally {
+      setIsEditSubmitting(false);
     }
   };
 
@@ -234,7 +242,9 @@ const Rooms = () => {
                   />
                 </div>
               </div>
-              <Button type="submit" className="w-full">Add Room</Button>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? "Adding..." : "Add Room"}
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -405,8 +415,8 @@ const Rooms = () => {
                   type="number"
                   min="0"
                   step="0.01"
-                  value={editForm.price_full_day}
-                  onChange={(e) => setEditForm({ ...editForm, price_full_day: parseFloat(e.target.value) || 0 })}
+                  value={editForm.price_full_day === 0 ? "" : editForm.price_full_day}
+                  onChange={(e) => setEditForm({ ...editForm, price_full_day: e.target.value === "" ? 0 : parseFloat(e.target.value) || 0 })}
                   required
                   placeholder="Per night"
                 />
@@ -421,14 +431,16 @@ const Rooms = () => {
                   type="number"
                   min="0"
                   step="0.01"
-                  value={editForm.price_short_time}
-                  onChange={(e) => setEditForm({ ...editForm, price_short_time: parseFloat(e.target.value) || 0 })}
+                  value={editForm.price_short_time === 0 ? "" : editForm.price_short_time}
+                  onChange={(e) => setEditForm({ ...editForm, price_short_time: e.target.value === "" ? 0 : parseFloat(e.target.value) || 0 })}
                   required
                   placeholder="Per hour/session"
                 />
               </div>
             </div>
-            <Button type="submit" className="w-full">Update Room</Button>
+            <Button type="submit" className="w-full" disabled={isEditSubmitting}>
+              {isEditSubmitting ? "Updating..." : "Update Room"}
+            </Button>
           </form>
         </DialogContent>
       </Dialog>

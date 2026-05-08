@@ -75,6 +75,7 @@ const POS = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
   // Get current user info
   const currentUser = {
@@ -391,6 +392,7 @@ const POS = () => {
     if (!validateOrder()) return;
 
     try {
+      setIsSending(true);
       // Get table info for dine-in
       const selectedTableInfo = orderType === "dine_in" 
         ? tables.find(t => t.id === selectedTable)
@@ -448,6 +450,8 @@ const POS = () => {
       console.error('Failed to create order', error);
       const msg = error?.response?.data?.message ?? 'Failed to create order';
       toast.error(msg);
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -933,9 +937,9 @@ const POS = () => {
                   <div className="space-y-2 pt-2">
                     {orderType === "dine_in" ? (
                       <div className="grid grid-cols-2 gap-2">
-                        <Button className="w-full" size="lg" variant="outline" onClick={handleCreateOrder} disabled={isPrinting}>
+                        <Button className="w-full" size="lg" variant="outline" onClick={handleCreateOrder} disabled={isPrinting || isSending}>
                           <Send className="h-4 w-4 mr-2" />
-                          Send
+                          {isSending ? "Sending..." : "Send"}
                         </Button>
                         <Button className="w-full" size="lg" onClick={handleDineInPayment} disabled={isPrinting}>
                           <Printer className="h-4 w-4 mr-2" />

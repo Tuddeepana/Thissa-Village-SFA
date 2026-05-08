@@ -33,6 +33,8 @@ const Tables = () => {
   const { toast } = useToast();
   const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [expandedTables, setExpandedTables] = useState<ExpandedTableItem[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -76,6 +78,7 @@ const Tables = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       await tableService.create({
         name: formData.name,
@@ -89,6 +92,8 @@ const Tables = () => {
       refetchExpanded();
     } catch (err: any) {
       toast({ title: "Error", description: err?.response?.data?.message ?? "Failed to add table" });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -116,6 +121,7 @@ const Tables = () => {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTable) return;
+    setIsEditSubmitting(true);
     try {
       await tableService.update(selectedTable.id, {
         name: editForm.name,
@@ -129,6 +135,8 @@ const Tables = () => {
       refetchExpanded();
     } catch (err: any) {
       toast({ title: "Error", description: err?.response?.data?.message ?? "Failed to update table" });
+    } finally {
+      setIsEditSubmitting(false);
     }
   };
 
@@ -191,7 +199,9 @@ const Tables = () => {
                   Number of tables to create (e.g., 5 will create Table 1, Table 2, ... Table 5)
                 </p>
               </div>
-              <Button type="submit" className="w-full">Add Table</Button>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? "Adding..." : "Add Table"}
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -337,7 +347,9 @@ const Tables = () => {
                 Changing quantity will update the number of tables displayed
               </p>
             </div>
-            <Button type="submit" className="w-full">Update Table</Button>
+            <Button type="submit" className="w-full" disabled={isEditSubmitting}>
+              {isEditSubmitting ? "Updating..." : "Update Table"}
+            </Button>
           </form>
         </DialogContent>
       </Dialog>

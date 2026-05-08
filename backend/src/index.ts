@@ -19,6 +19,7 @@ import salesSummaryRoutes from './routes/sales-summary.routes';
 import expenseRoutes from './routes/expense.routes';
 import orderRoutes from './routes/order.routes';
 import serviceChargeRoutes from './routes/service-charge.routes';
+import printerRoutes from './routes/printer.routes';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 
 // Load environment variables
@@ -58,6 +59,7 @@ app.use('/api/sales-summary', salesSummaryRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/service-charge', serviceChargeRoutes);
+app.use('/api/printers', printerRoutes);
 
 
 // Health check

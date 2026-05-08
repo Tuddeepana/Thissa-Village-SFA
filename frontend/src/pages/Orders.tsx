@@ -59,7 +59,7 @@ const Orders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("PENDING");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isAddItemDialogOpen, setIsAddItemDialogOpen] = useState(false);
@@ -296,20 +296,105 @@ const Orders = () => {
   const handleCompletePayment = async () => {
     if (!selectedOrder) return;
 
-    const change = amountPaid - selectedOrder.total;
+    const change = paymentMethod === "credit" ? 0 : amountPaid - selectedOrder.total;
     if (paymentMethod !== "credit" && change < 0) {
       toast.error("Amount paid is less than total!");
       return;
     }
 
-    // Update order status to completed
-    await handleUpdateOrderStatus(selectedOrder.id, OrderStatus.COMPLETED);
-    handlePrintBill(selectedOrder);
-    setIsPaymentDialogOpen(false);
-    setIsViewDialogOpen(false);
-    setPaymentMethod("cash");
-    setAmountPaid(0);
-    toast.success("Payment completed successfully!");
+    setIsPrinting(true);
+    try {
+      const now = new Date();
+
+      // Build payload for backend — same approach as POS page
+      const payload = {
+        date: now.toISOString(),
+        payment_method: paymentMethod.toUpperCase(),
+        customer_name: selectedOrder.customer_name,
+        customer_type: selectedOrder.customer_type,
+        service_charge_percentage: 0,
+        service_charge_amount: 0,
+        total: Number(selectedOrder.total.toFixed(2)),
+        cashier_name: currentUser.name,
+        terminal_id: currentUser.terminalId,
+        order_type: selectedOrder.order_type === "DINE_IN" ? "dine_in" : "take_away",
+        table_number: selectedOrder.table_id ?? null,
+        item_count: selectedOrder.items.length,
+        credit_note: null,
+        cash_given: paymentMethod === "credit" ? 0 : Number(amountPaid.toFixed(2)),
+        balance_given: Number(change.toFixed(2)),
+        tax: Number(selectedOrder.tax.toFixed(2)),
+        items: selectedOrder.items.map((item) => ({
+          productId: item.productId,
+          quantityMoved: item.quantity,
+        })),
+      };
+
+      // Create bill via backend (persists bill + creates inventory movements)
+      const res = await api.post('/bills', payload);
+      const createdBillNumber =
+        res?.data?.data?.bill?.bill_number ||
+        res?.data?.data?.billNumber ||
+        res?.data?.data?.bill_number ||
+        selectedOrder.order_number;
+
+      // Build printable bill object — same structure as POS page
+      const bill: Bill = {
+        id: createdBillNumber,
+        items: selectedOrder.items.map((item) => ({
+          product: {
+            id: item.productId,
+            name: item.product_name,
+            category: '',
+            product_type: undefined,
+            unit: null,
+            foreignerPrice: item.unit_price,
+            localPrice: item.unit_price,
+            cost: 0,
+            stock: 0,
+            minStock: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          quantity: item.quantity,
+          subtotal: item.total,
+        })),
+        subtotal: selectedOrder.subtotal,
+        tax: selectedOrder.tax,
+        taxRate: selectedOrder.tax > 0 ? (selectedOrder.tax / selectedOrder.subtotal) * 100 : 0,
+        discount: selectedOrder.discount,
+        discountRate: selectedOrder.discount > 0 ? (selectedOrder.discount / selectedOrder.subtotal) * 100 : 0,
+        total: selectedOrder.total,
+        customerName: currentUser.name, // Cashier name shown on receipt
+        customerPhone: selectedOrder.customer_phone,
+        paymentMethod,
+        amountPaid: paymentMethod === "credit" ? 0 : amountPaid,
+        change: Math.max(0, change),
+        createdAt: now,
+      };
+
+      // Print bill using the same approach as POS page
+      await printBillNewWindow(bill);
+
+      // Update order status to completed
+      await handleUpdateOrderStatus(selectedOrder.id, OrderStatus.COMPLETED);
+
+      // Close dialogs and reset
+      setIsPaymentDialogOpen(false);
+      setIsViewDialogOpen(false);
+      setPaymentMethod("cash");
+      setAmountPaid(0);
+
+      toast.success('Payment completed successfully!', {
+        description: `Bill #${createdBillNumber} - Total: Rs. ${selectedOrder.total.toFixed(2)}`,
+      });
+    } catch (err: any) {
+      console.error('Failed to complete payment', err);
+      const msg = err?.response?.data?.message ?? 'Failed to complete payment';
+      toast.error(msg);
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   const getStatusBadge = (status: OrderStatusType) => {
@@ -384,7 +469,7 @@ const Orders = () => {
                 <SelectItem value="CANCELLED">Cancelled</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" onClick={() => { setSearchQuery(""); setStatusFilter("all"); fetchOrders(); }}>
+            <Button variant="outline" onClick={() => { setSearchQuery(""); setStatusFilter("PENDING"); fetchOrders(); }}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>

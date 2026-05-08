@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/api/services/authService";
 import { STORAGE_KEYS } from "@/utils/constants";
-import logoSvg from "@/img/logo.svg";
+import villageLogo from "@/assets/images/village-bar-logo.png";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -42,8 +42,8 @@ const Auth = () => {
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-2 text-center">
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center">
-              <img src={logoSvg} alt="Tissa Village Logo" className="w-8 h-8" />
+            <div className="w-20 h-20 flex items-center justify-center">
+              <img src={villageLogo} alt="Tissa Village Logo" className="w-full h-full object-contain" />
             </div>
           </div>
           <CardTitle className="text-3xl font-bold text-primary">Tissa Village</CardTitle>

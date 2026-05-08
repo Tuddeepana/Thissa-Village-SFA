@@ -365,20 +365,21 @@ export class OrderService {
 
   /**
    * Get table status with current orders
+   * Optimised: single raw SQL query with LEFT JOIN LATERAL for orders + item counts
    */
   async getTableStatus(params?: {
     status?: 'available' | 'occupied' | 'all';
     date_from?: Date;
     date_to?: Date;
   }) {
-    // Get all expanded tables
+    // ── 1. Fetch restaurant tables (lightweight, no items) ──────────
     const expandedTables = await (prisma as any).restaurantTable.findMany({
       where: { deletedAt: null },
       orderBy: { createdAt: 'asc' },
     });
 
     // Expand tables based on quantity
-    const allTables: any[] = [];
+    const allTables: { id: string; displayName: string; baseName: string; tableNumber: number; table_type: string; parentId: string }[] = [];
     for (const table of expandedTables) {
       for (let i = 1; i <= table.quantity; i++) {
         allTables.push({
@@ -392,67 +393,126 @@ export class OrderService {
       }
     }
 
-    // Build where clause for orders
-    const orderWhere: Prisma.OrderWhereInput = {
-      status: OrderStatus.PENDING,
-      order_type: 'DINE_IN',
-    };
+    // Collect all virtual table IDs for the IN clause
+    const tableIds = allTables.map(t => t.id);
 
-    if (params?.date_from || params?.date_to) {
-      orderWhere.createdAt = {};
-      if (params.date_from) {
-        orderWhere.createdAt.gte = params.date_from;
-      }
-      if (params.date_to) {
-        orderWhere.createdAt.lte = params.date_to;
-      }
+    if (tableIds.length === 0) {
+      return {
+        tables: [],
+        summary: { total: 0, occupied: 0, available: 0, reserved: 0 },
+      };
     }
 
-    // Get all pending dine-in orders
-    const pendingOrders = await prisma.order.findMany({
-      where: orderWhere,
-      include: { items: true },
-      orderBy: { createdAt: 'desc' },
-    });
+    // ── 2. Single query: latest pending DINE_IN order per table + item count ──
+    //    Uses DISTINCT ON to pick the most recent order per table_id,
+    //    and a correlated sub-query for item_count (avoids full items payload).
+    let dateFilter = '';
+    const queryParams: any[] = [tableIds];
 
-    // Map orders to table numbers
+    if (params?.date_from && params?.date_to) {
+      dateFilter = `AND o."createdAt" >= $2 AND o."createdAt" <= $3`;
+      queryParams.push(params.date_from, params.date_to);
+    } else if (params?.date_from) {
+      dateFilter = `AND o."createdAt" >= $2`;
+      queryParams.push(params.date_from);
+    } else if (params?.date_to) {
+      dateFilter = `AND o."createdAt" <= $2`;
+      queryParams.push(params.date_to);
+    }
+
+    const orderRows: any[] = await (prisma as any).$queryRawUnsafe(`
+      SELECT DISTINCT ON (o."table_id")
+        o."id",
+        o."order_number",
+        o."customer_name",
+        o."customer_phone",
+        o."customer_type",
+        o."order_type",
+        o."table_id",
+        o."table_name",
+        o."table_number",
+        o."status",
+        o."subtotal",
+        o."tax",
+        o."discount",
+        o."total",
+        o."terminal_id",
+        o."cashier_name",
+        o."notes",
+        o."createdAt",
+        o."updatedAt",
+        COALESCE(ic.cnt, 0)::int AS "item_count"
+      FROM "orders" o
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS cnt
+        FROM "order_items" oi
+        WHERE oi."orderId" = o."id"
+      ) ic ON true
+      WHERE o."status" = 'PENDING'
+        AND o."order_type" = 'DINE_IN'
+        AND o."table_id" = ANY($1)
+        ${dateFilter}
+      ORDER BY o."table_id", o."createdAt" DESC
+    `, ...queryParams);
+
+    // ── 3. Build a lookup map: table_id → order row ─────────────────
     const ordersByTable = new Map<string, any>();
-    for (const order of pendingOrders) {
-      if (order.table_id) {
-        ordersByTable.set(order.table_id, this.mapToDTO(order));
-      }
+    for (const row of orderRows) {
+      ordersByTable.set(row.table_id, {
+        id: row.id,
+        order_number: row.order_number,
+        customer_name: row.customer_name,
+        customer_phone: row.customer_phone,
+        customer_type: row.customer_type || 'local',
+        order_type: row.order_type,
+        table_id: row.table_id,
+        table_name: row.table_name,
+        table_number: row.table_number,
+        status: row.status,
+        subtotal: Number(row.subtotal),
+        tax: Number(row.tax),
+        discount: Number(row.discount),
+        total: Number(row.total),
+        terminal_id: row.terminal_id,
+        cashier_name: row.cashier_name,
+        notes: row.notes,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        item_count: row.item_count,
+      });
     }
 
-    // Combine table info with order status
+    // ── 4. Combine tables with order status ─────────────────────────
     const tableStatus = allTables.map((table) => {
-      const currentOrder = ordersByTable.get(table.id);
+      const currentOrder = ordersByTable.get(table.id) || null;
 
       return {
         table_id: table.id,
         table_number: table.tableNumber,
         table_name: table.displayName,
         table_type: table.table_type,
-        status: currentOrder ? 'occupied' : 'available',
-        current_order: currentOrder || null,
+        status: currentOrder ? ('occupied' as const) : ('available' as const),
+        current_order: currentOrder,
         customer_name: currentOrder?.customer_name || null,
         order_time: currentOrder?.createdAt || null,
         total_amount: currentOrder?.total || null,
-        item_count: currentOrder?.items?.length || null,
+        item_count: currentOrder?.item_count || null,
       };
     });
 
-    // Apply status filter if provided
+    // ── 5. Apply status filter ──────────────────────────────────────
     let filteredTables = tableStatus;
     if (params?.status && params.status !== 'all') {
       filteredTables = tableStatus.filter(t => t.status === params.status);
     }
 
-    // Calculate summary
+    // ── 6. Summary (computed from full list, not filtered) ──────────
+    const occupied = ordersByTable.size;
     const summary = {
-      total: tableStatus.length,
-      occupied: tableStatus.filter(t => t.status === 'occupied').length,
-      available: tableStatus.filter(t => t.status === 'available').length,
-      reserved: 0, // Reserved feature can be added later
+      total: allTables.length,
+      occupied,
+      available: allTables.length - occupied,
+      reserved: 0,
     };
 
     return {
