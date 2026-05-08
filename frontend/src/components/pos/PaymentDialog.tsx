@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -41,6 +41,14 @@ export function PaymentDialog({
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'credit' | 'other'>('cash');
   const [amountPaid, setAmountPaid] = useState(total.toString());
   const [creditDescription, setCreditDescription] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setAmountPaid(total.toString());
+      setCreditDescription("");
+      setPaymentMethod('cash');
+    }
+  }, [open, total]);
 
   const amountPaidNum = parseFloat(amountPaid) || 0;
   const change = Math.max(0, amountPaidNum - total);
@@ -144,7 +152,7 @@ export function PaymentDialog({
                 {[100, 500, 1000, 2000, 5000].map((amount) => (
                   <Button
                     key={amount}
-                    variant="outline"
+                    variant={amountPaid === amount.toString() ? "default" : "outline"}
                     size="sm"
                     onClick={() => handleQuickAmount(amount)}
                     disabled={amount < total}
@@ -153,7 +161,8 @@ export function PaymentDialog({
                   </Button>
                 ))}
                 <Button
-                  variant="outline"
+                  variant={amountPaid === total.toString() ? "default" : "outline"}
+                  className={amountPaid === total.toString() ? "bg-green-600 hover:bg-green-700" : ""}
                   size="sm"
                   onClick={() => handleQuickAmount(total)}
                 >

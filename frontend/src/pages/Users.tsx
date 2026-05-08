@@ -65,6 +65,8 @@ const Users = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [isAddSubmitting, setIsAddSubmitting] = useState(false);
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
 
   // Dialog states
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -120,6 +122,7 @@ const Users = () => {
       toast.error("Please fill in all required fields");
       return;
     }
+    setIsAddSubmitting(true);
     try {
       await userService.registerUser({
         email: formEmail,
@@ -134,6 +137,8 @@ const Users = () => {
       refetch();
     } catch (e: any) {
       toast.error(e?.response?.data?.message ?? "Failed to create user");
+    } finally {
+      setIsAddSubmitting(false);
     }
   };
 
@@ -721,7 +726,9 @@ const Users = () => {
             }}>
               Cancel
             </Button>
-            <Button onClick={handleAddUser}>Create User</Button>
+            <Button onClick={handleAddUser} disabled={isAddSubmitting}>
+              {isAddSubmitting ? "Adding..." : "Create User"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

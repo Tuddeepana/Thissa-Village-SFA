@@ -25,6 +25,8 @@ import { format } from "date-fns";
 const Units = () => {
   const { toast } = useToast();
   const [units, setUnits] = useState<Unit[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({ name: "", description: "" });
   const [open, setOpen] = useState(false);
@@ -47,6 +49,7 @@ const Units = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       await unitService.create({ name: formData.name, description: formData.description || null });
       toast({ title: "Success", description: "Unit added successfully" });
@@ -55,6 +58,8 @@ const Units = () => {
       refetch();
     } catch (err: any) {
       toast({ title: "Error", description: err?.response?.data?.message ?? "Failed to add unit" });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -77,6 +82,7 @@ const Units = () => {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUnit) return;
+    setIsEditSubmitting(true);
     try {
       await unitService.update(selectedUnit.id, {
         name: editForm.name,
@@ -88,6 +94,8 @@ const Units = () => {
       refetch();
     } catch (err: any) {
       toast({ title: "Error", description: err?.response?.data?.message ?? "Failed to update unit" });
+    } finally {
+      setIsEditSubmitting(false);
     }
   };
 
@@ -129,7 +137,9 @@ const Units = () => {
                   placeholder="Optional description"
                 />
               </div>
-              <Button type="submit" className="w-full">Add Unit</Button>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? "Adding..." : "Add Unit"}
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -206,7 +216,9 @@ const Units = () => {
                 placeholder="Optional description"
               />
             </div>
-            <Button type="submit" className="w-full">Update Unit</Button>
+            <Button type="submit" className="w-full" disabled={isEditSubmitting}>
+              {isEditSubmitting ? "Updating..." : "Update Unit"}
+            </Button>
           </form>
         </DialogContent>
       </Dialog>

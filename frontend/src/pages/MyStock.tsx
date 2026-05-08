@@ -32,7 +32,7 @@ const MyStock = () => {
   const [searchProduct, setSearchProduct] = useState("");
   const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
   const [categories, setCategories] = useState<Category[]>([]);
-  const ALL_CATEGORY_VALUE = 'ALL_CATEGORIES';
+  const ALL_CATEGORY_VALUE = '__ALL__';
   const ALL_STOCK_VALUE = 'ALL_STOCK';
   const [stockFilter, setStockFilter] = useState<string>(ALL_STOCK_VALUE);
    const [currentPage, setCurrentPage] = useState(1);
@@ -165,7 +165,7 @@ const MyStock = () => {
       item.category?.name ?? '',
       item.availableQuantity.toString(),
       item.minStock?.toString() ?? '',
-      item.availableQuantity === 0 ? "Out of Stock" : item.availableQuantity <= item.minStock ? "Low Stock" : "In Stock",
+      item.productType === 'HANDMADE' ? "Made to Order" : (item.availableQuantity === 0 ? "Out of Stock" : item.availableQuantity <= item.minStock ? "Low Stock" : "In Stock"),
       format(item.lastUpdatedAt ? new Date(item.lastUpdatedAt) : new Date(), "yyyy-MM-dd HH:mm:ss"),
     ]);
 
@@ -194,7 +194,10 @@ const MyStock = () => {
     }
   };
 
-  const getStockStatus = (quantity: number, minStock: number) => {
+  const getStockStatus = (quantity: number, minStock: number, productType?: string) => {
+    if (productType === 'HANDMADE') {
+      return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">Made to Order</Badge>;
+    }
     if (quantity === 0) {
       return <Badge variant="destructive">Out of Stock</Badge>;
     } else if (quantity <= minStock) {
@@ -314,7 +317,7 @@ const MyStock = () => {
             </div>
             <div className="space-y-2 col-span-2 md:col-span-1">
               <Label htmlFor="categorySelect" className="text-xs md:text-sm">Category</Label>
-              <Select value={categoryId ?? ALL_CATEGORY_VALUE} onValueChange={(val) => setCategoryId(val === ALL_CATEGORY_VALUE ? undefined : val)}>
+              <Select value={categoryId || ALL_CATEGORY_VALUE} onValueChange={(val) => setCategoryId(val === ALL_CATEGORY_VALUE ? undefined : val)}>
                 <SelectTrigger id="categorySelect" className="h-9 md:h-10">
                   <SelectValue placeholder="All categories" />
                 </SelectTrigger>
@@ -421,7 +424,7 @@ const MyStock = () => {
                         {item.minStock}
                       </TableCell>
                       <TableCell className="text-center">
-                        {getStockStatus(item.availableQuantity, item.minStock)}
+                        {getStockStatus(item.availableQuantity, item.minStock, item.productType)}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         <div className="flex items-center gap-1">
@@ -458,7 +461,7 @@ const MyStock = () => {
                         <p className="text-xs text-muted-foreground">Unit: {item.unitType}</p>
                       )}
                     </div>
-                    {getStockStatus(item.availableQuantity, item.minStock)}
+                    {getStockStatus(item.availableQuantity, item.minStock, item.productType)}
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div>

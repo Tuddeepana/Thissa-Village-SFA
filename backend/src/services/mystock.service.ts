@@ -13,6 +13,14 @@ import type { MyStockQuery, MyStockResponse, MyStockTableRow } from '../types/my
  *                    LATERAL JOIN to grab only the latest inventory row per product.
  *                    The existing idx_inventory_product_latest index supports this.
  */
+/**
+ * Optimised mystock query using raw SQL with LATERAL JOIN.
+ *
+ * Previous approach: fetch ALL products → fetch ALL inventory rows → JS filter/paginate.
+ * New approach:      two parallel SQL queries (card metrics + paginated rows) that use
+ *                    LATERAL JOIN to grab only the latest inventory row per product.
+ *                    The existing idx_inventory_product_latest index supports this.
+ */
 export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> => {
   const page = query.page && query.page > 0 ? query.page : 1;
   const pageSize = query.pageSize && query.pageSize > 0 ? query.pageSize : 10;

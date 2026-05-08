@@ -65,6 +65,7 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
   const [taxRate, setTaxRate] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'other'>('cash');
   const [status, setStatus] = useState<'paid' | 'pending' | 'cancelled'>('pending');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const products = useMemo(() => generateProducts(), []);
 
@@ -230,6 +231,7 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
       items: items.map(i => ({ productId: i.productId, quantityMoved: i.quantity })),
     };
 
+    setIsSubmitting(true);
     try {
       if (invoiceToEdit && (invoiceToEdit.id || invoiceToEdit.invoiceNumber)) {
         // Try to use id if available, otherwise fall back to invoice number
@@ -254,6 +256,8 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const message = (err as any)?.response?.data?.message ?? 'Failed to save invoice';
       alert(message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -462,9 +466,9 @@ export function AddInvoiceDialog({ open, onOpenChange, onCreated, onUpdated, inv
         <DialogFooter>
           <Button
             onClick={handleSubmit}
-            disabled={!isValid}
+            disabled={!isValid || isSubmitting}
           >
-            {invoiceToEdit ? 'Update Invoice' : 'Save Invoice'}
+            {isSubmitting ? (invoiceToEdit ? 'Updating...' : 'Saving...') : (invoiceToEdit ? 'Update Invoice' : 'Save Invoice')}
           </Button>
         </DialogFooter>
       </DialogContent>
