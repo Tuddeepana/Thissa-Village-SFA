@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { STORAGE_KEYS, ROLES } from "@/utils/constants";
 import { User } from "@/types/user.types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShoppingCart, LayoutDashboard, Package, FileText, AlertCircle } from "lucide-react";
+import { ShoppingCart, LayoutDashboard, Package, FileText, AlertCircle, UtensilsCrossed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import villageLogo from "@/assets/images/village-bar-logo.png";
 
@@ -14,6 +14,8 @@ const ModuleSelection = () => {
     localStorage.setItem(STORAGE_KEYS.selectedModule, module);
     if (module === "sfa") {
       navigate("/dashboard");
+    } else if (module === "kot") {
+      navigate("/kot-dashboard");
     } else {
       navigate("/pos");
     }
@@ -32,6 +34,7 @@ const ModuleSelection = () => {
     try { return raw ? (JSON.parse(raw) as User) : null; } catch { return null; }
   }, []);
   const isAdmin = authUser?.role === ROLES.ADMIN;
+  const isSteward = authUser?.role === 'STEWARD';
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/20 to-background p-4">
@@ -89,6 +92,7 @@ const ModuleSelection = () => {
           )}
 
           {/* POS Module Card */}
+          {(isAdmin || authUser?.role === 'CASHIER') && (
           <Card 
             className="cursor-pointer transition-all hover:shadow-lg hover:border-primary group"
             onClick={() => handleModuleSelect("pos")}
@@ -126,6 +130,44 @@ const ModuleSelection = () => {
               </Button>
             </CardContent>
           </Card>
+          )}
+
+          {/* KOT Module Card */}
+          {(isAdmin || isSteward) && (
+          <Card 
+            className="cursor-pointer transition-all hover:shadow-lg hover:border-orange-500 group"
+            onClick={() => handleModuleSelect("kot")}
+          >
+            <CardHeader className="text-center pb-4">
+              <div className="flex justify-center mb-4">
+                <div className="w-20 h-20 rounded-full bg-orange-100 flex items-center justify-center group-hover:bg-orange-200 transition-colors">
+                  <UtensilsCrossed className="w-10 h-10 text-orange-500" />
+                </div>
+              </div>
+              <CardTitle className="text-2xl">KOT Module</CardTitle>
+              <CardDescription className="text-base">
+                Kitchen Order Ticket Dashboard
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <UtensilsCrossed className="w-4 h-4 text-orange-500" />
+                <span>Active Orders Queue</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <Package className="w-4 h-4 text-orange-500" />
+                <span>Mark Orders Completed</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <FileText className="w-4 h-4 text-orange-500" />
+                <span>Special Instructions</span>
+              </div>
+              <Button className="w-full mt-4 bg-orange-500 hover:bg-orange-600 text-white" size="lg">
+                Enter KOT Module
+              </Button>
+            </CardContent>
+          </Card>
+          )}
         </div>
 
         <div className="text-center">
