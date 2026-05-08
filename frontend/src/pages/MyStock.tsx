@@ -165,7 +165,7 @@ const MyStock = () => {
       item.category?.name ?? '',
       item.availableQuantity.toString(),
       item.minStock?.toString() ?? '',
-      item.availableQuantity === 0 ? "Out of Stock" : item.availableQuantity <= item.minStock ? "Low Stock" : "In Stock",
+      item.productType === 'HANDMADE' ? "Made to Order" : (item.availableQuantity === 0 ? "Out of Stock" : item.availableQuantity <= item.minStock ? "Low Stock" : "In Stock"),
       format(item.lastUpdatedAt ? new Date(item.lastUpdatedAt) : new Date(), "yyyy-MM-dd HH:mm:ss"),
     ]);
 
@@ -194,7 +194,10 @@ const MyStock = () => {
     }
   };
 
-  const getStockStatus = (quantity: number, minStock: number) => {
+  const getStockStatus = (quantity: number, minStock: number, productType?: string) => {
+    if (productType === 'HANDMADE') {
+      return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">Made to Order</Badge>;
+    }
     if (quantity === 0) {
       return <Badge variant="destructive">Out of Stock</Badge>;
     } else if (quantity <= minStock) {
@@ -421,7 +424,7 @@ const MyStock = () => {
                         {item.minStock}
                       </TableCell>
                       <TableCell className="text-center">
-                        {getStockStatus(item.availableQuantity, item.minStock)}
+                        {getStockStatus(item.availableQuantity, item.minStock, item.productType)}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         <div className="flex items-center gap-1">
@@ -458,7 +461,7 @@ const MyStock = () => {
                         <p className="text-xs text-muted-foreground">Unit: {item.unitType}</p>
                       )}
                     </div>
-                    {getStockStatus(item.availableQuantity, item.minStock)}
+                    {getStockStatus(item.availableQuantity, item.minStock, item.productType)}
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div>

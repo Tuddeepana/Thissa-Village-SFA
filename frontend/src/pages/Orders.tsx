@@ -59,7 +59,7 @@ const Orders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("PENDING");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isAddItemDialogOpen, setIsAddItemDialogOpen] = useState(false);
@@ -384,7 +384,7 @@ const Orders = () => {
                 <SelectItem value="CANCELLED">Cancelled</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" onClick={() => { setSearchQuery(""); setStatusFilter("all"); fetchOrders(); }}>
+            <Button variant="outline" onClick={() => { setSearchQuery(""); setStatusFilter("PENDING"); fetchOrders(); }}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
