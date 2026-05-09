@@ -17,6 +17,7 @@ export class KotService {
           table_name: input.table_name,
           order_type: input.order_type,
           total_amount: new Prisma.Decimal(input.total_amount),
+          remark: input.remark,
           items: {
             create: input.items.map(item => ({
               orderItemId: item.orderItemId,
@@ -53,6 +54,40 @@ export class KotService {
     return this.mapToDTO(kotLog);
   }
 
+  /**
+   * Get KOT logs with optional filters
+   */
+  async getKotLogs(filters: { steward?: string; status?: 'PENDING' | 'COMPLETED' }): Promise<KotLogDTO[]> {
+    const where: Prisma.KotLogWhereInput = {};
+    if (filters.steward) {
+      where.steward = filters.steward;
+    }
+    if (filters.status) {
+      where.status = filters.status;
+    }
+
+    const kotLogs = await prisma.kotLog.findMany({
+      where,
+      include: { items: true },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return kotLogs.map(log => this.mapToDTO(log));
+  }
+
+  /**
+   * Update KOT log status
+   */
+  async updateKotStatus(id: string, status: 'PENDING' | 'COMPLETED'): Promise<KotLogDTO> {
+    const kotLog = await prisma.kotLog.update({
+      where: { id },
+      data: { status },
+      include: { items: true }
+    });
+
+    return this.mapToDTO(kotLog);
+  }
+
   private mapToDTO(log: any): KotLogDTO {
     return {
       id: log.id,
@@ -61,6 +96,8 @@ export class KotService {
       table_name: log.table_name,
       order_type: log.order_type as OrderType,
       total_amount: Number(log.total_amount),
+      status: log.status,
+      remark: log.remark,
       createdAt: log.createdAt,
       items: log.items.map((item: any) => ({
         id: item.id,

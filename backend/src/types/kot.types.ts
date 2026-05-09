@@ -16,6 +16,8 @@ export interface KotLogDTO {
   table_name?: string | null;
   order_type: OrderType;
   total_amount: number;
+  status: 'PENDING' | 'COMPLETED';
+  remark?: string | null;
   createdAt: Date;
   items: KotLogItemDTO[];
 }
@@ -33,5 +35,6 @@ export interface CreateKotLogInput {
   table_name?: string;
   order_type: OrderType;
   total_amount: number;
+  remark?: string | null;
   items: CreateKotLogItemInput[];
 }

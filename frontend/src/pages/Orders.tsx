@@ -53,6 +53,7 @@ import { OrderStatus } from "@/types/order.types";
 import type { Order, OrderStatus as OrderStatusType, OrderStats } from "@/types/order.types";
 import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
 import { printBillNewWindow } from "@/lib/billPrinter";
+import { printKotSlip } from "@/lib/kotPrinter";
 import type { Bill } from "@/types/pos";
 import { kotService } from "@/api/services/kotService";
 
@@ -65,6 +66,7 @@ const Orders = () => {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isAddItemDialogOpen, setIsAddItemDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [kotRemark, setKotRemark] = useState("");
   const [isPrinting, setIsPrinting] = useState(false);
   const [kotSentOrderItemIds, setKotSentOrderItemIds] = useState<Set<string>>(new Set());
   const [stats, setStats] = useState<OrderStats>({
@@ -241,21 +243,38 @@ const Orders = () => {
     if (unsentItems.length === 0) return;
 
     try {
+      const stewardName = selectedOrder.steward_name || currentUser.name;
+      const tableName = selectedOrder.table_name || "Take Away";
+      const kotItems = unsentItems.map(item => {
+        const matchingProduct = products.find(p => p.productId === item.productId);
+        return {
+          orderItemId: item.id,
+          product_name: item.product_name,
+          quantity: item.quantity,
+          unit: matchingProduct?.unitType || undefined
+        };
+      });
+
+      // Print KOT slip first
+      await printKotSlip({
+        tableName,
+        orderType: selectedOrder.order_type,
+        stewardName,
+        cashierName: currentUser.name,
+        customerName: selectedOrder.customer_name || undefined,
+        remark: kotRemark || undefined,
+        items: kotItems,
+      });
+
+      // Then save KOT to backend
       await kotService.createKotLog({
         orderId: selectedOrder.id,
-        steward: selectedOrder.steward_name || currentUser.name,
-        table_name: selectedOrder.table_name || "Take Away",
+        steward: stewardName,
+        table_name: tableName,
         order_type: selectedOrder.order_type,
         total_amount: selectedOrder.total,
-        items: unsentItems.map(item => {
-          const matchingProduct = products.find(p => p.productId === item.productId);
-          return {
-            orderItemId: item.id,
-            product_name: item.product_name,
-            quantity: item.quantity,
-            unit: matchingProduct?.unitType || undefined
-          };
-        })
+        remark: kotRemark || undefined,
+        items: kotItems,
       });
 
       setKotSentOrderItemIds(prev => {
@@ -264,6 +283,7 @@ const Orders = () => {
         return newSet;
       });
 
+      setKotRemark("");
       toast.success("KOT sent to kitchen successfully");
     } catch (err) {
       console.error("Failed to send KOT", err);
@@ -760,6 +780,20 @@ const Orders = () => {
               <div className="text-xs text-muted-foreground">
                 <p>Terminal ID: {selectedOrder.terminal_id} | Cashier: {selectedOrder.cashier_name}</p>
               </div>
+
+              {selectedOrder?.status === "PENDING" && hasUnsentOrderItems && (
+                <div className="pt-2 border-t space-y-2 mt-4">
+                  <Label htmlFor="kot-remark" className="text-xs">
+                    Remark for Kitchen (for unsent items)
+                  </Label>
+                  <Input
+                    id="kot-remark"
+                    placeholder="E.g., Less spicy, no onions"
+                    value={kotRemark}
+                    onChange={(e) => setKotRemark(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
           )}
 

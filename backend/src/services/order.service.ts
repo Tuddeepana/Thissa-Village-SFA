@@ -287,7 +287,7 @@ export class OrderService {
 
     // Recalculate totals
     const remainingItems = existingOrder.items.filter((item) => item.id !== itemId);
-    
+
     if (remainingItems.length === 0) {
       // If no items left, just update totals to 0
       const order = await prisma.order.update({
