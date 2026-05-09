@@ -250,24 +250,27 @@ const Orders = () => {
       const bill: Bill = {
         id: order.order_number,
         billNumber: order.order_number,
-        items: order.items.map(item => ({
-          product: {
-            id: item.id,
-            name: item.product_name,
-            category: '',
-            product_type: undefined,
-            unit: null,
-            foreignerPrice: item.unit_price,
-            localPrice: item.unit_price,
-            cost: 0,
-            stock: 0,
-            minStock: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          quantity: item.quantity,
-          subtotal: item.total,
-        })),
+        items: order.items.map(item => {
+          const matchingProduct = products.find(p => p.productId === item.productId);
+          return {
+            product: {
+              id: item.id,
+              name: item.product_name,
+              category: '',
+              product_type: undefined,
+              unit: matchingProduct?.unitType ?? null,
+              foreignerPrice: item.unit_price,
+              localPrice: item.unit_price,
+              cost: 0,
+              stock: 0,
+              minStock: 0,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            quantity: item.quantity,
+            subtotal: item.total,
+          };
+        }),
         subtotal: order.subtotal,
         tax: order.tax,
         taxRate: order.tax > 0 ? (order.tax / order.subtotal) * 100 : 0,
@@ -341,24 +344,27 @@ const Orders = () => {
       // Build printable bill object — same structure as POS page
       const bill: Bill = {
         id: createdBillNumber,
-        items: selectedOrder.items.map((item) => ({
-          product: {
-            id: item.productId,
-            name: item.product_name,
-            category: '',
-            product_type: undefined,
-            unit: null,
-            foreignerPrice: item.unit_price,
-            localPrice: item.unit_price,
-            cost: 0,
-            stock: 0,
-            minStock: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          quantity: item.quantity,
-          subtotal: item.total,
-        })),
+        items: selectedOrder.items.map((item) => {
+          const matchingProduct = products.find(p => p.productId === item.productId);
+          return {
+            product: {
+              id: item.productId,
+              name: item.product_name,
+              category: '',
+              product_type: undefined,
+              unit: matchingProduct?.unitType ?? null,
+              foreignerPrice: item.unit_price,
+              localPrice: item.unit_price,
+              cost: 0,
+              stock: 0,
+              minStock: 0,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            quantity: item.quantity,
+            subtotal: item.total,
+          };
+        }),
         subtotal: selectedOrder.subtotal,
         tax: selectedOrder.tax,
         taxRate: selectedOrder.tax > 0 ? (selectedOrder.tax / selectedOrder.subtotal) * 100 : 0,
