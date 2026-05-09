@@ -102,6 +102,7 @@ const BILL_CSS = `
   /* ── Items table ─────────────────────────────────────────── */
   .items-table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
     margin: 4px 0;
   }
@@ -122,9 +123,10 @@ const BILL_CSS = `
     font-weight: 600;
     padding: 2px 2px;
     vertical-align: top;
+    overflow: hidden;
   }
   .items-table td.r { text-align: right; white-space: nowrap; }
-  .col-name  { word-break: keep-all; white-space: nowrap; overflow: hidden; }
+  .col-name  { word-break: break-word; white-space: normal; }
   .col-qty   { width: 7mm; }
   .col-price { width: 14mm; }
   .col-total { width: 14mm; }

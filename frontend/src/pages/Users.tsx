@@ -42,6 +42,7 @@ import {
   Mail,
   CreditCard,
   Calendar,
+  UtensilsCrossed,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -51,10 +52,10 @@ import { userService } from "@/api/services/userService";
 import type { User, Role } from "@/types/user.types";
 
 // Helper mappers for role/status casing
-const toBackendRole = (role: "admin" | "cashier"): Role =>
-  role === "admin" ? "ADMIN" : "CASHIER";
-const toUIRole = (role: Role): "admin" | "cashier" =>
-  role === "ADMIN" ? "admin" : "cashier";
+const toBackendRole = (role: "admin" | "cashier" | "steward"): Role =>
+  role === "admin" ? "ADMIN" : role === "steward" ? "STEWARD" : "CASHIER";
+const toUIRole = (role: Role): "admin" | "cashier" | "steward" =>
+  role === "ADMIN" ? "admin" : role === "STEWARD" ? "steward" : "cashier";
 const toBackendStatus = (status: string | undefined) =>
   status === "active" ? "Active" : status === "inactive" ? "Inactive" : undefined;
 
@@ -78,7 +79,7 @@ const Users = () => {
   const [formPassword, setFormPassword] = useState("");
   const [formNic, setFormNic] = useState("");
   const [formName, setFormName] = useState("");
-  const [formRole, setFormRole] = useState<"admin" | "cashier">("cashier");
+  const [formRole, setFormRole] = useState<"admin" | "cashier" | "steward">("cashier");
   const [showPassword, setShowPassword] = useState(false);
 
   // Filter users (server applies most filters; local guard remains for UI-side checks)
@@ -103,9 +104,10 @@ const Users = () => {
     const totalUsers = users.length;
     const adminCount = users.filter((u) => u.role === "ADMIN").length;
     const cashierCount = users.filter((u) => u.role === "CASHIER").length;
+    const stewardCount = users.filter((u) => u.role === "STEWARD").length;
     const activeCount = users.filter((u) => u.status === "Active").length;
     const inactiveCount = users.filter((u) => u.status === "Inactive").length;
-    return { totalUsers, adminCount, cashierCount, activeCount, inactiveCount };
+    return { totalUsers, adminCount, cashierCount, stewardCount, activeCount, inactiveCount };
   }, [users]);
 
   const resetForm = () => {
@@ -215,7 +217,7 @@ const Users = () => {
     queryFn: async () => {
       const { users, count } = await userService.listUsers({
         search: searchQuery || undefined,
-        role: roleFilter !== "all" ? toBackendRole(roleFilter as "admin" | "cashier") : undefined,
+        role: roleFilter !== "all" ? toBackendRole(roleFilter as "admin" | "cashier" | "steward") : undefined,
         status: toBackendStatus(statusFilter),
       });
       return { users, count };
@@ -235,6 +237,14 @@ const Users = () => {
         <Badge className="bg-purple-100 text-purple-800">
           <ShieldCheck className="h-3 w-3 mr-1" />
           Admin
+        </Badge>
+      );
+    }
+    if (role === "STEWARD") {
+      return (
+        <Badge className="bg-orange-100 text-orange-800">
+          <UtensilsCrossed className="h-3 w-3 mr-1" />
+          Steward
         </Badge>
       );
     }
@@ -270,7 +280,7 @@ const Users = () => {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-4">
         <Card>
           <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
             <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
@@ -302,6 +312,18 @@ const Users = () => {
           <CardContent className="p-3 md:p-4 pt-0">
             <div className="text-xl md:text-2xl font-bold text-blue-600">
               {stats.cashierCount}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+              Stewards
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 md:p-4 pt-0">
+            <div className="text-xl md:text-2xl font-bold text-orange-600">
+              {stats.stewardCount}
             </div>
           </CardContent>
         </Card>
@@ -366,6 +388,7 @@ const Users = () => {
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="cashier">Cashier</SelectItem>
+                  <SelectItem value="steward">Steward</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -707,13 +730,14 @@ const Users = () => {
 
             <div className="space-y-2">
               <Label htmlFor="role">Role *</Label>
-              <Select value={formRole} onValueChange={(val: "admin" | "cashier") => setFormRole(val)}>
+              <Select value={formRole} onValueChange={(val: "admin" | "cashier" | "steward") => setFormRole(val)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="cashier">Cashier</SelectItem>
+                  <SelectItem value="steward">Steward</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -813,13 +837,14 @@ const Users = () => {
 
             <div className="space-y-2">
               <Label htmlFor="edit-role">Role *</Label>
-              <Select value={formRole} onValueChange={(val: "admin" | "cashier") => setFormRole(val)}>
+              <Select value={formRole} onValueChange={(val: "admin" | "cashier" | "steward") => setFormRole(val)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="cashier">Cashier</SelectItem>
+                  <SelectItem value="steward">Steward</SelectItem>
                 </SelectContent>
               </Select>
             </div>
