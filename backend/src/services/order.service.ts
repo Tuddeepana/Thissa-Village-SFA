@@ -36,7 +36,6 @@ export class OrderService {
         table_id: input.table_id,
         table_name: input.table_name,
         table_number: input.table_number,
-        steward_name: input.steward_name,
         subtotal: new Prisma.Decimal(subtotal),
         tax: new Prisma.Decimal(tax),
         discount: new Prisma.Decimal(discount),
@@ -51,7 +50,6 @@ export class OrderService {
             quantity: item.quantity,
             unit_price: new Prisma.Decimal(item.unit_price),
             total: new Prisma.Decimal(item.unit_price * item.quantity),
-            kot_sent: item.kot_sent || false,
           })),
         },
       },
@@ -287,7 +285,7 @@ export class OrderService {
 
     // Recalculate totals
     const remainingItems = existingOrder.items.filter((item) => item.id !== itemId);
-
+    
     if (remainingItems.length === 0) {
       // If no items left, just update totals to 0
       const order = await prisma.order.update({
@@ -534,11 +532,10 @@ export class OrderService {
       customer_phone: order.customer_phone,
       customer_type: order.customer_type || 'local',
       order_type: order.order_type,
-      table_id: order.table_id || undefined,
-      table_name: order.table_name || undefined,
-      table_number: order.table_number || undefined,
-      steward_name: order.steward_name || undefined,
-      status: order.status as OrderStatus,
+      table_id: order.table_id,
+      table_name: order.table_name,
+      table_number: order.table_number,
+      status: order.status,
       subtotal: Number(order.subtotal),
       tax: Number(order.tax),
       discount: Number(order.discount),
@@ -555,7 +552,6 @@ export class OrderService {
         quantity: item.quantity,
         unit_price: Number(item.unit_price),
         total: Number(item.total),
-        kot_sent: item.kot_sent || false,
         createdAt: item.createdAt,
       })),
     };
