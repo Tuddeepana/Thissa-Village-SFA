@@ -16,6 +16,7 @@ export interface OrderItem {
   quantity: number;
   unit_price: number;
   total: number;
+  kot_sent: boolean;
   createdAt: Date;
 }
 
@@ -29,6 +30,7 @@ export interface Order {
   table_id?: string;
   table_name?: string;
   table_number?: number;
+  steward_name?: string;
   status: OrderStatus;
   subtotal: number;
   tax: number;
@@ -47,6 +49,7 @@ export interface CreateOrderItemInput {
   product_name: string;
   quantity: number;
   unit_price: number;
+  kot_sent?: boolean;
 }
 
 export interface CreateOrderInput {
@@ -57,6 +60,7 @@ export interface CreateOrderInput {
   table_id?: string | null;
   table_name?: string | null;
   table_number?: number | null;
+  steward_name?: string | null;
   tax?: number;
   discount?: number;
   terminal_id: string;
