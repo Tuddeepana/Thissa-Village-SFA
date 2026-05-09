@@ -25,6 +25,7 @@ import Users from "./pages/Users";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Tools from "./pages/Tools";
+import KotDashboard from "./pages/KotDashboard";
 import NotFound from "./pages/NotFound";
 import { STORAGE_KEYS } from "./utils/constants";
 import { LoadingProvider } from "@/state/loadingProvider";
@@ -94,6 +95,14 @@ const App = () => (
             <Route path="settings" element={<Settings />} />
             <Route path="tools" element={<Tools />} />
           </Route>
+          <Route
+            path="/kot-dashboard"
+            element={
+              <ProtectedRoute>
+                <KotDashboard />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<NotFound />} />
         </Routes>
         </BrowserRouter>
