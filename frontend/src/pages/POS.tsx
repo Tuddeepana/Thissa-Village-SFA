@@ -490,7 +490,7 @@ const POS = () => {
     toast.info("Item removed from order");
   };
 
-  const handleClearOrder = () => {
+  const handleClearOrder = (showToast = true) => {
     setBillItems([]);
     setKotSentItemIds(new Set());
     setCustomerName("");
@@ -500,7 +500,22 @@ const POS = () => {
     setSelectedTable(null);
     setSelectedSteward("");
     setDiscountRate(0);
-    toast.info("Order cleared");
+    
+    // Synchronously clear localStorage so it's not lost on unmount
+    localStorage.removeItem("pos_billItems");
+    localStorage.removeItem("pos_kotSentItemIds");
+    localStorage.removeItem("pos_customerName");
+    localStorage.removeItem("pos_customerPhone");
+    localStorage.setItem("pos_customerType", "local");
+    localStorage.setItem("pos_orderType", "dine_in");
+    localStorage.removeItem("pos_selectedTable");
+    localStorage.removeItem("pos_selectedSteward");
+    localStorage.removeItem("pos_taxRate");
+    localStorage.removeItem("pos_discountRate");
+
+    if (showToast) {
+      toast.info("Order cleared");
+    }
   };
 
   const validateOrder = () => {
@@ -576,11 +591,11 @@ const POS = () => {
         refreshTableStatus();
       }, 500);
 
+      // Clear the form silently before navigating so state doesn't persist
+      handleClearOrder(false);
+
       // Navigate to orders page
       navigate("/orders");
-
-      // Clear the form
-      handleClearOrder();
     } catch (error: any) {
       console.error('Failed to create order', error);
       const msg = error?.response?.data?.message ?? 'Failed to create order';
