@@ -1157,13 +1157,13 @@ const POS = () => {
                           <Send className="h-4 w-4 mr-2" />
                           {isSending ? "Sending..." : "Send"}
                         </Button>
-                        <Button className="w-full" size="lg" onClick={handleDineInPayment} disabled={isPrinting}>
+                        <Button className="w-full" size="lg" onClick={handleDineInPayment} disabled={isPrinting || !allKotSent} title={!allKotSent ? "Send KOT first" : undefined}>
                           <Printer className="h-4 w-4 mr-2" />
                           {isPrinting ? "Printing..." : "Print & Pay"}
                         </Button>
                       </div>
                     ) : (
-                      <Button className="w-full" size="lg" onClick={handleTakeAwayPayment} disabled={isPrinting}>
+                      <Button className="w-full" size="lg" onClick={handleTakeAwayPayment} disabled={isPrinting || !allKotSent} title={!allKotSent ? "Send KOT first" : undefined}>
                         <Printer className="h-4 w-4 mr-2" />
                         {isPrinting ? "Printing..." : "Print & Pay"}
                       </Button>
