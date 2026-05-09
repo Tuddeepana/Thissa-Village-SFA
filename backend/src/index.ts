@@ -20,7 +20,6 @@ import expenseRoutes from './routes/expense.routes';
 import orderRoutes from './routes/order.routes';
 import serviceChargeRoutes from './routes/service-charge.routes';
 import printerRoutes from './routes/printer.routes';
-import kotRoutes from './routes/kot.routes';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 
 // Load environment variables
@@ -61,7 +60,6 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/service-charge', serviceChargeRoutes);
 app.use('/api/printers', printerRoutes);
-app.use('/api/kot', kotRoutes);
 
 
 // Health check

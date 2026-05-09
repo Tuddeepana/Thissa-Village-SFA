@@ -15,12 +15,6 @@ datasource db {
 enum Role {
   CASHIER
   ADMIN
-  STEWARD
-}
-
-enum KotStatus {
-  PENDING
-  COMPLETED
 }
 
 enum PaidStatus {
@@ -295,7 +289,6 @@ model Order {
   table_id       String?
   table_name     String?
   table_number   Int?
-  steward_name   String?
   status         OrderStatus @default(PENDING)
   subtotal       Decimal     @db.Decimal(10, 2)
   tax            Decimal     @default(0) @db.Decimal(10, 2)
@@ -308,8 +301,7 @@ model Order {
   updatedAt      DateTime    @updatedAt
 
   // Relations
-  items    OrderItem[]
-  kotLogs  KotLog[]
+  items OrderItem[]
 
   @@index([status, order_type, table_id], name: "idx_order_status_type_table")
   @@index([status, createdAt], name: "idx_order_status_created")
@@ -317,14 +309,13 @@ model Order {
 }
 
 model OrderItem {
-  id           String   @id @default(uuid())
+  id           String  @id @default(uuid())
   orderId      String
   productId    String
   product_name String
   quantity     Int
-  unit_price   Decimal  @db.Decimal(10, 2)
-  total        Decimal  @db.Decimal(10, 2)
-  kot_sent     Boolean  @default(false)
+  unit_price   Decimal @db.Decimal(10, 2)
+  total        Decimal @db.Decimal(10, 2)
   createdAt    DateTime @default(now())
 
   // Relations
@@ -332,39 +323,6 @@ model OrderItem {
 
   @@index([orderId], name: "idx_order_item_order")
   @@map("order_items")
-}
-
-model KotLog {
-  id           String      @id @default(uuid())
-  orderId      String?
-  steward      String
-  table_name   String?
-  order_type   String
-  total_amount Decimal     @db.Decimal(10, 2)
-  status       KotStatus   @default(PENDING)
-  remark       String?
-  createdAt    DateTime    @default(now())
-
-  // Relations
-  order Order? @relation(fields: [orderId], references: [id])
-  items KotLogItem[]
-
-  @@index([orderId], name: "idx_kot_log_order")
-  @@map("kot_logs")
-}
-
-model KotLogItem {
-  id           String  @id @default(uuid())
-  kotLogId     String
-  orderItemId  String?
-  product_name String
-  quantity     Int
-  unit         String?
-
-  // Relations
-  kotLog KotLog @relation(fields: [kotLogId], references: [id], onDelete: Cascade)
-
-  @@map("kot_log_items")
 }
 
 enum PrinterType {

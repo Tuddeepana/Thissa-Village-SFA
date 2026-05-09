@@ -6,7 +6,6 @@ export const orderItemSchema = z.object({
   product_name: z.string().min(1, 'Product name is required'),
   quantity: z.number().int().positive('Quantity must be positive'),
   unit_price: z.number().positive('Unit price must be positive'),
-  kot_sent: z.boolean().optional().default(false),
 });
 
 export const createOrderSchema = z.object({
@@ -17,7 +16,6 @@ export const createOrderSchema = z.object({
   table_id: z.any().optional(),
   table_name: z.any().optional(),
   table_number: z.any().optional(),
-  steward_name: z.string().optional().nullable(),
   tax: z.number().nonnegative().optional().default(0),
   discount: z.number().nonnegative().optional().default(0),
   terminal_id: z.string().min(1, 'Terminal ID is required'),

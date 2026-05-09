@@ -6,13 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ProductSearch } from "@/components/pos/ProductSearch";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import { RoomBookingDialog } from "@/components/pos/RoomBookingDialog";
@@ -20,13 +13,9 @@ import api from "@/api/client";
 import { tableService } from "@/api/services/tableService";
 import { orderService } from "@/api/services/orderService";
 import { serviceChargeService } from "@/api/services/serviceChargeService";
-import { kotService } from "@/api/services/kotService";
-import { userService } from "@/api/services/userService";
-import type { User as AppUser } from "@/types/user.types";
 import { Product, BillItem, Bill, StockWarning } from "@/types/pos";
 import { OrderType } from "@/types/order.types";
 import { printBillNewWindow } from "@/lib/billPrinter";
-import { printKotSlip } from "@/lib/kotPrinter";
 import { toast } from "sonner";
 import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
 import type { ExpandedTableItem } from "@/types/table.types";
@@ -65,50 +54,20 @@ interface TableInfo {
 
 const POS = () => {
   const navigate = useNavigate();
-
+  
   // Customer Info State
-  const [customerName, setCustomerName] = useState(() => localStorage.getItem("pos_customerName") || "");
-  const [customerPhone, setCustomerPhone] = useState(() => localStorage.getItem("pos_customerPhone") || "");
-  const [customerType, setCustomerType] = useState<"local" | "foreigner">(() => (localStorage.getItem("pos_customerType") as "local" | "foreigner") || "local");
-  const [orderType, setOrderType] = useState<"dine_in" | "take_away">(() => (localStorage.getItem("pos_orderType") as "dine_in" | "take_away") || "dine_in");
-  const [selectedTable, setSelectedTable] = useState<string | null>(() => localStorage.getItem("pos_selectedTable") || null);
-  const [selectedSteward, setSelectedSteward] = useState<string>(() => localStorage.getItem("pos_selectedSteward") || "");
-  const [kotRemark, setKotRemark] = useState<string>(() => localStorage.getItem("pos_kotRemark") || "");
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerType, setCustomerType] = useState<"local" | "foreigner">("local");
+  const [orderType, setOrderType] = useState<"dine_in" | "take_away">("dine_in");
+  const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [tables, setTables] = useState<TableInfo[]>([]);
-  const [stewards, setStewards] = useState<AppUser[]>([]);
 
   // Products and Cart
   const [products, setProducts] = useState<Product[]>([]);
-  const [billItems, setBillItems] = useState<BillItem[]>(() => {
-    try {
-      const saved = localStorage.getItem("pos_billItems");
-      if (!saved) return [];
-      // Rehydrate dates
-      const items = JSON.parse(saved);
-      return items.map((item: any) => ({
-        ...item,
-        product: {
-          ...item.product,
-          createdAt: new Date(item.product.createdAt),
-          updatedAt: new Date(item.product.updatedAt),
-        }
-      }));
-    } catch { return []; }
-  });
-  const [kotSentItemIds, setKotSentItemIds] = useState<Set<string>>(() => {
-    try {
-      const saved = localStorage.getItem("pos_kotSentItemIds");
-      return saved ? new Set(JSON.parse(saved)) : new Set();
-    } catch { return new Set(); }
-  });
-  const [taxRate, setTaxRate] = useState(() => {
-    const saved = localStorage.getItem("pos_taxRate");
-    return saved ? parseFloat(saved) : 0;
-  });
-  const [discountRate, setDiscountRate] = useState(() => {
-    const saved = localStorage.getItem("pos_discountRate");
-    return saved ? parseFloat(saved) : 0;
-  });
+  const [billItems, setBillItems] = useState<BillItem[]>([]);
+  const [taxRate, setTaxRate] = useState(0);
+  const [discountRate, setDiscountRate] = useState(0);
   const [serviceCharge, setServiceCharge] = useState<{ percentage: number; isActive: boolean } | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isRoomBookingDialogOpen, setIsRoomBookingDialogOpen] = useState(false);
@@ -133,40 +92,6 @@ const POS = () => {
     terminalId: "T-001", // Hardcoded terminal ID
   };
 
-  // Persist POS cart to localStorage
-  useEffect(() => {
-    localStorage.setItem("pos_billItems", JSON.stringify(billItems));
-    localStorage.setItem("pos_kotSentItemIds", JSON.stringify(Array.from(kotSentItemIds)));
-    localStorage.setItem("pos_customerName", customerName);
-    localStorage.setItem("pos_customerPhone", customerPhone);
-    localStorage.setItem("pos_customerType", customerType);
-    localStorage.setItem("pos_orderType", orderType);
-    if (selectedTable) {
-      localStorage.setItem("pos_selectedTable", selectedTable);
-    } else {
-      localStorage.removeItem("pos_selectedTable");
-    }
-    localStorage.setItem("pos_taxRate", taxRate.toString());
-    localStorage.setItem("pos_discountRate", discountRate.toString());
-    localStorage.setItem("pos_selectedSteward", selectedSteward);
-    localStorage.setItem("pos_kotRemark", kotRemark);
-  }, [billItems, kotSentItemIds, customerName, customerPhone, customerType, orderType, selectedTable, taxRate, discountRate, selectedSteward, kotRemark]);
-
-  // Fetch stewards
-  useEffect(() => {
-    let cancelled = false;
-    const fetchStewards = async () => {
-      try {
-        const { users } = await userService.listUsers({ role: 'STEWARD' as any });
-        if (!cancelled) setStewards(users);
-      } catch (err) {
-        console.error("Failed to load stewards", err);
-      }
-    };
-    fetchStewards();
-    return () => { cancelled = true; };
-  }, []);
-
   // Function to refresh table status from server
   const refreshTableStatus = async () => {
     try {
@@ -180,7 +105,7 @@ const POS = () => {
 
       // Also get the base table structure
       const baseResponse = await tableService.getExpanded();
-
+      
       const expandedTables: ExpandedTableItem[] = baseResponse.tables || [];
       const mappedTables: TableInfo[] = expandedTables.map((t) => ({
         id: t.id,
@@ -214,7 +139,7 @@ const POS = () => {
         // Also get the base table structure
         const baseResponse = await tableService.getExpanded();
         if (cancelled) return;
-
+        
         const expandedTables: ExpandedTableItem[] = baseResponse.tables || [];
         const mappedTables: TableInfo[] = expandedTables.map((t) => ({
           id: t.id,
@@ -232,7 +157,7 @@ const POS = () => {
       }
     };
     fetchTables();
-
+    
     // Set up interval to refresh table status every 30 seconds to catch status changes
     const interval = setInterval(fetchTables, 30000);
     return () => {
@@ -247,7 +172,7 @@ const POS = () => {
     const fetchProducts = async () => {
       setLoadingProducts(true);
       try {
-        const res = await api.get<MyStockResponse>('/mystock', { params: { page, pageSize: PAGE_SIZE }, meta: { showLoader: 'local', loaderKey: 'pos-products' } });
+  const res = await api.get<MyStockResponse>('/mystock', { params: { page, pageSize: PAGE_SIZE }, meta: { showLoader: 'local', loaderKey: 'pos-products' } });
         if (cancelled) return;
         const rows: MyStockTableRow[] = res.data.tableResponse?.data ?? [];
         const mapped: Product[] = rows.map((r) => ({
@@ -325,81 +250,13 @@ const POS = () => {
     return subtotal + tax + serviceChargeAmount - discount;
   }, [subtotal, tax, discount, serviceChargeAmount]);
 
-  // KOT Status
-  const hasUnsentItems = useMemo(() => {
-    return billItems.some((item) => !kotSentItemIds.has(item.product.id));
-  }, [billItems, kotSentItemIds]);
-
-  const allKotSent = billItems.length > 0 && !hasUnsentItems;
-
-  const handleSendKot = async () => {
-    if (!selectedSteward) {
-      toast.error("Please select a steward before sending KOT");
-      return;
-    }
-
-    const unsentItems = billItems.filter(item => !kotSentItemIds.has(item.product.id));
-    if (unsentItems.length === 0) return;
-
-    try {
-      const selectedTableInfo = orderType === "dine_in"
-        ? tables.find(t => t.id === selectedTable)
-        : null;
-
-      const stewardObj = stewards.find(s => s.id === selectedSteward);
-      const stewardName = stewardObj?.name || selectedSteward || currentUser.name;
-      const tableName = selectedTableInfo?.displayName || "Take Away";
-      const kotOrderType = orderType === "dine_in" ? OrderType.DINE_IN : OrderType.TAKE_AWAY;
-
-      // Print KOT slip first
-      await printKotSlip({
-        tableName,
-        orderType: kotOrderType,
-        stewardName,
-        cashierName: currentUser.name,
-        customerName: customerName || undefined,
-        remark: kotRemark || undefined,
-        items: unsentItems.map(item => ({
-          product_name: item.product.name,
-          quantity: item.quantity,
-          unit: item.product.unit || undefined
-        }))
-      });
-
-      // Then save KOT to backend
-      await kotService.createKotLog({
-        steward: stewardName,
-        table_name: tableName,
-        order_type: kotOrderType,
-        total_amount: total,
-        remark: kotRemark || undefined,
-        items: unsentItems.map(item => ({
-          product_name: item.product.name,
-          quantity: item.quantity,
-          unit: item.product.unit || undefined
-        }))
-      });
-
-      setKotSentItemIds(prev => {
-        const newSet = new Set(prev);
-        unsentItems.forEach(item => newSet.add(item.product.id));
-        return newSet;
-      });
-
-      toast.success("KOT sent to kitchen successfully");
-    } catch (err) {
-      console.error("Failed to send KOT", err);
-      toast.error("Failed to send KOT");
-    }
-  };
-
   // Check for stock warnings (exclude HANDMADE products)
   const stockWarnings = useMemo(() => {
     const warnings: StockWarning[] = [];
     for (const item of billItems) {
       // Skip handmade products from stock warnings
       if (item.product.product_type === 'HANDMADE') continue;
-
+      
       if (item.product.stock <= item.product.minStock) {
         warnings.push({
           product: item.product,
@@ -446,7 +303,7 @@ const POS = () => {
   const handleAddProduct = (product: Product) => {
     // Skip stock validation for HANDMADE products
     const isHandmade = product.product_type === 'HANDMADE';
-
+    
     if (!isHandmade && product.stock === 0) {
       toast.error("Product is out of stock!");
       return;
@@ -482,7 +339,7 @@ const POS = () => {
 
     // Skip stock validation for HANDMADE products
     const isHandmade = item.product.product_type === 'HANDMADE';
-
+    
     if (!isHandmade && newQuantity > item.product.stock) {
       toast.error("Cannot exceed available stock!");
       return;
@@ -494,10 +351,10 @@ const POS = () => {
       billItems.map((item) =>
         item.product.id === productId
           ? {
-            ...item,
-            quantity: newQuantity,
-            subtotal: priceToUse * newQuantity,
-          }
+              ...item,
+              quantity: newQuantity,
+              subtotal: priceToUse * newQuantity,
+            }
           : item
       )
     );
@@ -505,42 +362,18 @@ const POS = () => {
 
   const handleRemoveItem = (productId: string) => {
     setBillItems(billItems.filter((item) => item.product.id !== productId));
-    setKotSentItemIds(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(productId);
-      return newSet;
-    });
     toast.info("Item removed from order");
   };
 
-  const handleClearOrder = (showToast = true) => {
+  const handleClearOrder = () => {
     setBillItems([]);
-    setKotSentItemIds(new Set());
     setCustomerName("");
     setCustomerPhone("");
     setCustomerType("local");
     setOrderType("dine_in");
     setSelectedTable(null);
-    setSelectedSteward("");
-    setKotRemark("");
     setDiscountRate(0);
-
-    // Synchronously clear localStorage so it's not lost on unmount
-    localStorage.removeItem("pos_billItems");
-    localStorage.removeItem("pos_kotSentItemIds");
-    localStorage.removeItem("pos_customerName");
-    localStorage.removeItem("pos_customerPhone");
-    localStorage.setItem("pos_customerType", "local");
-    localStorage.setItem("pos_orderType", "dine_in");
-    localStorage.removeItem("pos_selectedTable");
-    localStorage.removeItem("pos_selectedSteward");
-    localStorage.removeItem("pos_kotRemark");
-    localStorage.removeItem("pos_taxRate");
-    localStorage.removeItem("pos_discountRate");
-
-    if (showToast) {
-      toast.info("Order cleared");
-    }
+    toast.info("Order cleared");
   };
 
   const validateOrder = () => {
@@ -552,10 +385,6 @@ const POS = () => {
       toast.error("Please select a table for dine-in order");
       return false;
     }
-    if (!selectedSteward) {
-      toast.error("Please select a steward");
-      return false;
-    }
     return true;
   };
 
@@ -565,11 +394,9 @@ const POS = () => {
     try {
       setIsSending(true);
       // Get table info for dine-in
-      const selectedTableInfo = orderType === "dine_in"
+      const selectedTableInfo = orderType === "dine_in" 
         ? tables.find(t => t.id === selectedTable)
         : null;
-
-      const stewardObj = stewards.find(s => s.id === selectedSteward);
 
       // Create order via API
       const order = await orderService.createOrder({
@@ -580,7 +407,6 @@ const POS = () => {
         table_id: selectedTableInfo?.id ?? null,
         table_name: selectedTableInfo?.displayName ?? null,
         table_number: selectedTableInfo?.tableNumber ?? null,
-        steward_name: stewardObj?.name || selectedSteward,
         tax: taxRate,
         discount: discountRate,
         terminal_id: currentUser.terminalId,
@@ -590,7 +416,6 @@ const POS = () => {
           product_name: item.product.name,
           quantity: item.quantity,
           unit_price: customerType === "local" ? item.product.localPrice : item.product.foreignerPrice,
-          kot_sent: kotSentItemIds.has(item.product.id),
         })),
       });
 
@@ -616,11 +441,11 @@ const POS = () => {
         refreshTableStatus();
       }, 500);
 
-      // Clear the form silently before navigating so state doesn't persist
-      handleClearOrder(false);
-
       // Navigate to orders page
       navigate("/orders");
+
+      // Clear the form
+      handleClearOrder();
     } catch (error: any) {
       console.error('Failed to create order', error);
       const msg = error?.response?.data?.message ?? 'Failed to create order';
@@ -733,10 +558,11 @@ const POS = () => {
         </div>
         <Badge
           variant="outline"
-          className={`text-sm px-3 py-1 ${customerType === "local"
-              ? "bg-green-100 text-green-700 border-green-300"
+          className={`text-sm px-3 py-1 ${
+            customerType === "local" 
+              ? "bg-green-100 text-green-700 border-green-300" 
               : "bg-blue-100 text-blue-700 border-blue-300"
-            }`}
+          }`}
         >
           {customerType === "local" ? (
             <><Users className="h-4 w-4 mr-1.5" /> Local Pricing</>
@@ -825,16 +651,17 @@ const POS = () => {
                         <Button
                           key={table.id}
                           variant={selectedTable === table.id ? "default" : "outline"}
-                          className={`h-20 ${table.status === "occupied"
+                          className={`h-20 ${
+                            table.status === "occupied"
                               ? "opacity-50 cursor-not-allowed bg-red-50 border-red-200"
                               : selectedTable === table.id
-                                ? table.table_type === "VIP"
-                                  ? "bg-amber-600 hover:bg-amber-700"
-                                  : ""
-                                : table.table_type === "VIP"
-                                  ? "hover:bg-amber-50 hover:border-amber-300 border-amber-200"
-                                  : "hover:bg-green-50 hover:border-green-200"
-                            }`}
+                              ? table.table_type === "VIP" 
+                                ? "bg-amber-600 hover:bg-amber-700"
+                                : ""
+                              : table.table_type === "VIP"
+                              ? "hover:bg-amber-50 hover:border-amber-300 border-amber-200"
+                              : "hover:bg-green-50 hover:border-green-200"
+                          }`}
                           disabled={table.status === "occupied"}
                           onClick={() => setSelectedTable(table.id)}
                         >
@@ -920,38 +747,10 @@ const POS = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col overflow-y-auto">
-              {/* Customer & Steward Information */}
+              {/* Customer Information */}
               <div className="space-y-3 border-b pb-4 mb-4">
-                <h3 className="font-semibold text-sm">Customer & Steward</h3>
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label className="flex items-center gap-2 text-xs">
-                      <Crown className="h-3 w-3" /> Steward <span className="text-red-500">*</span>
-                    </Label>
-                    <Select value={selectedSteward} onValueChange={setSelectedSteward}>
-                      <SelectTrigger className="h-8">
-                        <SelectValue placeholder="Select Steward" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stewards.map(steward => (
-                          <SelectItem key={steward.id} value={steward.id}>
-                            {steward.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="kot-remark" className="flex items-center gap-2 text-xs">
-                      Remark for Kitchen
-                    </Label>
-                    <Input
-                      id="kot-remark"
-                      placeholder="E.g., Less spicy, no onions"
-                      value={kotRemark}
-                      onChange={(e) => setKotRemark(e.target.value)}
-                    />
-                  </div>
+                <h3 className="font-semibold text-sm">Customer Information</h3>
+                <div className="space-y-2">
                   <div className="space-y-1">
                     <Label htmlFor="customer-name" className="flex items-center gap-2 text-xs">
                       <User className="h-3 w-3" /> Name
@@ -1010,12 +809,7 @@ const POS = () => {
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <h4 className="font-medium text-sm">
-                            {item.product.name}
-                            <span className={`ml-2 text-[10px] uppercase font-bold ${kotSentItemIds.has(item.product.id) ? 'text-green-500' : 'text-orange-500'}`}>
-                              {kotSentItemIds.has(item.product.id) ? '✓ Sent' : 'Pending'}
-                            </span>
-                          </h4>
+                          <h4 className="font-medium text-sm">{item.product.name}</h4>
                           <p className="text-xs text-muted-foreground">
                             Rs. {(customerType === "local" ? item.product.localPrice : item.product.foreignerPrice).toFixed(2)} each
                           </p>
@@ -1051,7 +845,7 @@ const POS = () => {
                               handleUpdateQuantity(item.product.id, item.quantity + 1)
                             }
                             disabled={
-                              item.product.product_type !== 'HANDMADE' &&
+                              item.product.product_type !== 'HANDMADE' && 
                               item.quantity >= item.product.stock
                             }
                           >
@@ -1141,19 +935,9 @@ const POS = () => {
 
                   {/* Action Buttons */}
                   <div className="space-y-2 pt-2">
-                    <Button
-                      className="w-full bg-orange-500 hover:bg-orange-600 text-white disabled:bg-green-600 disabled:opacity-100"
-                      size="lg"
-                      onClick={handleSendKot}
-                      disabled={!hasUnsentItems || billItems.length === 0}
-                    >
-                      <UtensilsCrossed className="h-4 w-4 mr-2" />
-                      {hasUnsentItems ? "Send KOT" : (billItems.length > 0 ? "KOT Sent ✓" : "Send KOT")}
-                    </Button>
-
                     {orderType === "dine_in" ? (
                       <div className="grid grid-cols-2 gap-2">
-                        <Button className="w-full" size="lg" variant="outline" onClick={handleCreateOrder} disabled={isPrinting || isSending || !allKotSent} title={!allKotSent ? "Send KOT first" : undefined}>
+                        <Button className="w-full" size="lg" variant="outline" onClick={handleCreateOrder} disabled={isPrinting || isSending}>
                           <Send className="h-4 w-4 mr-2" />
                           {isSending ? "Sending..." : "Send"}
                         </Button>
