@@ -54,6 +54,7 @@ import type { Order, OrderStatus as OrderStatusType, OrderStats } from "@/types/
 import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
 import { printBillNewWindow } from "@/lib/billPrinter";
 import type { Bill } from "@/types/pos";
+import { kotService } from "@/api/services/kotService";
 
 const Orders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -65,6 +66,7 @@ const Orders = () => {
   const [isAddItemDialogOpen, setIsAddItemDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [kotSentOrderItemIds, setKotSentOrderItemIds] = useState<Set<string>>(new Set());
   const [stats, setStats] = useState<OrderStats>({
     pending: 0,
     completed: 0,
@@ -170,6 +172,7 @@ const Orders = () => {
       // Fetch full order details
       const fullOrder = await orderService.getOrderById(order.id);
       setSelectedOrder(fullOrder);
+      setKotSentOrderItemIds(new Set());
       setIsViewDialogOpen(true);
     } catch (error) {
       console.error("Failed to fetch order details", error);
@@ -224,6 +227,47 @@ const Orders = () => {
       console.error("Failed to delete item", error);
       const msg = error?.response?.data?.message ?? "Failed to delete item";
       toast.error(msg);
+    }
+  };
+
+  const hasUnsentOrderItems = useMemo(() => {
+    if (!selectedOrder) return false;
+    return selectedOrder.items.some(item => !item.kot_sent && !kotSentOrderItemIds.has(item.id));
+  }, [selectedOrder, kotSentOrderItemIds]);
+
+  const handleSendOrderKot = async () => {
+    if (!selectedOrder) return;
+    const unsentItems = selectedOrder.items.filter(item => !item.kot_sent && !kotSentOrderItemIds.has(item.id));
+    if (unsentItems.length === 0) return;
+
+    try {
+      await kotService.createKotLog({
+        orderId: selectedOrder.id,
+        steward: selectedOrder.steward_name || currentUser.name,
+        table_name: selectedOrder.table_name || "Take Away",
+        order_type: selectedOrder.order_type,
+        total_amount: selectedOrder.total,
+        items: unsentItems.map(item => {
+          const matchingProduct = products.find(p => p.productId === item.productId);
+          return {
+            orderItemId: item.id,
+            product_name: item.product_name,
+            quantity: item.quantity,
+            unit: matchingProduct?.unitType || undefined
+          };
+        })
+      });
+
+      setKotSentOrderItemIds(prev => {
+        const newSet = new Set(prev);
+        unsentItems.forEach(item => newSet.add(item.id));
+        return newSet;
+      });
+
+      toast.success("KOT sent to kitchen successfully");
+    } catch (err) {
+      console.error("Failed to send KOT", err);
+      toast.error("Failed to send KOT");
     }
   };
 
@@ -647,6 +691,7 @@ const Orders = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-[60px] text-center">KOT</TableHead>
                         <TableHead>Item</TableHead>
                         <TableHead className="text-center">Qty</TableHead>
                         <TableHead className="text-right">Price</TableHead>
@@ -657,6 +702,13 @@ const Orders = () => {
                     <TableBody>
                       {selectedOrder.items.map((item) => (
                         <TableRow key={item.id}>
+                          <TableCell className="text-center">
+                            {(item.kot_sent || kotSentOrderItemIds.has(item.id)) ? (
+                              <Check className="h-4 w-4 mx-auto text-green-500" title="KOT Sent" />
+                            ) : (
+                              <Clock className="h-4 w-4 mx-auto text-orange-500" title="Pending KOT" />
+                            )}
+                          </TableCell>
                           <TableCell>{item.product_name}</TableCell>
                           <TableCell className="text-center">{item.quantity}</TableCell>
                           <TableCell className="text-right">Rs.{item.unit_price.toFixed(0)}</TableCell>
@@ -712,6 +764,16 @@ const Orders = () => {
           )}
 
           <DialogFooter className="gap-2">
+            {selectedOrder?.status === "PENDING" && (
+              <Button 
+                className="bg-orange-500 hover:bg-orange-600 text-white disabled:bg-green-600 disabled:opacity-100" 
+                onClick={handleSendOrderKot} 
+                disabled={isPrinting || !hasUnsentOrderItems}
+              >
+                <UtensilsCrossed className="h-4 w-4 mr-2" /> 
+                {hasUnsentOrderItems ? "Send KOT" : "KOT Sent ✓"}
+              </Button>
+            )}
             <Button variant="outline" onClick={() => handlePrintBill(selectedOrder!)} disabled={isPrinting}>
               <Printer className="h-4 w-4 mr-2" /> {isPrinting ? "Printing..." : "Print Bill"}
             </Button>
