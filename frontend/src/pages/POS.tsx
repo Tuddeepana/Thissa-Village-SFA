@@ -26,6 +26,7 @@ import type { User as AppUser } from "@/types/user.types";
 import { Product, BillItem, Bill, StockWarning } from "@/types/pos";
 import { OrderType } from "@/types/order.types";
 import { printBillNewWindow } from "@/lib/billPrinter";
+import { printKotSlip } from "@/lib/kotPrinter";
 import { toast } from "sonner";
 import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
 import type { ExpandedTableItem } from "@/types/table.types";
@@ -64,7 +65,7 @@ interface TableInfo {
 
 const POS = () => {
   const navigate = useNavigate();
-  
+
   // Customer Info State
   const [customerName, setCustomerName] = useState(() => localStorage.getItem("pos_customerName") || "");
   const [customerPhone, setCustomerPhone] = useState(() => localStorage.getItem("pos_customerPhone") || "");
@@ -72,6 +73,7 @@ const POS = () => {
   const [orderType, setOrderType] = useState<"dine_in" | "take_away">(() => (localStorage.getItem("pos_orderType") as "dine_in" | "take_away") || "dine_in");
   const [selectedTable, setSelectedTable] = useState<string | null>(() => localStorage.getItem("pos_selectedTable") || null);
   const [selectedSteward, setSelectedSteward] = useState<string>(() => localStorage.getItem("pos_selectedSteward") || "");
+  const [kotRemark, setKotRemark] = useState<string>(() => localStorage.getItem("pos_kotRemark") || "");
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [stewards, setStewards] = useState<AppUser[]>([]);
 
@@ -147,7 +149,8 @@ const POS = () => {
     localStorage.setItem("pos_taxRate", taxRate.toString());
     localStorage.setItem("pos_discountRate", discountRate.toString());
     localStorage.setItem("pos_selectedSteward", selectedSteward);
-  }, [billItems, kotSentItemIds, customerName, customerPhone, customerType, orderType, selectedTable, taxRate, discountRate, selectedSteward]);
+    localStorage.setItem("pos_kotRemark", kotRemark);
+  }, [billItems, kotSentItemIds, customerName, customerPhone, customerType, orderType, selectedTable, taxRate, discountRate, selectedSteward, kotRemark]);
 
   // Fetch stewards
   useEffect(() => {
@@ -177,7 +180,7 @@ const POS = () => {
 
       // Also get the base table structure
       const baseResponse = await tableService.getExpanded();
-      
+
       const expandedTables: ExpandedTableItem[] = baseResponse.tables || [];
       const mappedTables: TableInfo[] = expandedTables.map((t) => ({
         id: t.id,
@@ -211,7 +214,7 @@ const POS = () => {
         // Also get the base table structure
         const baseResponse = await tableService.getExpanded();
         if (cancelled) return;
-        
+
         const expandedTables: ExpandedTableItem[] = baseResponse.tables || [];
         const mappedTables: TableInfo[] = expandedTables.map((t) => ({
           id: t.id,
@@ -229,7 +232,7 @@ const POS = () => {
       }
     };
     fetchTables();
-    
+
     // Set up interval to refresh table status every 30 seconds to catch status changes
     const interval = setInterval(fetchTables, 30000);
     return () => {
@@ -244,7 +247,7 @@ const POS = () => {
     const fetchProducts = async () => {
       setLoadingProducts(true);
       try {
-  const res = await api.get<MyStockResponse>('/mystock', { params: { page, pageSize: PAGE_SIZE }, meta: { showLoader: 'local', loaderKey: 'pos-products' } });
+        const res = await api.get<MyStockResponse>('/mystock', { params: { page, pageSize: PAGE_SIZE }, meta: { showLoader: 'local', loaderKey: 'pos-products' } });
         if (cancelled) return;
         const rows: MyStockTableRow[] = res.data.tableResponse?.data ?? [];
         const mapped: Product[] = rows.map((r) => ({
@@ -339,17 +342,37 @@ const POS = () => {
     if (unsentItems.length === 0) return;
 
     try {
-      const selectedTableInfo = orderType === "dine_in" 
+      const selectedTableInfo = orderType === "dine_in"
         ? tables.find(t => t.id === selectedTable)
         : null;
-      
-      const stewardObj = stewards.find(s => s.id === selectedSteward);
 
+      const stewardObj = stewards.find(s => s.id === selectedSteward);
+      const stewardName = stewardObj?.name || selectedSteward || currentUser.name;
+      const tableName = selectedTableInfo?.displayName || "Take Away";
+      const kotOrderType = orderType === "dine_in" ? OrderType.DINE_IN : OrderType.TAKE_AWAY;
+
+      // Print KOT slip first
+      await printKotSlip({
+        tableName,
+        orderType: kotOrderType,
+        stewardName,
+        cashierName: currentUser.name,
+        customerName: customerName || undefined,
+        remark: kotRemark || undefined,
+        items: unsentItems.map(item => ({
+          product_name: item.product.name,
+          quantity: item.quantity,
+          unit: item.product.unit || undefined
+        }))
+      });
+
+      // Then save KOT to backend
       await kotService.createKotLog({
-        steward: stewardObj?.name || selectedSteward || currentUser.name,
-        table_name: selectedTableInfo?.displayName || "Take Away",
-        order_type: orderType === "dine_in" ? OrderType.DINE_IN : OrderType.TAKE_AWAY,
+        steward: stewardName,
+        table_name: tableName,
+        order_type: kotOrderType,
         total_amount: total,
+        remark: kotRemark || undefined,
         items: unsentItems.map(item => ({
           product_name: item.product.name,
           quantity: item.quantity,
@@ -376,7 +399,7 @@ const POS = () => {
     for (const item of billItems) {
       // Skip handmade products from stock warnings
       if (item.product.product_type === 'HANDMADE') continue;
-      
+
       if (item.product.stock <= item.product.minStock) {
         warnings.push({
           product: item.product,
@@ -423,7 +446,7 @@ const POS = () => {
   const handleAddProduct = (product: Product) => {
     // Skip stock validation for HANDMADE products
     const isHandmade = product.product_type === 'HANDMADE';
-    
+
     if (!isHandmade && product.stock === 0) {
       toast.error("Product is out of stock!");
       return;
@@ -459,7 +482,7 @@ const POS = () => {
 
     // Skip stock validation for HANDMADE products
     const isHandmade = item.product.product_type === 'HANDMADE';
-    
+
     if (!isHandmade && newQuantity > item.product.stock) {
       toast.error("Cannot exceed available stock!");
       return;
@@ -471,10 +494,10 @@ const POS = () => {
       billItems.map((item) =>
         item.product.id === productId
           ? {
-              ...item,
-              quantity: newQuantity,
-              subtotal: priceToUse * newQuantity,
-            }
+            ...item,
+            quantity: newQuantity,
+            subtotal: priceToUse * newQuantity,
+          }
           : item
       )
     );
@@ -499,8 +522,9 @@ const POS = () => {
     setOrderType("dine_in");
     setSelectedTable(null);
     setSelectedSteward("");
+    setKotRemark("");
     setDiscountRate(0);
-    
+
     // Synchronously clear localStorage so it's not lost on unmount
     localStorage.removeItem("pos_billItems");
     localStorage.removeItem("pos_kotSentItemIds");
@@ -510,6 +534,7 @@ const POS = () => {
     localStorage.setItem("pos_orderType", "dine_in");
     localStorage.removeItem("pos_selectedTable");
     localStorage.removeItem("pos_selectedSteward");
+    localStorage.removeItem("pos_kotRemark");
     localStorage.removeItem("pos_taxRate");
     localStorage.removeItem("pos_discountRate");
 
@@ -540,7 +565,7 @@ const POS = () => {
     try {
       setIsSending(true);
       // Get table info for dine-in
-      const selectedTableInfo = orderType === "dine_in" 
+      const selectedTableInfo = orderType === "dine_in"
         ? tables.find(t => t.id === selectedTable)
         : null;
 
@@ -708,11 +733,10 @@ const POS = () => {
         </div>
         <Badge
           variant="outline"
-          className={`text-sm px-3 py-1 ${
-            customerType === "local" 
-              ? "bg-green-100 text-green-700 border-green-300" 
+          className={`text-sm px-3 py-1 ${customerType === "local"
+              ? "bg-green-100 text-green-700 border-green-300"
               : "bg-blue-100 text-blue-700 border-blue-300"
-          }`}
+            }`}
         >
           {customerType === "local" ? (
             <><Users className="h-4 w-4 mr-1.5" /> Local Pricing</>
@@ -801,17 +825,16 @@ const POS = () => {
                         <Button
                           key={table.id}
                           variant={selectedTable === table.id ? "default" : "outline"}
-                          className={`h-20 ${
-                            table.status === "occupied"
+                          className={`h-20 ${table.status === "occupied"
                               ? "opacity-50 cursor-not-allowed bg-red-50 border-red-200"
                               : selectedTable === table.id
-                              ? table.table_type === "VIP" 
-                                ? "bg-amber-600 hover:bg-amber-700"
-                                : ""
-                              : table.table_type === "VIP"
-                              ? "hover:bg-amber-50 hover:border-amber-300 border-amber-200"
-                              : "hover:bg-green-50 hover:border-green-200"
-                          }`}
+                                ? table.table_type === "VIP"
+                                  ? "bg-amber-600 hover:bg-amber-700"
+                                  : ""
+                                : table.table_type === "VIP"
+                                  ? "hover:bg-amber-50 hover:border-amber-300 border-amber-200"
+                                  : "hover:bg-green-50 hover:border-green-200"
+                            }`}
                           disabled={table.status === "occupied"}
                           onClick={() => setSelectedTable(table.id)}
                         >
@@ -919,6 +942,17 @@ const POS = () => {
                     </Select>
                   </div>
                   <div className="space-y-1">
+                    <Label htmlFor="kot-remark" className="flex items-center gap-2 text-xs">
+                      Remark for Kitchen
+                    </Label>
+                    <Input
+                      id="kot-remark"
+                      placeholder="E.g., Less spicy, no onions"
+                      value={kotRemark}
+                      onChange={(e) => setKotRemark(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
                     <Label htmlFor="customer-name" className="flex items-center gap-2 text-xs">
                       <User className="h-3 w-3" /> Name
                     </Label>
@@ -1017,7 +1051,7 @@ const POS = () => {
                               handleUpdateQuantity(item.product.id, item.quantity + 1)
                             }
                             disabled={
-                              item.product.product_type !== 'HANDMADE' && 
+                              item.product.product_type !== 'HANDMADE' &&
                               item.quantity >= item.product.stock
                             }
                           >
@@ -1107,16 +1141,16 @@ const POS = () => {
 
                   {/* Action Buttons */}
                   <div className="space-y-2 pt-2">
-                    <Button 
-                      className="w-full bg-orange-500 hover:bg-orange-600 text-white disabled:bg-green-600 disabled:opacity-100" 
-                      size="lg" 
+                    <Button
+                      className="w-full bg-orange-500 hover:bg-orange-600 text-white disabled:bg-green-600 disabled:opacity-100"
+                      size="lg"
                       onClick={handleSendKot}
                       disabled={!hasUnsentItems || billItems.length === 0}
                     >
                       <UtensilsCrossed className="h-4 w-4 mr-2" />
                       {hasUnsentItems ? "Send KOT" : (billItems.length > 0 ? "KOT Sent ✓" : "Send KOT")}
                     </Button>
-                    
+
                     {orderType === "dine_in" ? (
                       <div className="grid grid-cols-2 gap-2">
                         <Button className="w-full" size="lg" variant="outline" onClick={handleCreateOrder} disabled={isPrinting || isSending || !allKotSent} title={!allKotSent ? "Send KOT first" : undefined}>

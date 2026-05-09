@@ -14,5 +14,10 @@ export const createKotLogSchema = z.object({
   table_name: z.string().optional(),
   order_type: z.nativeEnum(OrderType, { message: 'Invalid order type' }),
   total_amount: z.number().nonnegative(),
+  remark: z.string().optional().nullable(),
   items: z.array(kotLogItemSchema).min(1, 'At least one item is required'),
+});
+
+export const updateKotStatusSchema = z.object({
+  status: z.enum(['PENDING', 'COMPLETED']),
 });
