@@ -26,7 +26,7 @@ export const createProduct = async (payload: ProductCreateInput): Promise<Produc
 };
 
 export const getProductById = async (id: string): Promise<ProductDTO | null> => {
-  const p = await (prisma as any).product.findUnique({ where: { id }, include: { category: { select: { name: true } } } });
+  const p = await (prisma as any).product.findFirst({ where: { id, deletedAt: null }, include: { category: { select: { name: true } } } });
   if (!p) return null;
   return { ...p, categoryName: p.category?.name ?? undefined, category: undefined } as ProductDTO;
 };
@@ -38,6 +38,7 @@ export const listProducts = async (query: PaginationQuery): Promise<PaginatedRes
 
   const where: any = {
     AND: [
+      { deletedAt: null },
       query.search ? { name: { contains: query.search, mode: 'insensitive' } } : {},
       query.categoryId ? { categoryId: query.categoryId } : {},
     ],
@@ -85,6 +86,9 @@ export const updateProduct = async (id: string, payload: ProductUpdateInput): Pr
 };
 
 export const deleteProduct = async (id: string): Promise<ProductDTO> => {
-  const deleted = await (prisma as any).product.delete({ where: { id } });
+  const deleted = await (prisma as any).product.update({ 
+    where: { id },
+    data: { deletedAt: new Date() }
+  });
   return deleted;
 };
