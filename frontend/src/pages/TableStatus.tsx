@@ -137,10 +137,17 @@ const TableStatus = () => {
     }
   };
 
-  const handleViewOrder = (table: TableWithStatus) => {
-    if (table.current_order) {
-      setSelectedOrder(table.current_order);
-      setViewDialogOpen(true);
+  const handleViewOrder = async (table: TableWithStatus) => {
+    if (table.current_order?.id) {
+      try {
+        // Fetch the full order details including items since getTableStatus payload is optimized
+        const fullOrder = await orderService.getOrderById(table.current_order.id);
+        setSelectedOrder(fullOrder as any);
+        setViewDialogOpen(true);
+      } catch (err) {
+        toast.error("Failed to load full order details");
+        console.error(err);
+      }
     } else {
       toast.error("No active order for this table");
     }
@@ -321,8 +328,8 @@ const TableStatus = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredTables.map((table) => (
-                      <TableRow key={table.table_number}>
+                    filteredTables.map((table, index) => (
+                      <TableRow key={table.table_name ? `table-${table.table_name}` : index}>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
                             <Utensils className="h-4 w-4 text-muted-foreground" />
@@ -446,8 +453,8 @@ const TableStatus = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {selectedOrder.items.map((item) => (
-                      <TableRow key={item.id}>
+                    {(selectedOrder.items || []).map((item, index) => (
+                      <TableRow key={item.id || `item-${index}`}>
                         <TableCell>{item.product_name}</TableCell>
                         <TableCell className="text-right">{item.quantity}</TableCell>
                         <TableCell className="text-right">Rs. {item.unit_price.toFixed(2)}</TableCell>

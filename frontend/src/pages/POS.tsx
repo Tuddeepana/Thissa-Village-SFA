@@ -1142,10 +1142,11 @@ const POS = () => {
                   {/* Action Buttons */}
                   <div className="space-y-2 pt-2">
                     <Button
-                      className="w-full bg-orange-500 hover:bg-orange-600 text-white disabled:bg-green-600 disabled:opacity-100"
+                      className="w-full bg-green-600 hover:bg-green-700 text-white disabled:bg-orange-500 disabled:opacity-100"
                       size="lg"
                       onClick={handleSendKot}
-                      disabled={!hasUnsentItems || billItems.length === 0}
+                      disabled={!hasUnsentItems || billItems.length === 0 || (orderType === "dine_in" && !selectedTable)}
+                      title={orderType === "dine_in" && !selectedTable ? "Please select a table first" : undefined}
                     >
                       <UtensilsCrossed className="h-4 w-4 mr-2" />
                       {hasUnsentItems ? "Send KOT" : (billItems.length > 0 ? "KOT Sent ✓" : "Send KOT")}

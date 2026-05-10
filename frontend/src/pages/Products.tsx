@@ -64,6 +64,7 @@ const Products = () => {
     const [editingCostPrice, setEditingCostPrice] = useState<number | "">("");
     const [editingForeignerPrice, setEditingForeignerPrice] = useState<number | "">("");
     const [editingLocalPrice, setEditingLocalPrice] = useState<number | "">("");
+    const [editingProductType, setEditingProductType] = useState<'HANDMADE' | 'PURCHASE'>('PURCHASE');
 
     // Controlled form state for minimal add form
     const [newName, setNewName] = useState("");
@@ -93,6 +94,7 @@ const Products = () => {
         setEditingCostPrice(Number.parseFloat(product.cost_price));
         setEditingForeignerPrice(Number.parseFloat(product.foreigner_price));
         setEditingLocalPrice(Number.parseFloat(product.local_price));
+        setEditingProductType(product.product_type);
     };
 
     const cancelEditing = () => {
@@ -101,6 +103,7 @@ const Products = () => {
         setEditingCostPrice("");
         setEditingForeignerPrice("");
         setEditingLocalPrice("");
+        setEditingProductType('PURCHASE');
     };
 
     const saveEditing = async () => {
@@ -111,6 +114,7 @@ const Products = () => {
         const localPriceNum = typeof editingLocalPrice === "number" ? editingLocalPrice : Number.parseFloat(String(editingLocalPrice || "0"));
         try {
             await productService.update(editingId, {
+                product_type: editingProductType,
                 low_stock: alertLevel,
                 cost_price: Number.isNaN(costPriceNum) ? undefined : costPriceNum.toFixed(2),
                 foreigner_price: Number.isNaN(foreignerPriceNum) ? undefined : foreignerPriceNum.toFixed(2),
@@ -473,7 +477,21 @@ const Products = () => {
                                 <TableRow key={product.id}>
                                     <TableCell className="font-medium">{product.name}</TableCell>
                                     <TableCell>{categoryNameById[product.categoryId] ?? "-"}</TableCell>
-                                    <TableCell>{product.product_type === 'HANDMADE' ? 'HandMade' : 'Purchase'}</TableCell>
+                                    <TableCell>
+                                        {editingId === product.id ? (
+                                            <Select value={editingProductType} onValueChange={(val) => setEditingProductType(val as 'HANDMADE' | 'PURCHASE')}>
+                                                <SelectTrigger className="w-32">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="PURCHASE">Purchase</SelectItem>
+                                                    <SelectItem value="HANDMADE">HandMade</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        ) : (
+                                            product.product_type === 'HANDMADE' ? 'HandMade' : 'Purchase'
+                                        )}
+                                    </TableCell>
                                     <TableCell>{product.barcode ?? "-"}</TableCell>
                                     <TableCell>{product.unit_type ?? "-"}</TableCell>
                                     <TableCell>

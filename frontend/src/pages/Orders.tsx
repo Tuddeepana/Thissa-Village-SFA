@@ -800,7 +800,7 @@ const Orders = () => {
           <DialogFooter className="gap-2">
             {selectedOrder?.status === "PENDING" && (
               <Button 
-                className="bg-orange-500 hover:bg-orange-600 text-white disabled:bg-green-600 disabled:opacity-100" 
+                className="bg-green-600 hover:bg-green-700 text-white disabled:bg-orange-500 disabled:opacity-100" 
                 onClick={handleSendOrderKot} 
                 disabled={isPrinting || !hasUnsentOrderItems}
               >
@@ -812,7 +812,7 @@ const Orders = () => {
               <Printer className="h-4 w-4 mr-2" /> {isPrinting ? "Printing..." : "Print Bill"}
             </Button>
             {selectedOrder?.status === "PENDING" && (
-              <Button onClick={() => { setAmountPaid(selectedOrder.total); setIsPaymentDialogOpen(true); }} disabled={isPrinting}>
+              <Button onClick={() => { setAmountPaid(selectedOrder.total); setIsPaymentDialogOpen(true); }} disabled={isPrinting || hasUnsentOrderItems} title={hasUnsentOrderItems ? "Send KOT first" : undefined}>
                 <CreditCard className="h-4 w-4 mr-2" /> Complete Payment
               </Button>
             )}
