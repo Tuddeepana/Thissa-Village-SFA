@@ -87,7 +87,7 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
         ORDER BY i."createdAt" DESC
         LIMIT 1
       ) latest_inv ON true
-      WHERE 1=1 ${productFilter}
+      WHERE p."deletedAt" IS NULL ${productFilter}
     )
   `;
 
