@@ -53,7 +53,9 @@ import { OrderStatus } from "@/types/order.types";
 import type { Order, OrderStatus as OrderStatusType, OrderStats } from "@/types/order.types";
 import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
 import { printBillNewWindow } from "@/lib/billPrinter";
+import { printKotSlip } from "@/lib/kotPrinter";
 import type { Bill } from "@/types/pos";
+import { kotService } from "@/api/services/kotService";
 
 const Orders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -64,7 +66,9 @@ const Orders = () => {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isAddItemDialogOpen, setIsAddItemDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [kotRemark, setKotRemark] = useState("");
   const [isPrinting, setIsPrinting] = useState(false);
+  const [kotSentOrderItemIds, setKotSentOrderItemIds] = useState<Set<string>>(new Set());
   const [stats, setStats] = useState<OrderStats>({
     pending: 0,
     completed: 0,
@@ -170,6 +174,7 @@ const Orders = () => {
       // Fetch full order details
       const fullOrder = await orderService.getOrderById(order.id);
       setSelectedOrder(fullOrder);
+      setKotSentOrderItemIds(new Set());
       setIsViewDialogOpen(true);
     } catch (error) {
       console.error("Failed to fetch order details", error);
@@ -227,6 +232,65 @@ const Orders = () => {
     }
   };
 
+  const hasUnsentOrderItems = useMemo(() => {
+    if (!selectedOrder) return false;
+    return selectedOrder.items.some(item => !item.kot_sent && !kotSentOrderItemIds.has(item.id));
+  }, [selectedOrder, kotSentOrderItemIds]);
+
+  const handleSendOrderKot = async () => {
+    if (!selectedOrder) return;
+    const unsentItems = selectedOrder.items.filter(item => !item.kot_sent && !kotSentOrderItemIds.has(item.id));
+    if (unsentItems.length === 0) return;
+
+    try {
+      const stewardName = selectedOrder.steward_name || currentUser.name;
+      const tableName = selectedOrder.table_name || "Take Away";
+      const kotItems = unsentItems.map(item => {
+        const matchingProduct = products.find(p => p.productId === item.productId);
+        return {
+          orderItemId: item.id,
+          product_name: item.product_name,
+          quantity: item.quantity,
+          unit: matchingProduct?.unitType || undefined
+        };
+      });
+
+      // Print KOT slip first
+      await printKotSlip({
+        tableName,
+        orderType: selectedOrder.order_type,
+        stewardName,
+        cashierName: currentUser.name,
+        customerName: selectedOrder.customer_name || undefined,
+        remark: kotRemark || undefined,
+        items: kotItems,
+      });
+
+      // Then save KOT to backend
+      await kotService.createKotLog({
+        orderId: selectedOrder.id,
+        steward: stewardName,
+        table_name: tableName,
+        order_type: selectedOrder.order_type,
+        total_amount: selectedOrder.total,
+        remark: kotRemark || undefined,
+        items: kotItems,
+      });
+
+      setKotSentOrderItemIds(prev => {
+        const newSet = new Set(prev);
+        unsentItems.forEach(item => newSet.add(item.id));
+        return newSet;
+      });
+
+      setKotRemark("");
+      toast.success("KOT sent to kitchen successfully");
+    } catch (err) {
+      console.error("Failed to send KOT", err);
+      toast.error("Failed to send KOT");
+    }
+  };
+
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatusType) => {
     try {
       const updatedOrder = await orderService.updateOrderStatus(orderId, { status: newStatus });
@@ -250,24 +314,27 @@ const Orders = () => {
       const bill: Bill = {
         id: order.order_number,
         billNumber: order.order_number,
-        items: order.items.map(item => ({
-          product: {
-            id: item.id,
-            name: item.product_name,
-            category: '',
-            product_type: undefined,
-            unit: null,
-            foreignerPrice: item.unit_price,
-            localPrice: item.unit_price,
-            cost: 0,
-            stock: 0,
-            minStock: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          quantity: item.quantity,
-          subtotal: item.total,
-        })),
+        items: order.items.map(item => {
+          const matchingProduct = products.find(p => p.productId === item.productId);
+          return {
+            product: {
+              id: item.id,
+              name: item.product_name,
+              category: '',
+              product_type: undefined,
+              unit: matchingProduct?.unitType ?? null,
+              foreignerPrice: item.unit_price,
+              localPrice: item.unit_price,
+              cost: 0,
+              stock: 0,
+              minStock: 0,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            quantity: item.quantity,
+            subtotal: item.total,
+          };
+        }),
         subtotal: order.subtotal,
         tax: order.tax,
         taxRate: order.tax > 0 ? (order.tax / order.subtotal) * 100 : 0,
@@ -296,20 +363,108 @@ const Orders = () => {
   const handleCompletePayment = async () => {
     if (!selectedOrder) return;
 
-    const change = amountPaid - selectedOrder.total;
+    const change = paymentMethod === "credit" ? 0 : amountPaid - selectedOrder.total;
     if (paymentMethod !== "credit" && change < 0) {
       toast.error("Amount paid is less than total!");
       return;
     }
 
-    // Update order status to completed
-    await handleUpdateOrderStatus(selectedOrder.id, OrderStatus.COMPLETED);
-    handlePrintBill(selectedOrder);
-    setIsPaymentDialogOpen(false);
-    setIsViewDialogOpen(false);
-    setPaymentMethod("cash");
-    setAmountPaid(0);
-    toast.success("Payment completed successfully!");
+    setIsPrinting(true);
+    try {
+      const now = new Date();
+
+      // Build payload for backend — same approach as POS page
+      const payload = {
+        date: now.toISOString(),
+        payment_method: paymentMethod.toUpperCase(),
+        customer_name: selectedOrder.customer_name,
+        customer_type: selectedOrder.customer_type,
+        service_charge_percentage: 0,
+        service_charge_amount: 0,
+        total: Number(selectedOrder.total.toFixed(2)),
+        cashier_name: currentUser.name,
+        terminal_id: currentUser.terminalId,
+        order_type: selectedOrder.order_type === "DINE_IN" ? "dine_in" : "take_away",
+        table_number: selectedOrder.table_id ?? null,
+        item_count: selectedOrder.items.length,
+        credit_note: null,
+        cash_given: paymentMethod === "credit" ? 0 : Number(amountPaid.toFixed(2)),
+        balance_given: Number(change.toFixed(2)),
+        tax: Number(selectedOrder.tax.toFixed(2)),
+        items: selectedOrder.items.map((item) => ({
+          productId: item.productId,
+          quantityMoved: item.quantity,
+        })),
+      };
+
+      // Create bill via backend (persists bill + creates inventory movements)
+      const res = await api.post('/bills', payload);
+      const createdBillNumber =
+        res?.data?.data?.bill?.bill_number ||
+        res?.data?.data?.billNumber ||
+        res?.data?.data?.bill_number ||
+        selectedOrder.order_number;
+
+      // Build printable bill object — same structure as POS page
+      const bill: Bill = {
+        id: createdBillNumber,
+        items: selectedOrder.items.map((item) => {
+          const matchingProduct = products.find(p => p.productId === item.productId);
+          return {
+            product: {
+              id: item.productId,
+              name: item.product_name,
+              category: '',
+              product_type: undefined,
+              unit: matchingProduct?.unitType ?? null,
+              foreignerPrice: item.unit_price,
+              localPrice: item.unit_price,
+              cost: 0,
+              stock: 0,
+              minStock: 0,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            quantity: item.quantity,
+            subtotal: item.total,
+          };
+        }),
+        subtotal: selectedOrder.subtotal,
+        tax: selectedOrder.tax,
+        taxRate: selectedOrder.tax > 0 ? (selectedOrder.tax / selectedOrder.subtotal) * 100 : 0,
+        discount: selectedOrder.discount,
+        discountRate: selectedOrder.discount > 0 ? (selectedOrder.discount / selectedOrder.subtotal) * 100 : 0,
+        total: selectedOrder.total,
+        customerName: currentUser.name, // Cashier name shown on receipt
+        customerPhone: selectedOrder.customer_phone,
+        paymentMethod,
+        amountPaid: paymentMethod === "credit" ? 0 : amountPaid,
+        change: Math.max(0, change),
+        createdAt: now,
+      };
+
+      // Print bill using the same approach as POS page
+      await printBillNewWindow(bill);
+
+      // Update order status to completed
+      await handleUpdateOrderStatus(selectedOrder.id, OrderStatus.COMPLETED);
+
+      // Close dialogs and reset
+      setIsPaymentDialogOpen(false);
+      setIsViewDialogOpen(false);
+      setPaymentMethod("cash");
+      setAmountPaid(0);
+
+      toast.success('Payment completed successfully!', {
+        description: `Bill #${createdBillNumber} - Total: Rs. ${selectedOrder.total.toFixed(2)}`,
+      });
+    } catch (err: any) {
+      console.error('Failed to complete payment', err);
+      const msg = err?.response?.data?.message ?? 'Failed to complete payment';
+      toast.error(msg);
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   const getStatusBadge = (status: OrderStatusType) => {
@@ -556,6 +711,7 @@ const Orders = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-[60px] text-center">KOT</TableHead>
                         <TableHead>Item</TableHead>
                         <TableHead className="text-center">Qty</TableHead>
                         <TableHead className="text-right">Price</TableHead>
@@ -566,6 +722,13 @@ const Orders = () => {
                     <TableBody>
                       {selectedOrder.items.map((item) => (
                         <TableRow key={item.id}>
+                          <TableCell className="text-center">
+                            {(item.kot_sent || kotSentOrderItemIds.has(item.id)) ? (
+                              <Check className="h-4 w-4 mx-auto text-green-500" title="KOT Sent" />
+                            ) : (
+                              <Clock className="h-4 w-4 mx-auto text-orange-500" title="Pending KOT" />
+                            )}
+                          </TableCell>
                           <TableCell>{item.product_name}</TableCell>
                           <TableCell className="text-center">{item.quantity}</TableCell>
                           <TableCell className="text-right">Rs.{item.unit_price.toFixed(0)}</TableCell>
@@ -617,15 +780,39 @@ const Orders = () => {
               <div className="text-xs text-muted-foreground">
                 <p>Terminal ID: {selectedOrder.terminal_id} | Cashier: {selectedOrder.cashier_name}</p>
               </div>
+
+              {selectedOrder?.status === "PENDING" && hasUnsentOrderItems && (
+                <div className="pt-2 border-t space-y-2 mt-4">
+                  <Label htmlFor="kot-remark" className="text-xs">
+                    Remark for Kitchen (for unsent items)
+                  </Label>
+                  <Input
+                    id="kot-remark"
+                    placeholder="E.g., Less spicy, no onions"
+                    value={kotRemark}
+                    onChange={(e) => setKotRemark(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
           )}
 
           <DialogFooter className="gap-2">
+            {selectedOrder?.status === "PENDING" && (
+              <Button 
+                className="bg-green-600 hover:bg-green-700 text-white disabled:bg-orange-500 disabled:opacity-100" 
+                onClick={handleSendOrderKot} 
+                disabled={isPrinting || !hasUnsentOrderItems}
+              >
+                <UtensilsCrossed className="h-4 w-4 mr-2" /> 
+                {hasUnsentOrderItems ? "Send KOT" : "KOT Sent ✓"}
+              </Button>
+            )}
             <Button variant="outline" onClick={() => handlePrintBill(selectedOrder!)} disabled={isPrinting}>
               <Printer className="h-4 w-4 mr-2" /> {isPrinting ? "Printing..." : "Print Bill"}
             </Button>
             {selectedOrder?.status === "PENDING" && (
-              <Button onClick={() => { setAmountPaid(selectedOrder.total); setIsPaymentDialogOpen(true); }} disabled={isPrinting}>
+              <Button onClick={() => { setAmountPaid(selectedOrder.total); setIsPaymentDialogOpen(true); }} disabled={isPrinting || hasUnsentOrderItems} title={hasUnsentOrderItems ? "Send KOT first" : undefined}>
                 <CreditCard className="h-4 w-4 mr-2" /> Complete Payment
               </Button>
             )}
