@@ -58,21 +58,49 @@ export class KotService {
    * Get KOT logs with optional filters
    */
   async getKotLogs(filters: { steward?: string; status?: 'PENDING' | 'COMPLETED' }): Promise<KotLogDTO[]> {
-    const where: Prisma.KotLogWhereInput = {};
+    const filterParams: any[] = [];
+    const filterClauses: string[] = [];
+    let paramIdx = 1;
+
     if (filters.steward) {
-      where.steward = filters.steward;
+      filterClauses.push(`k."steward" = $${paramIdx}`);
+      filterParams.push(filters.steward);
+      paramIdx++;
     }
+    
     if (filters.status) {
-      where.status = filters.status;
+      // Prisma enums are strings in PostgreSQL
+      filterClauses.push(`k."status" = $${paramIdx}::"KotStatus"`);
+      filterParams.push(filters.status);
+      paramIdx++;
     }
 
-    const kotLogs = await prisma.kotLog.findMany({
-      where,
-      include: { items: true },
-      orderBy: { createdAt: 'desc' }
-    });
+    const whereClause = filterClauses.length > 0 ? 'WHERE ' + filterClauses.join(' AND ') : '';
 
-    return kotLogs.map(log => this.mapToDTO(log));
+    const rawLogs = await (prisma as any).$queryRawUnsafe(`
+      SELECT 
+        k.*,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', i."id",
+              'kotLogId', i."kotLogId",
+              'orderItemId', i."orderItemId",
+              'product_name', i."product_name",
+              'quantity', i."quantity",
+              'unit', i."unit"
+            )
+          ) FILTER (WHERE i.id IS NOT NULL), 
+          '[]'
+        ) as items
+      FROM "kot_logs" k
+      LEFT JOIN "kot_log_items" i ON i."kotLogId" = k.id
+      ${whereClause}
+      GROUP BY k.id
+      ORDER BY k."createdAt" DESC
+    `, ...filterParams);
+
+    return rawLogs.map((log: any) => this.mapToDTO(log));
   }
 
   /**

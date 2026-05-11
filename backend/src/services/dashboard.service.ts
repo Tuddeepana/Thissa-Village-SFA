@@ -34,7 +34,7 @@ class DashboardService {
       categories,
     ] = await Promise.all([
       // 1. Total product count
-      (prisma as any).product.count(),
+      (prisma as any).product.count({ where: { deletedAt: null } }),
 
       // 2. Weekly income grouped by date (1 query instead of 7 + 1)
       (prisma as any).bill.groupBy({
@@ -72,7 +72,9 @@ class DashboardService {
           ORDER BY i."createdAt" DESC
           LIMIT 1
         ) latest_inv ON true
-        WHERE COALESCE(latest_inv."available_quantity", 0) <= COALESCE(p."low_stock", 0)
+        WHERE p."deletedAt" IS NULL 
+          AND p."product_type" != 'HANDMADE'
+          AND COALESCE(latest_inv."available_quantity", 0) <= COALESCE(p."low_stock", 0)
       `,
 
       // 5. Category distribution (already efficient, just one query)
@@ -80,7 +82,7 @@ class DashboardService {
         select: {
           id: true,
           name: true,
-          _count: { select: { products: true } },
+          _count: { select: { products: { where: { deletedAt: null } } } },
         },
       }),
     ]);
@@ -152,12 +154,13 @@ class DashboardService {
   }
 
   async getProductCategoryDistribution() {
-    const totalProducts = await (prisma as any).product.count();
+    const totalProducts = await (prisma as any).product.count({ where: { deletedAt: null } });
     const categories = await (prisma as any).category.findMany({
+      where: { deletedAt: null },
       select: {
         id: true,
         name: true,
-        _count: { select: { products: true } },
+        _count: { select: { products: { where: { deletedAt: null } } } },
       },
     });
 
