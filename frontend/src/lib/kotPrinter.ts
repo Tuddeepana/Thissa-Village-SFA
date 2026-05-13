@@ -71,6 +71,13 @@ const KOT_CSS = `
     letter-spacing: 0.12em;
     text-transform: uppercase;
   }
+  .header-resturant {
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    margin-top: 4px;
+    text-transform: uppercase;
+  }
 
   /* ── KOT Title ───────────────────────────────────────────── */
   .kot-title {
@@ -179,6 +186,7 @@ const buildKotSlipBody = (data: KotSlipData, logoDataUrl: string): string => `
       ? `<img class="logo-img" src="${logoDataUrl}" alt="Tissa Village Restaurant & Bar" />`
       : `<div class="logo-fallback">Tissa Village</div>`
     }
+    <div class="header-resturant">RESTURANT</div>
   </div>
 
   <div class="kot-title">Kitchen Order Ticket</div>
