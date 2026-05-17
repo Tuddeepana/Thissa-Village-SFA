@@ -1145,8 +1145,14 @@ const POS = () => {
                       className="w-full bg-green-600 hover:bg-green-700 text-white disabled:bg-orange-500 disabled:opacity-100"
                       size="lg"
                       onClick={handleSendKot}
-                      disabled={!hasUnsentItems || billItems.length === 0 || (orderType === "dine_in" && !selectedTable)}
-                      title={orderType === "dine_in" && !selectedTable ? "Please select a table first" : undefined}
+                      disabled={!hasUnsentItems || billItems.length === 0 || !selectedSteward || (orderType === "dine_in" && !selectedTable)}
+                      title={
+                        !selectedSteward
+                          ? "Please select a steward first"
+                          : orderType === "dine_in" && !selectedTable
+                          ? "Please select a table first"
+                          : undefined
+                      }
                     >
                       <UtensilsCrossed className="h-4 w-4 mr-2" />
                       {hasUnsentItems ? "Send KOT" : (billItems.length > 0 ? "KOT Sent ✓" : "Send KOT")}
