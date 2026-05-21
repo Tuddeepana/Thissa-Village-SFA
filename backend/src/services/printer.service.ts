@@ -1,6 +1,11 @@
 import prisma from '../lib/prisma';
 import type { PrinterDTO, CreatePrinterInput, UpdatePrinterInput } from '../types/printer.types';
-import net from 'net';
+import {
+  ThermalPrinter,
+  PrinterTypes,
+  CharacterSet,
+  BreakLine,
+} from 'node-thermal-printer';
 
 function toPrinterDTO(record: any): PrinterDTO {
   return {
@@ -15,6 +20,24 @@ function toPrinterDTO(record: any): PrinterDTO {
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   };
+}
+
+/**
+ * Create a ThermalPrinter instance configured for an Xprinter
+ * connected via network (TCP).
+ */
+function createPrinterInstance(ip: string, port: number): ThermalPrinter {
+  return new ThermalPrinter({
+    type: PrinterTypes.EPSON, // Xprinter uses EPSON-compatible ESC/POS
+    interface: `tcp://${ip}:${port}`,
+    characterSet: CharacterSet.PC437_USA,
+    removeSpecialCharacters: false,
+    lineCharacter: '-',
+    breakLine: BreakLine.WORD,
+    options: {
+      timeout: 5000, // 5 second connection timeout
+    },
+  });
 }
 
 class PrinterService {
@@ -81,9 +104,8 @@ class PrinterService {
   }
 
   /**
-   * Test printer connectivity by opening a raw TCP socket to the printer's
-   * IP and port. If the connection succeeds, send an ESC/POS initialisation
-   * command followed by a small test receipt and a paper-cut command.
+   * Test printer connectivity using node-thermal-printer.
+   * Sends a formatted test receipt to the printer and cuts the paper.
    *
    * Updates lastTestedAt / lastTestOk in the database regardless of outcome.
    */
@@ -125,95 +147,69 @@ class PrinterService {
   }
 
   /**
-   * Open a raw TCP socket and send ESC/POS commands for a test receipt.
-   * The XPrinter XP-80T (and most thermal printers) listen on port 9100
-   * and accept standard ESC/POS byte sequences.
+   * Send a test print using node-thermal-printer library.
+   * Uses EPSON-compatible ESC/POS commands via TCP.
    */
-  private sendTestPrint(ip: string, port: number, printerName: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const timeoutMs = 5000;
-      const client = new net.Socket();
+  private async sendTestPrint(ip: string, port: number, printerName: string): Promise<void> {
+    const printer = createPrinterInstance(ip, port);
 
-      const timer = setTimeout(() => {
-        client.destroy();
-        reject(new Error(`Connection timed out after ${timeoutMs / 1000}s — verify IP and port`));
-      }, timeoutMs);
+    // Check connectivity first
+    const isConnected = await printer.isPrinterConnected();
+    if (!isConnected) {
+      throw new Error(`Cannot connect to printer at ${ip}:${port} — verify IP, port, and that the printer is powered on and on the same network.`);
+    }
 
-      client.connect(port, ip, () => {
-        clearTimeout(timer);
-
-        try {
-          const now = new Date();
-          const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-          const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-          // ESC/POS command bytes
-          const ESC = 0x1B;
-          const GS = 0x1D;
-
-          const commands: Buffer[] = [];
-
-          // Initialize printer
-          commands.push(Buffer.from([ESC, 0x40]));
-
-          // Center alignment
-          commands.push(Buffer.from([ESC, 0x61, 0x01]));
-
-          // Bold on
-          commands.push(Buffer.from([ESC, 0x45, 0x01]));
-          commands.push(Buffer.from('================================\n'));
-          commands.push(Buffer.from('     PRINTER TEST\n'));
-          commands.push(Buffer.from('================================\n'));
-          // Bold off
-          commands.push(Buffer.from([ESC, 0x45, 0x00]));
-
-          commands.push(Buffer.from('Tissa Village Bar & Restaurant\n'));
-          commands.push(Buffer.from('\n'));
-
-          // Left alignment
-          commands.push(Buffer.from([ESC, 0x61, 0x00]));
-          commands.push(Buffer.from(`  Printer : ${printerName}\n`));
-          commands.push(Buffer.from(`  IP      : ${ip}:${port}\n`));
-          commands.push(Buffer.from(`  Date    : ${dateStr}\n`));
-          commands.push(Buffer.from(`  Time    : ${timeStr}\n`));
-          commands.push(Buffer.from('\n'));
-
-          // Center alignment
-          commands.push(Buffer.from([ESC, 0x61, 0x01]));
-          // Bold on
-          commands.push(Buffer.from([ESC, 0x45, 0x01]));
-          commands.push(Buffer.from('Connection Successful!\n'));
-          // Bold off
-          commands.push(Buffer.from([ESC, 0x45, 0x00]));
-          commands.push(Buffer.from('This is a test print.\n'));
-          commands.push(Buffer.from('================================\n'));
-          commands.push(Buffer.from('\n\n'));
-
-          // Paper cut (partial cut)
-          commands.push(Buffer.from([GS, 0x56, 0x41, 0x03]));
-
-          const fullPayload = Buffer.concat(commands);
-
-          client.write(fullPayload, (writeErr) => {
-            client.end();
-            if (writeErr) {
-              reject(new Error(`Failed to send data: ${writeErr.message}`));
-            } else {
-              resolve();
-            }
-          });
-        } catch (err: any) {
-          client.destroy();
-          reject(new Error(`Error building print data: ${err.message}`));
-        }
-      });
-
-      client.on('error', (err) => {
-        clearTimeout(timer);
-        client.destroy();
-        reject(new Error(`TCP connection error: ${err.message}`));
-      });
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
     });
+    const timeStr = now.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+
+    // Build the test receipt
+    printer.alignCenter();
+    printer.bold(true);
+    printer.setTextSize(1, 1);
+    printer.println('================================');
+    printer.println('     PRINTER TEST');
+    printer.println('================================');
+    printer.bold(false);
+
+    printer.println('');
+    printer.println('Tissa Village Bar & Restaurant');
+    printer.println('');
+
+    printer.alignLeft();
+    printer.println(`  Printer : ${printerName}`);
+    printer.println(`  IP      : ${ip}:${port}`);
+    printer.println(`  Date    : ${dateStr}`);
+    printer.println(`  Time    : ${timeStr}`);
+    printer.println('');
+
+    printer.alignCenter();
+    printer.bold(true);
+    printer.println('Connection Successful!');
+    printer.bold(false);
+    printer.println('This is a test print from SFA.');
+    printer.println('================================');
+
+    printer.println('');
+    printer.println('');
+
+    // Cut paper
+    printer.cut();
+
+    // Execute — send all commands to the printer
+    try {
+      await printer.execute();
+    } catch (execError: any) {
+      throw new Error(`Failed to send print data: ${execError.message}`);
+    }
   }
 }
 
