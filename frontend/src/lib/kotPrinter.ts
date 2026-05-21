@@ -253,42 +253,52 @@ const buildKotSlipBody = (data: KotSlipData, logoDataUrl: string): string => `
 `;
 
 export const printKotSlip = async (data: KotSlipData): Promise<void> => {
+  // Flag to force manual print if network fails
+  let printAttempted = false;
+
   try {
-    // Attempt printing via network KOT printers first
+    // Attempt backend ESC/POS printing (if Port Forwarding or Local Server is set up)
     await printerService.printKot(data);
-    return; // Success, skip browser print
+    printAttempted = true;
   } catch (err: any) {
-    console.warn("Network KOT printing failed/unavailable, falling back to browser print:", err);
+    console.warn("Direct network print failed, falling back to browser window:", err);
   }
 
-  const logoDataUrl = await toDataURL(logoUrl);
-  const printWindow = window.open('', '_blank', 'width=320,height=520');
-  if (!printWindow) return;
+  // Fallback: If network print failed, open the standard browser print dialog
+  if (!printAttempted) {
+    const logoDataUrl = await toDataURL(logoUrl);
+    const printWindow = window.open('', '_blank', 'width=320,height=520');
+    if (!printWindow) {
+      alert("Please allow popups for KOT printing");
+      return;
+    }
 
-  const kotHTML = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>KOT - ${data.tableName}</title>
-      <style>${KOT_CSS}</style>
-    </head>
-    <body>
-      ${buildKotSlipBody(data, logoDataUrl)}
-      <script>
-        window.onload = function() {
-          setTimeout(function() {
-            window.print();
+    const kotHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>KOT - ${data.tableName}</title>
+        <style>${KOT_CSS}</style>
+      </head>
+      <body>
+        ${buildKotSlipBody(data, logoDataUrl)}
+        <script>
+          window.onload = function() {
+            // Short delay to ensure styles and images are fully rendered
             setTimeout(function() {
-              window.close();
-            }, 500);
-          }, 100);
-        };
-      <\/script>
-    </body>
-    </html>
-  `;
+              window.print();
+              setTimeout(function() {
+                window.close();
+              }, 500);
+            }, 100);
+          };
+        </script>
+      </body>
+      </html>
+    `;
 
-  printWindow.document.write(kotHTML);
-  printWindow.document.close();
+    printWindow.document.write(kotHTML);
+    printWindow.document.close();
+  }
 };
