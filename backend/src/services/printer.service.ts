@@ -220,8 +220,42 @@ class PrinterService {
    * Print a KOT slip by sending ESC/POS commands to all active KOT printers
    */
   async printKot(data: any): Promise<{ success: boolean; message: string; prints: string[] }> {
-    // FIXED INTERNAL HARDCODED IP FALLBACK LOGIC
-    // Use the explicitly defined environment variable, or hardcode the fallback directly
+    // 1. Attempt to fetch active KOT printers from database
+    const activePrinters = await (prisma as any).printer.findMany({
+      where: {
+        isActive: true,
+        type: 'KOT'
+      }
+    });
+
+    if (activePrinters && activePrinters.length > 0) {
+      const results: string[] = [];
+      const errors: string[] = [];
+
+      // Try printing to each configured printer
+      for (const printer of activePrinters) {
+        try {
+          await this.sendKotPrint(printer.ipAddress, printer.port, data);
+          results.push(`KOT printed to ${printer.name} (${printer.ipAddress})`);
+        } catch (err: any) {
+          errors.push(`${printer.name} (${printer.ipAddress}): ${err.message}`);
+        }
+      }
+
+      // If at least one printer succeeded, we consider it a success
+      if (results.length > 0) {
+        return {
+          success: true,
+          message: `KOT printed successfully: ${results.join(', ')}`,
+          prints: results
+        };
+      } else {
+        // All configured printers failed
+        throw new Error(`KOT printing failed for all configured printers: ${errors.join('; ')}`);
+      }
+    }
+
+    // 2. Fallback to environment variable or hardcoded IP if no active printers are configured in DB
     const KOT_IP = process.env.KOT_PRINTER_IP || '192.168.100.50';
     const KOT_PORT = parseInt(process.env.KOT_PRINTER_PORT || '9100', 10);
 
@@ -229,11 +263,11 @@ class PrinterService {
       await this.sendKotPrint(KOT_IP, KOT_PORT, data);
       return {
         success: true,
-        message: `KOT printed successfully to ${KOT_IP}`,
-        prints: [`Sent to hardcoded local printer at ${KOT_IP}`],
+        message: `KOT printed successfully to fallback printer ${KOT_IP}`,
+        prints: [`Sent to fallback local printer at ${KOT_IP}`],
       };
     } catch (err: any) {
-      throw new Error(`KOT print failed on hardcoded IP ${KOT_IP}: ${err.message}`);
+      throw new Error(`KOT print failed on hardcoded IP ${KOT_IP}: ${err.message}. (Cloud deployments usually require a local print bridge or browser-based printing fallback)`);
     }
   }
 
