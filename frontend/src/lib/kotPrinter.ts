@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import logoUrl from '@/assets/images/resturent_logo.png';
+import { printerService } from '@/api/services/printerService';
 
 // Reuse the same logo caching pattern from billPrinter
 let cachedLogoDataUrl: string | null = null;
@@ -252,6 +253,14 @@ const buildKotSlipBody = (data: KotSlipData, logoDataUrl: string): string => `
 `;
 
 export const printKotSlip = async (data: KotSlipData): Promise<void> => {
+  try {
+    // Attempt printing via network KOT printers first
+    await printerService.printKot(data);
+    return; // Success, skip browser print
+  } catch (err: any) {
+    console.warn("Network KOT printing failed/unavailable, falling back to browser print:", err);
+  }
+
   const logoDataUrl = await toDataURL(logoUrl);
   const printWindow = window.open('', '_blank', 'width=320,height=520');
   if (!printWindow) return;

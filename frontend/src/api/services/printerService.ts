@@ -40,4 +40,12 @@ export const printerService = {
     );
     return response.data;
   },
+
+  async printKot(data: any): Promise<{ success: boolean; message: string; prints?: string[] }> {
+    const response = await api.post<{ success: boolean; message: string; prints?: string[] }>(
+      ENDPOINTS.printers.printKot,
+      data
+    );
+    return response.data;
+  },
 };
