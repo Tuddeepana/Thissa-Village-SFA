@@ -220,35 +220,21 @@ class PrinterService {
    * Print a KOT slip by sending ESC/POS commands to all active KOT printers
    */
   async printKot(data: any): Promise<{ success: boolean; message: string; prints: string[] }> {
-    const activePrinters = await (prisma as any).printer.findMany({
-      where: { isActive: true, type: 'KOT' },
-    });
+    // FIXED INTERNAL HARDCODED IP FALLBACK LOGIC
+    // Use the explicitly defined environment variable, or hardcode the fallback directly
+    const KOT_IP = process.env.KOT_PRINTER_IP || '192.168.100.50';
+    const KOT_PORT = parseInt(process.env.KOT_PRINTER_PORT || '9100', 10);
 
-    if (activePrinters.length === 0) {
-      throw new Error('No active KOT printers configured');
+    try {
+      await this.sendKotPrint(KOT_IP, KOT_PORT, data);
+      return {
+        success: true,
+        message: `KOT printed successfully to ${KOT_IP}`,
+        prints: [`Sent to hardcoded local printer at ${KOT_IP}`],
+      };
+    } catch (err: any) {
+      throw new Error(`KOT print failed on hardcoded IP ${KOT_IP}: ${err.message}`);
     }
-
-    const successfulPrints: string[] = [];
-    const errors: string[] = [];
-
-    for (const printer of activePrinters) {
-      try {
-        await this.sendKotPrint(printer.ipAddress, printer.port, data);
-        successfulPrints.push(`Sent to ${printer.name}`);
-      } catch (err: any) {
-        errors.push(`Failed on ${printer.name}: ${err.message}`);
-      }
-    }
-
-    if (successfulPrints.length === 0) {
-      throw new Error(`KOT print failed on all printers: ${errors.join(' | ')}`);
-    }
-
-    return {
-      success: true,
-      message: `KOT printed successfully. ${errors.length > 0 ? 'Some failures: ' + errors.join(' | ') : ''}`,
-      prints: successfulPrints,
-    };
   }
 
   /**
