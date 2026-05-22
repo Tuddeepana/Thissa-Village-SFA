@@ -25,6 +25,7 @@ import Users from "./pages/Users";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Tools from "./pages/Tools";
+import PrinterSetup from "./pages/PrinterSetup";
 import KotDashboard from "./pages/KotDashboard";
 import NotFound from "./pages/NotFound";
 import { STORAGE_KEYS } from "./utils/constants";
@@ -94,6 +95,7 @@ const App = () => (
             <Route path="profile" element={<Profile />} />
             <Route path="settings" element={<Settings />} />
             <Route path="tools" element={<Tools />} />
+            <Route path="printer-setup" element={<PrinterSetup />} />
           </Route>
           <Route
             path="/kot-dashboard"

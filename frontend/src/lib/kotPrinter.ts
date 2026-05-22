@@ -253,52 +253,58 @@ const buildKotSlipBody = (data: KotSlipData, logoDataUrl: string): string => `
 `;
 
 export const printKotSlip = async (data: KotSlipData): Promise<void> => {
-  // Flag to force manual print if network fails
-  let printAttempted = false;
-
+  // 1. Try the local print agent (via ngrok when deployed to Railway)
   try {
-    // Attempt backend ESC/POS printing (if Port Forwarding or Local Server is set up)
-    await printerService.printKot(data);
-    printAttempted = true;
+    await printerService.printKotViaAgent(data);
+    console.log('✅ KOT printed via print agent');
+    return;
   } catch (err: any) {
-    console.warn("Direct network print failed, falling back to browser window:", err);
+    console.warn('Print agent unavailable, trying backend direct print...', err?.message);
   }
 
-  // Fallback: If network print failed, open the standard browser print dialog
-  if (!printAttempted) {
-    const logoDataUrl = await toDataURL(logoUrl);
-    const printWindow = window.open('', '_blank', 'width=320,height=520');
-    if (!printWindow) {
-      alert("Please allow popups for KOT printing");
-      return;
-    }
+  // 2. Try backend direct print (works only when backend is on the same LAN as the printer)
+  try {
+    await printerService.printKot(data);
+    console.log('✅ KOT printed via backend direct');
+    return;
+  } catch (err: any) {
+    console.warn('Backend direct print failed, falling back to browser print...', err?.message);
+  }
 
-    const kotHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>KOT - ${data.tableName}</title>
-        <style>${KOT_CSS}</style>
-      </head>
-      <body>
-        ${buildKotSlipBody(data, logoDataUrl)}
-        <script>
-          window.onload = function() {
-            // Short delay to ensure styles and images are fully rendered
+  // 3. Final fallback: browser print dialog
+  const logoDataUrl = await toDataURL(logoUrl);
+  const printWindow = window.open('', '_blank', 'width=320,height=520');
+  if (!printWindow) {
+    alert("Please allow popups for KOT printing");
+    return;
+  }
+
+  const kotHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>KOT - ${data.tableName}</title>
+      <style>${KOT_CSS}</style>
+    </head>
+    <body>
+      ${buildKotSlipBody(data, logoDataUrl)}
+      <script>
+        window.onload = function() {
+          // Short delay to ensure styles and images are fully rendered
+          setTimeout(function() {
+            window.print();
             setTimeout(function() {
-              window.print();
-              setTimeout(function() {
-                window.close();
-              }, 500);
-            }, 100);
-          };
-        </script>
-      </body>
-      </html>
-    `;
+              window.close();
+            }, 500);
+          }, 100);
+        };
+      </script>
+    </body>
+    </html>
+  `;
 
-    printWindow.document.write(kotHTML);
-    printWindow.document.close();
-  }
+  printWindow.document.write(kotHTML);
+  printWindow.document.close();
 };
+
