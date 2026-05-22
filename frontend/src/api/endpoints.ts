@@ -40,5 +40,9 @@ export const ENDPOINTS = {
 		test: (id: string) => `/printers/${id}/test`,
 		printKot: '/printers/print-kot',
 	},
+	config: {
+		byKey: (key: string) => `/config/${key}`,
+		base: '/config',
+	},
 };
 
