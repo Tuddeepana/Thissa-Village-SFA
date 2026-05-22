@@ -326,7 +326,7 @@ class PrinterService {
 
           // Print Title - Double height
           commands.push(Buffer.from([GS, 0x21, 0x01]));
-          commands.push(Buffer.from('KITCHEN ORDER TICKET\n'));
+          commands.push(Buffer.from('KOT - RESTAURANT\n'));
           commands.push(Buffer.from([GS, 0x21, 0x00])); // Normal size
 
           commands.push(Buffer.from([ESC, 0x45, 0x00])); // Bold Off
