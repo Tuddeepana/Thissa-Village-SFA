@@ -50,3 +50,15 @@ export const testPrinter = async (req: Request, res: Response) => {
     data: result.printer,
   });
 };
+
+export const printKot = async (req: Request, res: Response) => {
+  try {
+    const result = await printerService.printKot(req.body);
+    res.status(200).json(result);
+  } catch (err: any) {
+    res.status(422).json({
+      success: false,
+      message: err.message || 'Failed to print KOT',
+    });
+  }
+};

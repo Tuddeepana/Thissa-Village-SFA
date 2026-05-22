@@ -22,6 +22,7 @@ import {
     ShoppingCart,
     ClipboardList,
     Wrench,
+    Printer as PrinterIcon,
 } from "lucide-react";
 import {
     Sidebar,
@@ -93,6 +94,7 @@ const hotelMenuGroups: MenuGroup[] = [
             { title: "Users", url: "/users", icon: Users },
             { title: "Service Fees", url: "/settings", icon: Settings },
             { title: "Tools", url: "/tools", icon: Wrench },
+            { title: "Printer Setup", url: "/printer-setup", icon: PrinterIcon },
         ],
     },
 ];

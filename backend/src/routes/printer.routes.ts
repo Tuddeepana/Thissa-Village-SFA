@@ -5,6 +5,8 @@ import { adminOnly } from '../middleware/rbac.middleware';
 
 const router = Router();
 
+router.post('/print-kot', authenticate, controller.printKot);
+
 // All printer routes require admin authentication
 router.use(authenticate, adminOnly);
 

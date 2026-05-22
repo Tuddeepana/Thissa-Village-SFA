@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import logoUrl from '@/assets/images/resturent_logo.png';
+import { printerService } from '@/api/services/printerService';
 
 // Reuse the same logo caching pattern from billPrinter
 let cachedLogoDataUrl: string | null = null;
@@ -252,9 +253,31 @@ const buildKotSlipBody = (data: KotSlipData, logoDataUrl: string): string => `
 `;
 
 export const printKotSlip = async (data: KotSlipData): Promise<void> => {
+  // 1. Try the local print agent (via ngrok when deployed to Railway)
+  try {
+    await printerService.printKotViaAgent(data);
+    console.log('✅ KOT printed via print agent');
+    return;
+  } catch (err: any) {
+    console.warn('Print agent unavailable, trying backend direct print...', err?.message);
+  }
+
+  // 2. Try backend direct print (works only when backend is on the same LAN as the printer)
+  try {
+    await printerService.printKot(data);
+    console.log('✅ KOT printed via backend direct');
+    return;
+  } catch (err: any) {
+    console.warn('Backend direct print failed, falling back to browser print...', err?.message);
+  }
+
+  // 3. Final fallback: browser print dialog
   const logoDataUrl = await toDataURL(logoUrl);
   const printWindow = window.open('', '_blank', 'width=320,height=520');
-  if (!printWindow) return;
+  if (!printWindow) {
+    alert("Please allow popups for KOT printing");
+    return;
+  }
 
   const kotHTML = `
     <!DOCTYPE html>
@@ -268,6 +291,7 @@ export const printKotSlip = async (data: KotSlipData): Promise<void> => {
       ${buildKotSlipBody(data, logoDataUrl)}
       <script>
         window.onload = function() {
+          // Short delay to ensure styles and images are fully rendered
           setTimeout(function() {
             window.print();
             setTimeout(function() {
@@ -275,7 +299,7 @@ export const printKotSlip = async (data: KotSlipData): Promise<void> => {
             }, 500);
           }, 100);
         };
-      <\/script>
+      </script>
     </body>
     </html>
   `;
@@ -283,3 +307,4 @@ export const printKotSlip = async (data: KotSlipData): Promise<void> => {
   printWindow.document.write(kotHTML);
   printWindow.document.close();
 };
+

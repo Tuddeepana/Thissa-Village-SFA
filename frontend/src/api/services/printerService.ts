@@ -1,11 +1,43 @@
 import api from '../client';
 import { ENDPOINTS } from '../endpoints';
 import type { Printer, CreatePrinterInput, UpdatePrinterInput } from '@/types/printer.types';
+import { configService } from './configService';
 
 interface ApiResponse<T> {
   success: boolean;
   data: T;
   message?: string;
+}
+
+// Cache agent config for the session to avoid repeated DB calls
+let cachedAgentUrl: string | null = null;
+let cachedAgentKey: string | null = null;
+
+async function getAgentConfig(): Promise<{ url: string; key: string } | null> {
+  if (cachedAgentUrl && cachedAgentKey) {
+    return { url: cachedAgentUrl, key: cachedAgentKey };
+  }
+
+  try {
+    const [urlConfig, keyConfig] = await Promise.all([
+      configService.get('PRINT_AGENT_URL'),
+      configService.get('PRINT_AGENT_KEY'),
+    ]);
+
+    if (!urlConfig.value || !keyConfig.value) return null;
+
+    cachedAgentUrl = urlConfig.value.replace(/\/+$/, ''); // remove trailing slash
+    cachedAgentKey = keyConfig.value;
+    return { url: cachedAgentUrl, key: cachedAgentKey };
+  } catch {
+    return null;
+  }
+}
+
+/** Clear cached agent config (call when user updates settings) */
+export function clearAgentConfigCache() {
+  cachedAgentUrl = null;
+  cachedAgentKey = null;
 }
 
 export const printerService = {
@@ -40,4 +72,65 @@ export const printerService = {
     );
     return response.data;
   },
+
+  async printKot(data: any): Promise<{ success: boolean; message: string; prints?: string[] }> {
+    const response = await api.post<{ success: boolean; message: string; prints?: string[] }>(
+      ENDPOINTS.printers.printKot,
+      data
+    );
+    return response.data;
+  },
+
+  // ── Print Agent Methods ──────────────────────────────────────
+
+  /** Check if the print agent is online */
+  async checkAgentHealth(agentUrl?: string, agentKey?: string): Promise<{ status: string; printer: any }> {
+    const url = agentUrl || cachedAgentUrl;
+    if (!url) throw new Error('Agent URL not configured');
+
+    const res = await fetch(`${url}/health`, {
+      method: 'GET',
+      headers: { 'ngrok-skip-browser-warning': 'true' },
+    });
+    if (!res.ok) throw new Error(`Agent health check failed: ${res.status}`);
+    return res.json();
+  },
+
+  /** Send test print via the agent */
+  async testAgentPrint(agentUrl?: string, agentKey?: string): Promise<{ success: boolean; message: string }> {
+    const url = agentUrl || cachedAgentUrl;
+    const key = agentKey || cachedAgentKey;
+    if (!url || !key) throw new Error('Agent URL or key not configured');
+
+    const res = await fetch(`${url}/print-test`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Print-Agent-Key': key,
+        'ngrok-skip-browser-warning': 'true',
+      },
+    });
+    return res.json();
+  },
+
+  /** Print a KOT via the agent */
+  async printKotViaAgent(data: any): Promise<{ success: boolean; message: string }> {
+    const config = await getAgentConfig();
+    if (!config) throw new Error('Agent not configured');
+
+    const res = await fetch(`${config.url}/print`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Print-Agent-Key': config.key,
+        'ngrok-skip-browser-warning': 'true',
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await res.json();
+    if (!result.success) throw new Error(result.message || 'Agent print failed');
+    return result;
+  },
 };
+

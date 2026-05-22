@@ -215,6 +215,210 @@ class PrinterService {
       });
     });
   }
+
+  /**
+   * Print a KOT slip by sending ESC/POS commands to all active KOT printers
+   */
+  async printKot(data: any): Promise<{ success: boolean; message: string; prints: string[] }> {
+    // 1. Attempt to fetch active KOT printers from database
+    const activePrinters = await (prisma as any).printer.findMany({
+      where: {
+        isActive: true,
+        type: 'KOT'
+      }
+    });
+
+    if (activePrinters && activePrinters.length > 0) {
+      const results: string[] = [];
+      const errors: string[] = [];
+
+      // Try printing to each configured printer
+      for (const printer of activePrinters) {
+        try {
+          await this.sendKotPrint(printer.ipAddress, printer.port, data);
+          results.push(`KOT printed to ${printer.name} (${printer.ipAddress})`);
+        } catch (err: any) {
+          errors.push(`${printer.name} (${printer.ipAddress}): ${err.message}`);
+        }
+      }
+
+      // If at least one printer succeeded, we consider it a success
+      if (results.length > 0) {
+        return {
+          success: true,
+          message: `KOT printed successfully: ${results.join(', ')}`,
+          prints: results
+        };
+      } else {
+        // All configured printers failed
+        throw new Error(`KOT printing failed for all configured printers: ${errors.join('; ')}`);
+      }
+    }
+
+    // 2. Fallback to environment variable or hardcoded IP if no active printers are configured in DB
+    const KOT_IP = process.env.KOT_PRINTER_IP || '192.168.100.50';
+    const KOT_PORT = parseInt(process.env.KOT_PRINTER_PORT || '9100', 10);
+
+    try {
+      await this.sendKotPrint(KOT_IP, KOT_PORT, data);
+      return {
+        success: true,
+        message: `KOT printed successfully to fallback printer ${KOT_IP}`,
+        prints: [`Sent to fallback local printer at ${KOT_IP}`],
+      };
+    } catch (err: any) {
+      throw new Error(`KOT print failed on hardcoded IP ${KOT_IP}: ${err.message}. (Cloud deployments usually require a local print bridge or browser-based printing fallback)`);
+    }
+  }
+
+  /**
+   * Build an ESC/POS payload for a KOT and send it via raw TCP.
+   */
+  private sendKotPrint(ip: string, port: number, kotData: any): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timeoutMs = 5000;
+      const client = new net.Socket();
+
+      const timer = setTimeout(() => {
+        client.destroy();
+        reject(new Error(`Connection timed out`));
+      }, timeoutMs);
+
+      client.connect(port, ip, () => {
+        clearTimeout(timer);
+
+        try {
+          const now = new Date();
+          const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+          const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+          const ESC = 0x1B;
+          const GS = 0x1D;
+
+          const commands: Buffer[] = [];
+
+          // Init
+          commands.push(Buffer.from([ESC, 0x40]));
+
+          // Set Font A (standard)
+          commands.push(Buffer.from([ESC, 0x4D, 0x00]));
+
+          const lineDashed = '-'.repeat(48) + '\n';
+          const lineThick = '='.repeat(48) + '\n';
+
+          const justifyRow = (left: string, right: string) => {
+            const spaces = 48 - left.length - right.length;
+            return left + ' '.repeat(Math.max(0, spaces)) + right + '\n';
+          };
+
+          // Center for header
+          commands.push(Buffer.from([ESC, 0x61, 0x01]));
+
+          // Bold On
+          commands.push(Buffer.from([ESC, 0x45, 0x01]));
+
+          // Tissa Village - Double height/width
+          commands.push(Buffer.from([GS, 0x21, 0x11]));
+          commands.push(Buffer.from('TISSA VILLAGE\n'));
+          commands.push(Buffer.from([GS, 0x21, 0x00])); // Normal size
+
+          commands.push(Buffer.from(lineDashed));
+
+          // Print Title - Double height
+          commands.push(Buffer.from([GS, 0x21, 0x01]));
+          commands.push(Buffer.from('KOT - RESTAURANT\n'));
+          commands.push(Buffer.from([GS, 0x21, 0x00])); // Normal size
+
+          commands.push(Buffer.from([ESC, 0x45, 0x00])); // Bold Off
+          commands.push(Buffer.from('\n'));
+
+          // Left alignment for info
+          commands.push(Buffer.from([ESC, 0x61, 0x00]));
+
+          commands.push(Buffer.from(justifyRow('Date', dateStr)));
+          commands.push(Buffer.from(justifyRow('Time', timeStr)));
+          commands.push(Buffer.from(justifyRow('Table', kotData.tableName || '')));
+          commands.push(Buffer.from(justifyRow('Type', kotData.orderType === 'DINE_IN' ? 'Dine In' : 'Take Away')));
+          commands.push(Buffer.from(justifyRow('Steward', kotData.stewardName || '')));
+          commands.push(Buffer.from(justifyRow('Cashier', kotData.cashierName || '')));
+          if (kotData.customerName) {
+            commands.push(Buffer.from(justifyRow('Customer', kotData.customerName)));
+          }
+
+          commands.push(Buffer.from(lineDashed));
+
+          if (kotData.remark) {
+            commands.push(Buffer.from([ESC, 0x45, 0x01])); // Bold
+            commands.push(Buffer.from('Kitchen Instructions:\n'));
+            commands.push(Buffer.from([ESC, 0x45, 0x00])); // Bold Off
+            commands.push(Buffer.from(`${kotData.remark}\n`));
+            commands.push(Buffer.from(lineDashed));
+          }
+
+          // Items Header
+          commands.push(Buffer.from([ESC, 0x45, 0x01])); // Bold
+          commands.push(Buffer.from(justifyRow('Item', 'Qty')));
+          commands.push(Buffer.from(lineDashed));
+
+          for (const item of kotData.items) {
+            let itemName = item.product_name || '';
+            if (item.unit) itemName += ` (${item.unit})`;
+
+            // Format to something like "ItemName......" so total is 48 chars width, Qty right aligned
+            // Max width: 48 chars. Let's reserve 4 for qty. ItemName gets up to 44.
+            const maxItemLen = 42;
+            let firstLineName = itemName.length > maxItemLen ? itemName.substring(0, maxItemLen) : itemName;
+            let qtyStr = item.quantity.toString().padStart(4, ' ');
+
+            let line = firstLineName + ' '.repeat(48 - firstLineName.length - qtyStr.length) + qtyStr + '\n';
+
+            // Render item text slightly larger (Double width)
+            // Wait, double width breaks the layout. Let's keep normal width but bold.
+            commands.push(Buffer.from(line));
+
+            // If itemName is longer than maxItemLen, print the rest wrapped
+            if (itemName.length > maxItemLen) {
+              let restName = itemName.substring(maxItemLen);
+              while (restName.length > 0) {
+                let chunk = restName.substring(0, maxItemLen);
+                restName = restName.substring(maxItemLen);
+                commands.push(Buffer.from(chunk + '\n'));
+              }
+            }
+          }
+
+          commands.push(Buffer.from([ESC, 0x45, 0x00])); // Bold Off
+          commands.push(Buffer.from('\n' + lineThick));
+
+          commands.push(Buffer.from([ESC, 0x61, 0x01])); // Center
+          commands.push(Buffer.from('*** Kitchen Copy ***\n\n\n\n\n'));
+
+          // Cut
+          commands.push(Buffer.from([GS, 0x56, 0x41, 0x03]));
+
+          const fullPayload = Buffer.concat(commands);
+
+          client.write(fullPayload, (writeErr) => {
+            client.end();
+            if (writeErr) {
+              reject(new Error(`Failed to send data: ${writeErr.message}`));
+            } else {
+              resolve();
+            }
+          });
+        } catch (err: any) {
+          client.destroy();
+          reject(new Error(`Error building print data: ${err.message}`));
+        }
+      });
+
+      client.on('error', (err) => {
+        clearTimeout(timer);
+        client.destroy();
+        reject(new Error(`TCP connection error: ${err.message}`));
+      });
+    });
+  }
 }
 
 export const printerService = new PrinterService();
