@@ -204,12 +204,10 @@ class InvoiceService {
     }
 
     if (query.dateFrom) {
-      const df = typeof query.dateFrom === 'string' ? new Date(query.dateFrom) : query.dateFrom;
-      startDate = df;
+      startDate = typeof query.dateFrom === 'string' ? new Date(query.dateFrom) : query.dateFrom;
     }
     if (query.dateTo) {
-      const dt = typeof query.dateTo === 'string' ? new Date(query.dateTo) : query.dateTo;
-      endDate = dt;
+      endDate = typeof query.dateTo === 'string' ? new Date(query.dateTo) : query.dateTo;
     }
 
     if (startDate || endDate) {
@@ -219,16 +217,9 @@ class InvoiceService {
       andClauses.push({ invoiceDate: dateClause });
     }
 
-    // Category filter: invoices that have at least one inventory record whose product's category matches
     if (query.category) {
       andClauses.push({
-        inventoryRecords: {
-          some: {
-            product: {
-              category: { name: { equals: query.category, mode: 'insensitive' } },
-            },
-          },
-        },
+        inventoryRecords: { some: { product: { category: { name: { equals: query.category, mode: 'insensitive' } } } } },
       });
     }
 
@@ -238,8 +229,8 @@ class InvoiceService {
 
     const useNoPagination = !!query.noPagination;
 
-    // Table: paginated invoices with products
-    const [total, items] = await Promise.all([
+    // Use Promise.all to fetch everything in parallel
+    const [total, items, metricsResults] = await Promise.all([
       (prisma as any).invoice.count({ where }),
       (prisma as any).invoice.findMany({
         where,
@@ -248,6 +239,35 @@ class InvoiceService {
         orderBy: { createdAt: 'desc' },
         include: { inventoryRecords: { include: { product: { include: { category: true } } } } },
       }),
+      // Optimized metrics query using raw SQL for performance
+      (prisma as any).$queryRaw`
+        SELECT 
+          COUNT(*)::INT as "totalInvoices",
+          COUNT(*) FILTER (WHERE "paid_status" = 'PAID')::INT as "paidInvoices",
+          COUNT(*) FILTER (WHERE "paid_status" = 'PENDING')::INT as "pendingInvoices",
+          SUM(COALESCE(cost_calc.total_cost, 0))::FLOAT as "totalCost"
+        FROM "invoices" i
+        LEFT JOIN LATERAL (
+          SELECT SUM(inv."quantity_moved" * p."cost_price") as total_cost
+          FROM "inventory" inv
+          JOIN "products" p ON inv."productId" = p.id
+          WHERE inv."invoiceId" = i.id
+        ) cost_calc ON true
+        WHERE 
+          (${query.search || null}::text IS NULL OR i."in_number" ILIKE '%' || ${query.search || null} || '%')
+          AND (${startDate || null}::timestamp IS NULL OR i."invoiceDate" >= ${startDate || null})
+          AND (${endDate || null}::timestamp IS NULL OR i."invoiceDate" <= ${endDate || null})
+          -- Simplified category check for metrics (approximate if complex, but here we can do it exactly)
+          AND (${query.category || null}::text IS NULL OR EXISTS (
+            SELECT 1 FROM "inventory" inv2 
+            JOIN "products" p2 ON inv2."productId" = p2.id
+            JOIN "categories" c2 ON p2."categoryId" = c2.id
+            WHERE inv2."invoiceId" = i.id AND c2."name" ILIKE ${query.category || null}
+          ))
+      `.catch((err: any) => {
+        console.error("Metrics raw query failed:", err);
+        return [{ totalInvoices: 0, paidInvoices: 0, pendingInvoices: 0, totalCost: 0 }];
+      })
     ]);
 
     const data = (items as any[]).map((inv) => ({
@@ -282,26 +302,15 @@ class InvoiceService {
       },
     };
 
-    // Card metrics: compute from all filtered invoices (not just paginated)
-    const allInvoices = await (prisma as any).invoice.findMany({ where, select: { id: true, paid_status: true } });
-    const ids = allInvoices.map((i: any) => i.id);
-    const totalInvoices = allInvoices.length;
-    const paidInvoices = allInvoices.filter((i: any) => i.paid_status === 'PAID').length;
-    const pendingInvoices = allInvoices.filter((i: any) => i.paid_status === 'PENDING').length;
+    const metrics = (metricsResults as any[])[0] || { totalInvoices: total, paidInvoices: 0, pendingInvoices: 0, totalCost: 0 };
 
-    let totalCost = 0;
-    if (ids.length) {
-      const invMovements = await (prisma as any).inventory.findMany({
-        where: { invoiceId: { in: ids } },
-        include: { product: { select: { cost_price: true } } },
-      });
-      for (const mv of invMovements) {
-        const cp = mv.product?.cost_price !== undefined && mv.product?.cost_price !== null ? Number(mv.product.cost_price) : 0;
-        totalCost += cp * Number(mv.quantity_moved ?? 0);
-      }
-    }
-
-    const cardResponse = { totalInvoices, paidInvoices, pendingInvoices, totalCost: Number(totalCost.toFixed(2)) };
+    // In case raw query failed or search/category filters were too complex, fallback or use results
+    const cardResponse = {
+      totalInvoices: metrics.totalInvoices || 0,
+      paidInvoices: metrics.paidInvoices || 0,
+      pendingInvoices: metrics.pendingInvoices || 0,
+      totalCost: Number((metrics.totalCost || 0).toFixed(2))
+    };
 
     return { cardResponse, tableResponse };
   }
