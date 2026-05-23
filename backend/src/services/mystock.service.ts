@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import type { MyStockQuery, MyStockResponse, MyStockTableRow } from '../types/mystock.types';
 
@@ -14,56 +15,89 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
   const barcode = query.barcode || null;
   const categoryId = query.categoryId || null;
   const statusFilter = query.status || null;
+  const useNoPagination = !!query.noPagination;
 
-  // We use a Common Table Expression (CTE) to:
-  // 1. Get the latest inventory record for each product.
-  // 2. Filter products based on name, barcode, and category.
-  // 3. Calculate status and other fields at the database level.
+  // Use Promise.all to run metrics and data queries in parallel
+  // and use Database-level pagination to improve speed.
+  const [metricsResult, dataResult] = await Promise.all([
+    // Query 1: Metrics (Total counts and sums)
+    prisma.$queryRaw<any[]>`
+      WITH ProductStock AS (
+        SELECT
+          COALESCE(li.available_quantity, 0) AS "availableQuantity",
+          CASE
+            WHEN COALESCE(li.available_quantity, 0) <= 0 THEN 'OutOfStock'
+            WHEN COALESCE(li.available_quantity, 0) <= p.low_stock THEN 'LowStock'
+            ELSE 'InStock'
+          END AS "status"
+        FROM "products" p
+        LEFT JOIN LATERAL (
+          SELECT available_quantity
+          FROM "inventory" i
+          WHERE i."productId" = p.id
+          ORDER BY i."createdAt" DESC
+          LIMIT 1
+        ) li ON true
+        WHERE 
+          (${productName}::text IS NULL OR p.name ILIKE '%' || ${productName} || '%' OR p.barcode ILIKE ${productName} || '%')
+          AND (${barcode}::text IS NULL OR p.barcode ILIKE ${barcode} || '%')
+          AND (${categoryId}::text IS NULL OR p."categoryId" = ${categoryId})
+      )
+      SELECT 
+        COUNT(*)::INT as "totalRecords",
+        COALESCE(SUM("availableQuantity"), 0)::FLOAT as "totalQuantity",
+        COUNT(*) FILTER (WHERE "status" = 'LowStock')::INT as "lowStockItems",
+        COUNT(*) FILTER (WHERE "status" = 'OutOfStock')::INT as "outOfStockItems"
+      FROM ProductStock
+      WHERE (${statusFilter}::text IS NULL OR "status" = ${statusFilter})
+    `,
+    // Query 2: Paginated Data
+    prisma.$queryRaw<any[]>`
+      WITH ProductStock AS (
+        SELECT
+          p.id AS "productId",
+          p.name AS "productName",
+          p.barcode,
+          p.litres,
+          p.bottle_volume AS "bottleVolume",
+          p.selling_price AS "sellingPrice",
+          p.low_stock AS "lowStock",
+          c.id AS "categoryId",
+          c.name AS "categoryName",
+          COALESCE(li.available_quantity, 0) AS "availableQuantity",
+          li."updatedAt" AS "lastUpdatedAt",
+          CASE
+            WHEN COALESCE(li.available_quantity, 0) <= 0 THEN 'OutOfStock'
+            WHEN COALESCE(li.available_quantity, 0) <= p.low_stock THEN 'LowStock'
+            ELSE 'InStock'
+          END AS "status"
+        FROM "products" p
+        LEFT JOIN "categories" c ON p."categoryId" = c.id
+        LEFT JOIN LATERAL (
+          SELECT "available_quantity", "updatedAt"
+          FROM "inventory" i
+          WHERE i."productId" = p.id
+          ORDER BY i."createdAt" DESC
+          LIMIT 1
+        ) li ON true
+        WHERE 
+          (${productName}::text IS NULL OR p.name ILIKE '%' || ${productName} || '%' OR p.barcode ILIKE ${productName} || '%')
+          AND (${barcode}::text IS NULL OR p.barcode ILIKE ${barcode} || '%')
+          AND (${categoryId}::text IS NULL OR p."categoryId" = ${categoryId})
+      )
+      SELECT * FROM ProductStock
+      WHERE (${statusFilter}::text IS NULL OR "status" = ${statusFilter})
+      ORDER BY "productName" ASC
+      ${useNoPagination ? Prisma.sql`` : Prisma.sql`LIMIT ${pageSize} OFFSET ${skip}`}
+    `
+  ]);
 
-  const rawData: any[] = await prisma.$queryRaw`
-    WITH LatestInventory AS (
-      SELECT DISTINCT ON ("productId")
-        "productId",
-        "available_quantity",
-        "updatedAt"
-      FROM "inventory"
-      ORDER BY "productId", "createdAt" DESC
-    ),
-    ProductStock AS (
-      SELECT
-        p.id AS "productId",
-        p.name AS "productName",
-        p.barcode,
-        p.litres,
-        p.bottle_volume AS "bottleVolume",
-        p.selling_price AS "sellingPrice",
-        p.low_stock AS "lowStock",
-        c.id AS "categoryId",
-        c.name AS "categoryName",
-        COALESCE(li.available_quantity, 0) AS "availableQuantity",
-        li."updatedAt" AS "lastUpdatedAt",
-        CASE
-          WHEN COALESCE(li.available_quantity, 0) <= 0 THEN 'OutOfStock'
-          WHEN COALESCE(li.available_quantity, 0) <= p.low_stock THEN 'LowStock'
-          ELSE 'InStock'
-        END AS "status"
-      FROM "products" p
-      LEFT JOIN "categories" c ON p."categoryId" = c.id
-      LEFT JOIN LatestInventory li ON p.id = li."productId"
-      WHERE 
-        (${productName}::text IS NULL OR p.name ILIKE '%' || ${productName} || '%' OR p.barcode ILIKE ${productName} || '%')
-        AND (${barcode}::text IS NULL OR p.barcode ILIKE ${barcode} || '%')
-        AND (${categoryId}::text IS NULL OR p."categoryId" = ${categoryId})
-    )
-    SELECT * FROM ProductStock
-    WHERE (${statusFilter}::text IS NULL OR "status" = ${statusFilter})
-    ORDER BY "productName" ASC
-  `;
+  const metrics = metricsResult[0] || { totalRecords: 0, totalQuantity: 0, lowStockItems: 0, outOfStockItems: 0 };
 
-  const allRows: MyStockTableRow[] = rawData.map((row) => ({
+  const pageRows: MyStockTableRow[] = dataResult.map((row) => ({
     productId: row.productId,
     productName: row.productName,
-    category: row.categoryId ? { id: row.categoryId, name: row.categoryNamez } : null,
+    category: row.categoryId ? { id: row.categoryId, name: row.categoryName } : null,
     availableQuantity: row.availableQuantity,
     minStock: row.lowStock,
     sellingPrice: row.sellingPrice ? Number(row.sellingPrice) : undefined,
@@ -73,24 +107,15 @@ export const getMyStock = async (query: MyStockQuery): Promise<MyStockResponse> 
     lastUpdatedAt: row.lastUpdatedAt ? new Date(row.lastUpdatedAt).toISOString() : null,
   }));
 
-  // Compute card metrics from the full filtered set
-  const totalItems = allRows.length;
-  const totalQuantity = allRows.reduce((sum, row) => sum + row.availableQuantity, 0);
-  const lowStockItems = allRows.filter((r) => r.status === 'LowStock').length;
-  const outOfStockItems = allRows.filter((r) => r.status === 'OutOfStock').length;
-
-  // Pagination
-  const useNoPagination = !!query.noPagination;
-  const totalRecords = allRows.length;
+  const totalRecords = metrics.totalRecords;
   const totalPages = useNoPagination ? 1 : Math.max(1, Math.ceil(totalRecords / pageSize));
-  const pageRows = useNoPagination ? allRows : allRows.slice(skip, skip + pageSize);
 
   return {
     cardResponse: {
-      totalItems,
-      totalQuantity,
-      lowStockItems,
-      outOfStockItems,
+      totalItems: totalRecords,
+      totalQuantity: metrics.totalQuantity,
+      lowStockItems: metrics.lowStockItems,
+      outOfStockItems: metrics.outOfStockItems,
     },
     tableResponse: {
       data: pageRows,
