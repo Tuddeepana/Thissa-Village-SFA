@@ -351,13 +351,12 @@ const POS = () => {
       const tableName = selectedTableInfo?.displayName || "Take Away";
       const kotOrderType = orderType === "dine_in" ? OrderType.DINE_IN : OrderType.TAKE_AWAY;
 
-      // Print KOT slip first
-      await printKotSlip({
-        tableName,
-        orderType: kotOrderType,
-        stewardName,
-        cashierName: currentUser.name,
-        customerName: customerName || undefined,
+      // First save KOT to backend to get the generated KOT ID
+      const kotLogResponse = await kotService.createKotLog({
+        steward: stewardName,
+        table_name: tableName,
+        order_type: kotOrderType,
+        total_amount: total,
         remark: kotRemark || undefined,
         items: unsentItems.map(item => ({
           product_name: item.product.name,
@@ -366,12 +365,14 @@ const POS = () => {
         }))
       });
 
-      // Then save KOT to backend
-      await kotService.createKotLog({
-        steward: stewardName,
-        table_name: tableName,
-        order_type: kotOrderType,
-        total_amount: total,
+      // Then print KOT slip with the generated ID
+      await printKotSlip({
+        kotId: kotLogResponse.kot_number || undefined,
+        tableName,
+        orderType: kotOrderType,
+        stewardName,
+        cashierName: currentUser.name,
+        customerName: customerName || undefined,
         remark: kotRemark || undefined,
         items: unsentItems.map(item => ({
           product_name: item.product.name,
