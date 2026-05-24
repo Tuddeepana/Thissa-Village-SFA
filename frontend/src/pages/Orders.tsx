@@ -255,24 +255,25 @@ const Orders = () => {
         };
       });
 
-      // Print KOT slip first
-      await printKotSlip({
-        tableName,
-        orderType: selectedOrder.order_type,
-        stewardName,
-        cashierName: currentUser.name,
-        customerName: selectedOrder.customer_name || undefined,
-        remark: kotRemark || undefined,
-        items: kotItems,
-      });
-
-      // Then save KOT to backend
-      await kotService.createKotLog({
+      // First save KOT to backend to get the generated KOT ID
+      const kotLogResponse = await kotService.createKotLog({
         orderId: selectedOrder.id,
         steward: stewardName,
         table_name: tableName,
         order_type: selectedOrder.order_type,
         total_amount: selectedOrder.total,
+        remark: kotRemark || undefined,
+        items: kotItems,
+      });
+
+      // Then print KOT slip with the generated ID
+      await printKotSlip({
+        kotId: kotLogResponse.kotLog?.kot_number || undefined,
+        tableName,
+        orderType: selectedOrder.order_type,
+        stewardName,
+        cashierName: currentUser.name,
+        customerName: selectedOrder.customer_name || undefined,
         remark: kotRemark || undefined,
         items: kotItems,
       });
