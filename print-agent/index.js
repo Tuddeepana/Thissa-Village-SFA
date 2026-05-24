@@ -148,6 +148,9 @@ function buildKotPayload(kotData) {
   // Left alignment for info
   commands.push(Buffer.from([ESC, 0x61, 0x00]));
 
+  if (kotData.kotId) {
+    commands.push(Buffer.from(justifyRow('KOT ID', kotData.kotId)));
+  }
   commands.push(Buffer.from(justifyRow('Date', dateStr)));
   commands.push(Buffer.from(justifyRow('Time', timeStr)));
   commands.push(Buffer.from(justifyRow('Table', kotData.tableName || '')));
