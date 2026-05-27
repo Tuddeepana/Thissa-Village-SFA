@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { userController } from '../controllers/user.controller';
 import { authenticate } from '../middleware/auth.middleware';
-import { adminOnly } from '../middleware/rbac.middleware';
+import { adminOnly, adminOrCashier } from '../middleware/rbac.middleware';
 import { validate } from '../middleware/validate.middleware';
 import {
   loginUserSchema,
@@ -46,10 +46,10 @@ router.post('/register', authenticate, adminOnly, validate({ body: registerUserS
 
 /**
  * @route   GET /api/users
- * @desc    Get all users
- * @access  Private (Admin only)
+ * @desc    Get all users (stewards visible to both admin and cashier for POS)
+ * @access  Private (Admin or Cashier)
  */
-router.get('/', authenticate, adminOnly, validate({ query: userQuerySchema }), userController.getUsers);
+router.get('/', authenticate, adminOrCashier, validate({ query: userQuerySchema }), userController.getUsers);
 
 /**
  * @route   GET /api/users/:id
