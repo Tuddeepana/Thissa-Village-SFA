@@ -56,6 +56,7 @@ import { printBillNewWindow } from "@/lib/billPrinter";
 import { printKotSlip } from "@/lib/kotPrinter";
 import type { Bill } from "@/types/pos";
 import { kotService } from "@/api/services/kotService";
+import { PaymentDialog } from "@/components/pos/PaymentDialog";
 
 const Orders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -82,10 +83,6 @@ const Orders = () => {
   // Add item form state
   const [selectedProductId, setSelectedProductId] = useState("");
   const [quantity, setQuantity] = useState(1);
-
-  // Payment form state
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "credit">("cash");
-  const [amountPaid, setAmountPaid] = useState(0);
 
   // Get current user info
   const currentUser = {
@@ -361,7 +358,11 @@ const Orders = () => {
     }
   };
 
-  const handleCompletePayment = async () => {
+  const handleConfirmPayment = async (
+    paymentMethod: 'cash' | 'card' | 'credit' | 'other',
+    amountPaid: number,
+    creditDescription?: string
+  ) => {
     if (!selectedOrder) return;
 
     const change = paymentMethod === "credit" ? 0 : amountPaid - selectedOrder.total;
@@ -388,7 +389,7 @@ const Orders = () => {
         order_type: selectedOrder.order_type === "DINE_IN" ? "dine_in" : "take_away",
         table_number: selectedOrder.table_id ?? null,
         item_count: selectedOrder.items.length,
-        credit_note: null,
+        credit_note: paymentMethod === 'credit' ? (creditDescription || null) : null,
         cash_given: paymentMethod === "credit" ? 0 : Number(amountPaid.toFixed(2)),
         balance_given: Number(change.toFixed(2)),
         tax: Number(selectedOrder.tax.toFixed(2)),
@@ -441,6 +442,7 @@ const Orders = () => {
         paymentMethod,
         amountPaid: paymentMethod === "credit" ? 0 : amountPaid,
         change: Math.max(0, change),
+        creditDescription: paymentMethod === 'credit' ? (creditDescription || null) : null,
         createdAt: now,
       };
 
@@ -453,8 +455,6 @@ const Orders = () => {
       // Close dialogs and reset
       setIsPaymentDialogOpen(false);
       setIsViewDialogOpen(false);
-      setPaymentMethod("cash");
-      setAmountPaid(0);
 
       toast.success('Payment completed successfully!', {
         description: `Bill #${createdBillNumber} - Total: Rs. ${selectedOrder.total.toFixed(2)}`,
@@ -813,7 +813,7 @@ const Orders = () => {
               <Printer className="h-4 w-4 mr-2" /> {isPrinting ? "Printing..." : "Print Bill"}
             </Button>
             {selectedOrder?.status === "PENDING" && (
-              <Button onClick={() => { setAmountPaid(selectedOrder.total); setIsPaymentDialogOpen(true); }} disabled={isPrinting || hasUnsentOrderItems} title={hasUnsentOrderItems ? "Send KOT first" : undefined}>
+              <Button onClick={() => setIsPaymentDialogOpen(true)} disabled={isPrinting || hasUnsentOrderItems} title={hasUnsentOrderItems ? "Send KOT first" : undefined}>
                 <CreditCard className="h-4 w-4 mr-2" /> Complete Payment
               </Button>
             )}
@@ -874,58 +874,14 @@ const Orders = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Payment Dialog */}
-      <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Complete Payment</DialogTitle>
-            <DialogDescription>
-              Total Amount: Rs.{selectedOrder?.total.toFixed(0)}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Payment Method</Label>
-              <Select value={paymentMethod} onValueChange={(val: "cash" | "card" | "credit") => setPaymentMethod(val)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="card">Card</SelectItem>
-                  <SelectItem value="credit">Credit</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {paymentMethod !== "credit" && (
-              <div className="space-y-2">
-                <Label>Amount Paid</Label>
-                <Input
-                  type="number"
-                  value={amountPaid}
-                  onChange={(e) => setAmountPaid(parseFloat(e.target.value) || 0)}
-                />
-                {amountPaid > (selectedOrder?.total || 0) && (
-                  <p className="text-sm text-green-600">
-                    Change: Rs.{(amountPaid - (selectedOrder?.total || 0)).toFixed(0)}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)} disabled={isPrinting}>
-              Cancel
-            </Button>
-            <Button onClick={handleCompletePayment} disabled={isPrinting}>
-              {isPrinting ? "Processing..." : "Complete Payment"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Payment Dialog for Order Details */}
+      <PaymentDialog
+        open={isPaymentDialogOpen}
+        onOpenChange={setIsPaymentDialogOpen}
+        total={selectedOrder?.total || 0}
+        onConfirmPayment={handleConfirmPayment}
+        isPrinting={isPrinting}
+      />
     </div>
   );
 };
