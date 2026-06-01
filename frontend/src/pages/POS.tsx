@@ -320,13 +320,15 @@ const POS = () => {
   }, [subtotal, discountRate]);
 
   const serviceChargeAmount = useMemo(() => {
+    // Service charge applies only to DINE_IN orders, NOT to TAKE_AWAY
+    if (orderType !== "dine_in") return 0;
     if (!serviceCharge?.isActive) return 0;
     const pct = Number(serviceCharge.percentage || 0);
     if (!pct) return 0;
     // Apply service charge on (subtotal - discount) (common approach)
     const base = Math.max(0, subtotal - discount);
     return (base * pct) / 100;
-  }, [serviceCharge, subtotal, discount]);
+  }, [serviceCharge, subtotal, discount, orderType]);
 
   const total = useMemo(() => {
     return subtotal + tax + serviceChargeAmount - discount;

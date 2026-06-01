@@ -57,6 +57,8 @@ import { printKotSlip } from "@/lib/kotPrinter";
 import type { Bill } from "@/types/pos";
 import { kotService } from "@/api/services/kotService";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
+import { serviceChargeService } from "@/api/services/serviceChargeService";
+import type { ServiceCharge } from "@/types/service-charge";
 
 const Orders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -70,6 +72,7 @@ const Orders = () => {
   const [kotRemark, setKotRemark] = useState("");
   const [isPrinting, setIsPrinting] = useState(false);
   const [kotSentOrderItemIds, setKotSentOrderItemIds] = useState<Set<string>>(new Set());
+  const [serviceCharge, setServiceCharge] = useState<ServiceCharge | null>(null);
   const [stats, setStats] = useState<OrderStats>({
     pending: 0,
     completed: 0,
@@ -136,10 +139,22 @@ const Orders = () => {
     }
   };
 
+  // Fetch service charge config
+  const fetchServiceCharge = async () => {
+    try {
+      const sc = await serviceChargeService.get();
+      if (!sc) return;
+      setServiceCharge(sc);
+    } catch (err) {
+      console.error("Failed to fetch service charge config", err);
+    }
+  };
+
   useEffect(() => {
     fetchOrders();
     fetchStats();
     fetchProducts();
+    fetchServiceCharge();
   }, [statusFilter]);
 
   // Filter orders (client-side for search) and sort pending to top
@@ -165,6 +180,23 @@ const Orders = () => {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
   }, [orders, searchQuery]);
+
+  // Calculate service charge for selected order (for display in view dialog)
+  const selectedOrderServiceCharge = useMemo(() => {
+    if (!selectedOrder || selectedOrder.order_type !== "DINE_IN" || !serviceCharge?.isActive) {
+      return 0;
+    }
+    const pct = Number(serviceCharge.percentage || 0);
+    if (!pct) return 0;
+    const base = Math.max(0, selectedOrder.subtotal - selectedOrder.discount);
+    return (base * pct) / 100;
+  }, [selectedOrder, serviceCharge]);
+
+  // Calculate total with service charge for display
+  const selectedOrderTotalWithServiceCharge = useMemo(() => {
+    if (!selectedOrder) return 0;
+    return selectedOrder.total + selectedOrderServiceCharge;
+  }, [selectedOrder, selectedOrderServiceCharge]);
 
   const handleViewOrder = async (order: Order) => {
     try {
@@ -375,15 +407,36 @@ const Orders = () => {
     try {
       const now = new Date();
 
+      // Calculate service charge only for DINE_IN orders, NOT for TAKE_AWAY
+      let serviceChargePercentage = 0;
+      let serviceChargeAmount = 0;
+      if (selectedOrder.order_type === "DINE_IN" && serviceCharge?.isActive) {
+        serviceChargePercentage = Number(serviceCharge.percentage || 0);
+        // Apply service charge on (subtotal - discount) (common approach)
+        const base = Math.max(0, selectedOrder.subtotal - selectedOrder.discount);
+        serviceChargeAmount = (base * serviceChargePercentage) / 100;
+      }
+
+      // Calculate new total including service charge
+      const totalWithServiceCharge = Number((selectedOrder.total + serviceChargeAmount).toFixed(2));
+
+      // Calculate change with the updated total
+      const changeWithServiceCharge = paymentMethod === "credit" ? 0 : amountPaid - totalWithServiceCharge;
+      if (paymentMethod !== "credit" && changeWithServiceCharge < 0) {
+        toast.error("Amount paid is less than total!");
+        setIsPrinting(false);
+        return;
+      }
+
       // Build payload for backend — same approach as POS page
       const payload = {
         date: now.toISOString(),
         payment_method: paymentMethod.toUpperCase(),
         customer_name: selectedOrder.customer_name,
         customer_type: selectedOrder.customer_type,
-        service_charge_percentage: 0,
-        service_charge_amount: 0,
-        total: Number(selectedOrder.total.toFixed(2)),
+        service_charge_percentage: serviceChargePercentage,
+        service_charge_amount: Number(serviceChargeAmount.toFixed(2)),
+        total: totalWithServiceCharge,
         cashier_name: currentUser.name,
         terminal_id: currentUser.terminalId,
         order_type: selectedOrder.order_type === "DINE_IN" ? "dine_in" : "take_away",
@@ -391,7 +444,7 @@ const Orders = () => {
         item_count: selectedOrder.items.length,
         credit_note: paymentMethod === 'credit' ? (creditDescription || null) : null,
         cash_given: paymentMethod === "credit" ? 0 : Number(amountPaid.toFixed(2)),
-        balance_given: Number(change.toFixed(2)),
+        balance_given: Number(changeWithServiceCharge.toFixed(2)),
         tax: Number(selectedOrder.tax.toFixed(2)),
         items: selectedOrder.items.map((item) => ({
           productId: item.productId,
@@ -436,12 +489,14 @@ const Orders = () => {
         taxRate: selectedOrder.tax > 0 ? (selectedOrder.tax / selectedOrder.subtotal) * 100 : 0,
         discount: selectedOrder.discount,
         discountRate: selectedOrder.discount > 0 ? (selectedOrder.discount / selectedOrder.subtotal) * 100 : 0,
-        total: selectedOrder.total,
+        serviceCharge: serviceChargeAmount,
+        serviceChargeRate: serviceChargePercentage,
+        total: totalWithServiceCharge,
         customerName: currentUser.name, // Cashier name shown on receipt
         customerPhone: selectedOrder.customer_phone,
         paymentMethod,
         amountPaid: paymentMethod === "credit" ? 0 : amountPaid,
-        change: Math.max(0, change),
+        change: Math.max(0, changeWithServiceCharge),
         creditDescription: paymentMethod === 'credit' ? (creditDescription || null) : null,
         createdAt: now,
       };
@@ -457,7 +512,7 @@ const Orders = () => {
       setIsViewDialogOpen(false);
 
       toast.success('Payment completed successfully!', {
-        description: `Bill #${createdBillNumber} - Total: Rs. ${selectedOrder.total.toFixed(2)}`,
+        description: `Bill #${createdBillNumber} - Total: Rs. ${totalWithServiceCharge.toFixed(2)}`,
       });
     } catch (err: any) {
       console.error('Failed to complete payment', err);
@@ -770,10 +825,16 @@ const Orders = () => {
                     <span className="text-green-600">-Rs.{selectedOrder.discount.toFixed(0)}</span>
                   </div>
                 )}
+                {selectedOrderServiceCharge > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Service Charge ({serviceCharge?.percentage}%):</span>
+                    <span>Rs.{selectedOrderServiceCharge.toFixed(0)}</span>
+                  </div>
+                )}
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total:</span>
-                  <span>Rs.{selectedOrder.total.toFixed(0)}</span>
+                  <span>Rs.{selectedOrderTotalWithServiceCharge.toFixed(0)}</span>
                 </div>
               </div>
 
@@ -878,7 +939,7 @@ const Orders = () => {
       <PaymentDialog
         open={isPaymentDialogOpen}
         onOpenChange={setIsPaymentDialogOpen}
-        total={selectedOrder?.total || 0}
+        total={selectedOrderTotalWithServiceCharge || 0}
         onConfirmPayment={handleConfirmPayment}
         isPrinting={isPrinting}
       />
