@@ -9,9 +9,25 @@ export class KotService {
    */
   async createKotLog(input: CreateKotLogInput): Promise<KotLogDTO> {
     const kotLog = await prisma.$transaction(async (tx) => {
+      // Calculate start of current day for sequence generation
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      // Count existing KOTs for today to generate sequence number
+      const todayCount = await tx.kotLog.count({
+        where: { createdAt: { gte: startOfDay } }
+      });
+
+      const sequence = todayCount + 1;
+      const padSeq = String(sequence).padStart(3, '0');
+      const day = String(startOfDay.getDate()).padStart(2, '0');
+      const month = String(startOfDay.getMonth() + 1).padStart(2, '0');
+      const kot_number = `K${day}${month}S${padSeq}`;
+
       // Create the KotLog and its items
       const newKotLog = await tx.kotLog.create({
         data: {
+          kot_number,
           orderId: input.orderId,
           steward: input.steward,
           table_name: input.table_name,
@@ -119,6 +135,7 @@ export class KotService {
   private mapToDTO(log: any): KotLogDTO {
     return {
       id: log.id,
+      kot_number: log.kot_number,
       orderId: log.orderId,
       steward: log.steward,
       table_name: log.table_name,

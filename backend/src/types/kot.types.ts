@@ -11,6 +11,7 @@ export interface KotLogItemDTO {
 
 export interface KotLogDTO {
   id: string;
+  kot_number?: string | null;
   orderId?: string | null;
   steward: string;
   table_name?: string | null;

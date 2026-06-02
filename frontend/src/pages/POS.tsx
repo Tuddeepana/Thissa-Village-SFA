@@ -101,6 +101,12 @@ const POS = () => {
       return saved ? new Set(JSON.parse(saved)) : new Set();
     } catch { return new Set(); }
   });
+  const [unlinkedKotIds, setUnlinkedKotIds] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem("pos_unlinkedKotIds");
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch { return new Set(); }
+  });
   const [taxRate, setTaxRate] = useState(() => {
     const saved = localStorage.getItem("pos_taxRate");
     return saved ? parseFloat(saved) : 0;
@@ -150,7 +156,8 @@ const POS = () => {
     localStorage.setItem("pos_discountRate", discountRate.toString());
     localStorage.setItem("pos_selectedSteward", selectedSteward);
     localStorage.setItem("pos_kotRemark", kotRemark);
-  }, [billItems, kotSentItemIds, customerName, customerPhone, customerType, orderType, selectedTable, taxRate, discountRate, selectedSteward, kotRemark]);
+    localStorage.setItem("pos_unlinkedKotIds", JSON.stringify(Array.from(unlinkedKotIds)));
+  }, [billItems, kotSentItemIds, unlinkedKotIds, customerName, customerPhone, customerType, orderType, selectedTable, taxRate, discountRate, selectedSteward, kotRemark]);
 
   // Fetch stewards
   useEffect(() => {
@@ -313,13 +320,15 @@ const POS = () => {
   }, [subtotal, discountRate]);
 
   const serviceChargeAmount = useMemo(() => {
+    // Service charge applies only to DINE_IN orders, NOT to TAKE_AWAY
+    if (orderType !== "dine_in") return 0;
     if (!serviceCharge?.isActive) return 0;
     const pct = Number(serviceCharge.percentage || 0);
     if (!pct) return 0;
     // Apply service charge on (subtotal - discount) (common approach)
     const base = Math.max(0, subtotal - discount);
     return (base * pct) / 100;
-  }, [serviceCharge, subtotal, discount]);
+  }, [serviceCharge, subtotal, discount, orderType]);
 
   const total = useMemo(() => {
     return subtotal + tax + serviceChargeAmount - discount;
@@ -351,8 +360,23 @@ const POS = () => {
       const tableName = selectedTableInfo?.displayName || "Take Away";
       const kotOrderType = orderType === "dine_in" ? OrderType.DINE_IN : OrderType.TAKE_AWAY;
 
-      // Print KOT slip first
+      // First save KOT to backend to get the generated KOT ID
+      const kotLogResponse = await kotService.createKotLog({
+        steward: stewardName,
+        table_name: tableName,
+        order_type: kotOrderType,
+        total_amount: total,
+        remark: kotRemark || undefined,
+        items: unsentItems.map(item => ({
+          product_name: item.product.name,
+          quantity: item.quantity,
+          unit: item.product.unit || undefined
+        }))
+      });
+
+      // Then print KOT slip with the generated ID
       await printKotSlip({
+        kotId: kotLogResponse.kotLog?.kot_number || undefined,
         tableName,
         orderType: kotOrderType,
         stewardName,
@@ -366,25 +390,20 @@ const POS = () => {
         }))
       });
 
-      // Then save KOT to backend
-      await kotService.createKotLog({
-        steward: stewardName,
-        table_name: tableName,
-        order_type: kotOrderType,
-        total_amount: total,
-        remark: kotRemark || undefined,
-        items: unsentItems.map(item => ({
-          product_name: item.product.name,
-          quantity: item.quantity,
-          unit: item.product.unit || undefined
-        }))
-      });
-
       setKotSentItemIds(prev => {
         const newSet = new Set(prev);
         unsentItems.forEach(item => newSet.add(item.product.id));
         return newSet;
       });
+
+      // Track the KOT ID so we can link it to the final order
+      if (kotLogResponse.kotLog?.id) {
+        setUnlinkedKotIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(kotLogResponse.kotLog.id);
+          return newSet;
+        });
+      }
 
       toast.success("KOT sent to kitchen successfully");
     } catch (err) {
@@ -516,6 +535,7 @@ const POS = () => {
   const handleClearOrder = (showToast = true) => {
     setBillItems([]);
     setKotSentItemIds(new Set());
+    setUnlinkedKotIds(new Set());
     setCustomerName("");
     setCustomerPhone("");
     setCustomerType("local");
@@ -528,6 +548,7 @@ const POS = () => {
     // Synchronously clear localStorage so it's not lost on unmount
     localStorage.removeItem("pos_billItems");
     localStorage.removeItem("pos_kotSentItemIds");
+    localStorage.removeItem("pos_unlinkedKotIds");
     localStorage.removeItem("pos_customerName");
     localStorage.removeItem("pos_customerPhone");
     localStorage.setItem("pos_customerType", "local");
@@ -592,6 +613,7 @@ const POS = () => {
           unit_price: customerType === "local" ? item.product.localPrice : item.product.foreignerPrice,
           kot_sent: kotSentItemIds.has(item.product.id),
         })),
+        unlinkedKotIds: Array.from(unlinkedKotIds),
       });
 
       // Mark table as occupied (local state only)

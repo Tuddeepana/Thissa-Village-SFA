@@ -337,6 +337,7 @@ model OrderItem {
 
 model KotLog {
   id           String      @id @default(uuid())
+  kot_number   String?
   orderId      String?
   steward      String
   table_name   String?
@@ -351,6 +352,7 @@ model KotLog {
   items KotLogItem[]
 
   @@index([orderId], name: "idx_kot_log_order")
+  @@index([createdAt], name: "idx_kot_log_created")
   @@map("kot_logs")
 }
 
