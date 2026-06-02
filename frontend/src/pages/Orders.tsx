@@ -56,6 +56,9 @@ import { printBillNewWindow } from "@/lib/billPrinter";
 import { printKotSlip } from "@/lib/kotPrinter";
 import type { Bill } from "@/types/pos";
 import { kotService } from "@/api/services/kotService";
+import { PaymentDialog } from "@/components/pos/PaymentDialog";
+import { serviceChargeService } from "@/api/services/serviceChargeService";
+import type { ServiceCharge } from "@/types/service-charge";
 
 const Orders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -69,6 +72,7 @@ const Orders = () => {
   const [kotRemark, setKotRemark] = useState("");
   const [isPrinting, setIsPrinting] = useState(false);
   const [kotSentOrderItemIds, setKotSentOrderItemIds] = useState<Set<string>>(new Set());
+  const [serviceCharge, setServiceCharge] = useState<ServiceCharge | null>(null);
   const [stats, setStats] = useState<OrderStats>({
     pending: 0,
     completed: 0,
@@ -82,10 +86,6 @@ const Orders = () => {
   // Add item form state
   const [selectedProductId, setSelectedProductId] = useState("");
   const [quantity, setQuantity] = useState(1);
-
-  // Payment form state
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "credit">("cash");
-  const [amountPaid, setAmountPaid] = useState(0);
 
   // Get current user info
   const currentUser = {
@@ -139,10 +139,22 @@ const Orders = () => {
     }
   };
 
+  // Fetch service charge config
+  const fetchServiceCharge = async () => {
+    try {
+      const sc = await serviceChargeService.get();
+      if (!sc) return;
+      setServiceCharge(sc);
+    } catch (err) {
+      console.error("Failed to fetch service charge config", err);
+    }
+  };
+
   useEffect(() => {
     fetchOrders();
     fetchStats();
     fetchProducts();
+    fetchServiceCharge();
   }, [statusFilter]);
 
   // Filter orders (client-side for search) and sort pending to top
@@ -168,6 +180,23 @@ const Orders = () => {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
   }, [orders, searchQuery]);
+
+  // Calculate service charge for selected order (for display in view dialog)
+  const selectedOrderServiceCharge = useMemo(() => {
+    if (!selectedOrder || selectedOrder.order_type !== "DINE_IN" || !serviceCharge?.isActive) {
+      return 0;
+    }
+    const pct = Number(serviceCharge.percentage || 0);
+    if (!pct) return 0;
+    const base = Math.max(0, selectedOrder.subtotal - selectedOrder.discount);
+    return (base * pct) / 100;
+  }, [selectedOrder, serviceCharge]);
+
+  // Calculate total with service charge for display
+  const selectedOrderTotalWithServiceCharge = useMemo(() => {
+    if (!selectedOrder) return 0;
+    return selectedOrder.total + selectedOrderServiceCharge;
+  }, [selectedOrder, selectedOrderServiceCharge]);
 
   const handleViewOrder = async (order: Order) => {
     try {
@@ -255,24 +284,25 @@ const Orders = () => {
         };
       });
 
-      // Print KOT slip first
-      await printKotSlip({
-        tableName,
-        orderType: selectedOrder.order_type,
-        stewardName,
-        cashierName: currentUser.name,
-        customerName: selectedOrder.customer_name || undefined,
-        remark: kotRemark || undefined,
-        items: kotItems,
-      });
-
-      // Then save KOT to backend
-      await kotService.createKotLog({
+      // First save KOT to backend to get the generated KOT ID
+      const kotLogResponse = await kotService.createKotLog({
         orderId: selectedOrder.id,
         steward: stewardName,
         table_name: tableName,
         order_type: selectedOrder.order_type,
         total_amount: selectedOrder.total,
+        remark: kotRemark || undefined,
+        items: kotItems,
+      });
+
+      // Then print KOT slip with the generated ID
+      await printKotSlip({
+        kotId: kotLogResponse.kotLog?.kot_number || undefined,
+        tableName,
+        orderType: selectedOrder.order_type,
+        stewardName,
+        cashierName: currentUser.name,
+        customerName: selectedOrder.customer_name || undefined,
         remark: kotRemark || undefined,
         items: kotItems,
       });
@@ -360,7 +390,11 @@ const Orders = () => {
     }
   };
 
-  const handleCompletePayment = async () => {
+  const handleConfirmPayment = async (
+    paymentMethod: 'cash' | 'card' | 'credit' | 'other',
+    amountPaid: number,
+    creditDescription?: string
+  ) => {
     if (!selectedOrder) return;
 
     const change = paymentMethod === "credit" ? 0 : amountPaid - selectedOrder.total;
@@ -373,23 +407,44 @@ const Orders = () => {
     try {
       const now = new Date();
 
+      // Calculate service charge only for DINE_IN orders, NOT for TAKE_AWAY
+      let serviceChargePercentage = 0;
+      let serviceChargeAmount = 0;
+      if (selectedOrder.order_type === "DINE_IN" && serviceCharge?.isActive) {
+        serviceChargePercentage = Number(serviceCharge.percentage || 0);
+        // Apply service charge on (subtotal - discount) (common approach)
+        const base = Math.max(0, selectedOrder.subtotal - selectedOrder.discount);
+        serviceChargeAmount = (base * serviceChargePercentage) / 100;
+      }
+
+      // Calculate new total including service charge
+      const totalWithServiceCharge = Number((selectedOrder.total + serviceChargeAmount).toFixed(2));
+
+      // Calculate change with the updated total
+      const changeWithServiceCharge = paymentMethod === "credit" ? 0 : amountPaid - totalWithServiceCharge;
+      if (paymentMethod !== "credit" && changeWithServiceCharge < 0) {
+        toast.error("Amount paid is less than total!");
+        setIsPrinting(false);
+        return;
+      }
+
       // Build payload for backend — same approach as POS page
       const payload = {
         date: now.toISOString(),
         payment_method: paymentMethod.toUpperCase(),
         customer_name: selectedOrder.customer_name,
         customer_type: selectedOrder.customer_type,
-        service_charge_percentage: 0,
-        service_charge_amount: 0,
-        total: Number(selectedOrder.total.toFixed(2)),
+        service_charge_percentage: serviceChargePercentage,
+        service_charge_amount: Number(serviceChargeAmount.toFixed(2)),
+        total: totalWithServiceCharge,
         cashier_name: currentUser.name,
         terminal_id: currentUser.terminalId,
         order_type: selectedOrder.order_type === "DINE_IN" ? "dine_in" : "take_away",
         table_number: selectedOrder.table_id ?? null,
         item_count: selectedOrder.items.length,
-        credit_note: null,
+        credit_note: paymentMethod === 'credit' ? (creditDescription || null) : null,
         cash_given: paymentMethod === "credit" ? 0 : Number(amountPaid.toFixed(2)),
-        balance_given: Number(change.toFixed(2)),
+        balance_given: Number(changeWithServiceCharge.toFixed(2)),
         tax: Number(selectedOrder.tax.toFixed(2)),
         items: selectedOrder.items.map((item) => ({
           productId: item.productId,
@@ -434,12 +489,15 @@ const Orders = () => {
         taxRate: selectedOrder.tax > 0 ? (selectedOrder.tax / selectedOrder.subtotal) * 100 : 0,
         discount: selectedOrder.discount,
         discountRate: selectedOrder.discount > 0 ? (selectedOrder.discount / selectedOrder.subtotal) * 100 : 0,
-        total: selectedOrder.total,
+        serviceCharge: serviceChargeAmount,
+        serviceChargeRate: serviceChargePercentage,
+        total: totalWithServiceCharge,
         customerName: currentUser.name, // Cashier name shown on receipt
         customerPhone: selectedOrder.customer_phone,
         paymentMethod,
         amountPaid: paymentMethod === "credit" ? 0 : amountPaid,
-        change: Math.max(0, change),
+        change: Math.max(0, changeWithServiceCharge),
+        creditDescription: paymentMethod === 'credit' ? (creditDescription || null) : null,
         createdAt: now,
       };
 
@@ -452,11 +510,9 @@ const Orders = () => {
       // Close dialogs and reset
       setIsPaymentDialogOpen(false);
       setIsViewDialogOpen(false);
-      setPaymentMethod("cash");
-      setAmountPaid(0);
 
       toast.success('Payment completed successfully!', {
-        description: `Bill #${createdBillNumber} - Total: Rs. ${selectedOrder.total.toFixed(2)}`,
+        description: `Bill #${createdBillNumber} - Total: Rs. ${totalWithServiceCharge.toFixed(2)}`,
       });
     } catch (err: any) {
       console.error('Failed to complete payment', err);
@@ -769,10 +825,16 @@ const Orders = () => {
                     <span className="text-green-600">-Rs.{selectedOrder.discount.toFixed(0)}</span>
                   </div>
                 )}
+                {selectedOrderServiceCharge > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Service Charge ({serviceCharge?.percentage}%):</span>
+                    <span>Rs.{selectedOrderServiceCharge.toFixed(0)}</span>
+                  </div>
+                )}
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total:</span>
-                  <span>Rs.{selectedOrder.total.toFixed(0)}</span>
+                  <span>Rs.{selectedOrderTotalWithServiceCharge.toFixed(0)}</span>
                 </div>
               </div>
 
@@ -812,7 +874,7 @@ const Orders = () => {
               <Printer className="h-4 w-4 mr-2" /> {isPrinting ? "Printing..." : "Print Bill"}
             </Button>
             {selectedOrder?.status === "PENDING" && (
-              <Button onClick={() => { setAmountPaid(selectedOrder.total); setIsPaymentDialogOpen(true); }} disabled={isPrinting || hasUnsentOrderItems} title={hasUnsentOrderItems ? "Send KOT first" : undefined}>
+              <Button onClick={() => setIsPaymentDialogOpen(true)} disabled={isPrinting || hasUnsentOrderItems} title={hasUnsentOrderItems ? "Send KOT first" : undefined}>
                 <CreditCard className="h-4 w-4 mr-2" /> Complete Payment
               </Button>
             )}
@@ -873,58 +935,14 @@ const Orders = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Payment Dialog */}
-      <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Complete Payment</DialogTitle>
-            <DialogDescription>
-              Total Amount: Rs.{selectedOrder?.total.toFixed(0)}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Payment Method</Label>
-              <Select value={paymentMethod} onValueChange={(val: "cash" | "card" | "credit") => setPaymentMethod(val)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="card">Card</SelectItem>
-                  <SelectItem value="credit">Credit</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {paymentMethod !== "credit" && (
-              <div className="space-y-2">
-                <Label>Amount Paid</Label>
-                <Input
-                  type="number"
-                  value={amountPaid}
-                  onChange={(e) => setAmountPaid(parseFloat(e.target.value) || 0)}
-                />
-                {amountPaid > (selectedOrder?.total || 0) && (
-                  <p className="text-sm text-green-600">
-                    Change: Rs.{(amountPaid - (selectedOrder?.total || 0)).toFixed(0)}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)} disabled={isPrinting}>
-              Cancel
-            </Button>
-            <Button onClick={handleCompletePayment} disabled={isPrinting}>
-              {isPrinting ? "Processing..." : "Complete Payment"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Payment Dialog for Order Details */}
+      <PaymentDialog
+        open={isPaymentDialogOpen}
+        onOpenChange={setIsPaymentDialogOpen}
+        total={selectedOrderTotalWithServiceCharge || 0}
+        onConfirmPayment={handleConfirmPayment}
+        isPrinting={isPrinting}
+      />
     </div>
   );
 };

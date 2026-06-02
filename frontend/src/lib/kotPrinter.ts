@@ -165,6 +165,7 @@ const KOT_CSS = `
 `;
 
 export interface KotSlipData {
+  kotId?: string;
   tableName: string;
   orderType: string;
   stewardName: string;
@@ -183,6 +184,12 @@ const buildKotSlipBody = (data: KotSlipData, logoDataUrl: string): string => `
   </div>
 
   <div class="kot-title">Kitchen Order Ticket</div>
+
+  ${data.kotId ? `
+  <div class="info-row">
+    <span class="info-label">KOT ID</span>
+    <span>${data.kotId}</span>
+  </div>` : ''}
 
   <div class="info-row">
     <span class="info-label">Date</span>

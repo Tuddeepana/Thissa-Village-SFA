@@ -24,6 +24,7 @@ export const createOrderSchema = z.object({
   cashier_name: z.string().min(1, 'Cashier name is required'),
   notes: z.string().optional(),
   items: z.array(orderItemSchema).min(1, 'At least one item is required'),
+  unlinkedKotIds: z.array(z.string()).optional(),
 }).refine(
   (data) => {
     // If order type is DINE_IN, table_id is required

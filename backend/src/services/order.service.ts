@@ -26,38 +26,50 @@ export class OrderService {
     // Generate unique order number
     const orderNumber = `ORD-${Date.now().toString().slice(-8)}`;
 
-    const order = await prisma.order.create({
-      data: {
-        order_number: orderNumber,
-        customer_name: input.customer_name,
-        customer_phone: input.customer_phone,
-        customer_type: input.customer_type,
-        order_type: input.order_type,
-        table_id: input.table_id,
-        table_name: input.table_name,
-        table_number: input.table_number,
-        steward_name: input.steward_name,
-        subtotal: new Prisma.Decimal(subtotal),
-        tax: new Prisma.Decimal(tax),
-        discount: new Prisma.Decimal(discount),
-        total: new Prisma.Decimal(total),
-        terminal_id: input.terminal_id,
-        cashier_name: input.cashier_name,
-        notes: input.notes,
-        items: {
-          create: input.items.map((item) => ({
-            productId: item.productId,
-            product_name: item.product_name,
-            quantity: item.quantity,
-            unit_price: new Prisma.Decimal(item.unit_price),
-            total: new Prisma.Decimal(item.unit_price * item.quantity),
-            kot_sent: item.kot_sent || false,
-          })),
+    const order = await prisma.$transaction(async (tx) => {
+      const newOrder = await tx.order.create({
+        data: {
+          order_number: orderNumber,
+          customer_name: input.customer_name,
+          customer_phone: input.customer_phone,
+          customer_type: input.customer_type,
+          order_type: input.order_type,
+          table_id: input.table_id,
+          table_name: input.table_name,
+          table_number: input.table_number,
+          steward_name: input.steward_name,
+          subtotal: new Prisma.Decimal(subtotal),
+          tax: new Prisma.Decimal(tax),
+          discount: new Prisma.Decimal(discount),
+          total: new Prisma.Decimal(total),
+          terminal_id: input.terminal_id,
+          cashier_name: input.cashier_name,
+          notes: input.notes,
+          items: {
+            create: input.items.map((item) => ({
+              productId: item.productId,
+              product_name: item.product_name,
+              quantity: item.quantity,
+              unit_price: new Prisma.Decimal(item.unit_price),
+              total: new Prisma.Decimal(item.unit_price * item.quantity),
+              kot_sent: item.kot_sent || false,
+            })),
+          },
         },
-      },
-      include: {
-        items: true,
-      },
+        include: {
+          items: true,
+        },
+      });
+
+      // Link any previously created KOTs to this new order
+      if (input.unlinkedKotIds && input.unlinkedKotIds.length > 0) {
+        await tx.kotLog.updateMany({
+          where: { id: { in: input.unlinkedKotIds } },
+          data: { orderId: newOrder.id },
+        });
+      }
+
+      return newOrder;
     });
 
     return this.mapToDTO(order);

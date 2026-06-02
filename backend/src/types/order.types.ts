@@ -67,6 +67,7 @@ export interface CreateOrderInput {
   cashier_name: string;
   notes?: string;
   items: CreateOrderItemInput[];
+  unlinkedKotIds?: string[];
 }
 
 export interface UpdateOrderStatusInput {
