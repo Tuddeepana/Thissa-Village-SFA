@@ -11,21 +11,40 @@ import {
   pnlQuerySchema,
 } from '../validations/expense.validation';
 
+// ─── Helper: map service errors to HTTP status codes ───────────────────────
+const handleServiceError = (err: any): never => {
+  const msg: string = err?.message ?? 'An unexpected error occurred';
+
+  if (
+    msg.includes('already exists') ||
+    msg.includes('Cannot delete') ||
+    msg.includes('Invalid or deleted')
+  ) {
+    throw new AppError(msg, 409);
+  }
+  if (msg.includes('not found')) {
+    throw new AppError(msg, 404);
+  }
+  throw new AppError(msg, 500);
+};
+
 // ═══════════════════════════════════════════
 //  EXPENSE TYPES
 // ═══════════════════════════════════════════
 
 export const createExpenseType = async (req: Request, res: Response) => {
   const parsed = createExpenseTypeSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError('Validation failed', 400);
+  if (!parsed.success) {
+    throw new AppError(
+      parsed.error.issues.map((i) => i.message).join(', '),
+      400
+    );
+  }
   try {
     const et = await expenseService.createExpenseType(parsed.data);
     res.status(201).json({ success: true, data: et });
   } catch (err: any) {
-    if (err.message?.includes('already exists')) {
-      throw new AppError(err.message, 409);
-    }
-    throw err;
+    handleServiceError(err);
   }
 };
 
@@ -33,7 +52,7 @@ export const listExpenseTypes = async (req: Request, res: Response) => {
   const parsed = expenseTypeQuerySchema.safeParse(req.query);
   if (!parsed.success) throw new AppError('Invalid query params', 400);
   const result = await expenseService.listExpenseTypes(parsed.data);
-  res.json({ success: true, ...result });
+  res.json({ success: true, data: result.data, total: result.total });
 };
 
 export const getExpenseTypeById = async (req: Request, res: Response) => {
@@ -47,14 +66,22 @@ export const updateExpenseType = async (req: Request, res: Response) => {
   const { id } = req.params;
   const parsed = updateExpenseTypeSchema.safeParse(req.body);
   if (!parsed.success) throw new AppError('Validation failed', 400);
-  const et = await expenseService.updateExpenseType(id, parsed.data);
-  res.json({ success: true, data: et });
+  try {
+    const et = await expenseService.updateExpenseType(id, parsed.data);
+    res.json({ success: true, data: et });
+  } catch (err: any) {
+    handleServiceError(err);
+  }
 };
 
 export const softDeleteExpenseType = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const et = await expenseService.softDeleteExpenseType(id);
-  res.json({ success: true, data: et });
+  try {
+    const et = await expenseService.softDeleteExpenseType(id);
+    res.json({ success: true, data: et });
+  } catch (err: any) {
+    handleServiceError(err);
+  }
 };
 
 export const restoreExpenseType = async (req: Request, res: Response) => {
@@ -69,16 +96,34 @@ export const restoreExpenseType = async (req: Request, res: Response) => {
 
 export const createExpense = async (req: Request, res: Response) => {
   const parsed = createExpenseSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError('Validation failed', 400);
-  const expense = await expenseService.createExpense(parsed.data);
-  res.status(201).json({ success: true, data: expense });
+  if (!parsed.success) {
+    throw new AppError(
+      parsed.error.issues.map((i) => i.message).join(', '),
+      400
+    );
+  }
+  try {
+    const expense = await expenseService.createExpense(parsed.data);
+    res.status(201).json({ success: true, data: expense });
+  } catch (err: any) {
+    handleServiceError(err);
+  }
 };
 
 export const bulkCreateExpenses = async (req: Request, res: Response) => {
   const parsed = bulkCreateExpenseSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError('Validation failed', 400);
-  const expenses = await expenseService.bulkCreateExpenses(parsed.data);
-  res.status(201).json({ success: true, data: expenses });
+  if (!parsed.success) {
+    throw new AppError(
+      parsed.error.issues.map((i) => i.message).join(', '),
+      400
+    );
+  }
+  try {
+    const expenses = await expenseService.bulkCreateExpenses(parsed.data);
+    res.status(201).json({ success: true, data: expenses });
+  } catch (err: any) {
+    handleServiceError(err);
+  }
 };
 
 export const listExpenses = async (req: Request, res: Response) => {
@@ -106,8 +151,12 @@ export const getExpenseById = async (req: Request, res: Response) => {
 
 export const deleteExpense = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const expense = await expenseService.deleteExpense(id);
-  res.json({ success: true, data: expense });
+  try {
+    const expense = await expenseService.deleteExpense(id);
+    res.json({ success: true, data: expense });
+  } catch (err: any) {
+    handleServiceError(err);
+  }
 };
 
 // ═══════════════════════════════════════════
