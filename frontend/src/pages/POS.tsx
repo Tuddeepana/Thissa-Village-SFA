@@ -22,6 +22,7 @@ import { orderService } from "@/api/services/orderService";
 import { serviceChargeService } from "@/api/services/serviceChargeService";
 import { kotService } from "@/api/services/kotService";
 import { userService } from "@/api/services/userService";
+import { printerService } from "@/api/services/printerService";
 import type { User as AppUser } from "@/types/user.types";
 import { Product, BillItem, Bill, StockWarning } from "@/types/pos";
 import { OrderType } from "@/types/order.types";
@@ -48,6 +49,7 @@ import {
   Crown,
   Globe,
   Users,
+  TestTube2,
 } from "lucide-react";
 
 const PAGE_SIZE = 50;
@@ -76,6 +78,7 @@ const POS = () => {
   const [kotRemark, setKotRemark] = useState<string>(() => localStorage.getItem("pos_kotRemark") || "");
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [stewards, setStewards] = useState<AppUser[]>([]);
+  const [isTestingPrinter, setIsTestingPrinter] = useState(false);
 
   // Products and Cart
   const [products, setProducts] = useState<Product[]>([]);
@@ -754,6 +757,25 @@ const POS = () => {
       });
   };
 
+  const handleTestPrint = async () => {
+    setIsTestingPrinter(true);
+    try {
+      const result = await printerService.testAgentPrint();
+      if (result.success) {
+        toast.success("Test print sent!", { description: result.message });
+      } else {
+        toast.error("Test print failed", { description: result.message });
+      }
+    } catch (error: any) {
+      console.error("Test print error:", error);
+      toast.error("Test print failed", {
+        description: error.message || "Could not reach the print agent. Make sure it is configured in Printer Setup.",
+      });
+    } finally {
+      setIsTestingPrinter(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-start">
@@ -763,19 +785,31 @@ const POS = () => {
             Terminal: {currentUser.terminalId} • Cashier: {currentUser.name}
           </p>
         </div>
-        <Badge
-          variant="outline"
-          className={`text-sm px-3 py-1 ${customerType === "local"
-              ? "bg-green-100 text-green-700 border-green-300"
-              : "bg-blue-100 text-blue-700 border-blue-300"
-            }`}
-        >
-          {customerType === "local" ? (
-            <><Users className="h-4 w-4 mr-1.5" /> Local Pricing</>
-          ) : (
-            <><Globe className="h-4 w-4 mr-1.5" /> Foreigner Pricing</>
-          )}
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTestPrint}
+            disabled={isTestingPrinter}
+            className="text-muted-foreground"
+          >
+            <TestTube2 className="h-4 w-4 mr-2" />
+            {isTestingPrinter ? "Testing..." : "Test Agent Print"}
+          </Button>
+          <Badge
+            variant="outline"
+            className={`text-sm px-3 py-1 ${customerType === "local"
+                ? "bg-green-100 text-green-700 border-green-300"
+                : "bg-blue-100 text-blue-700 border-blue-300"
+              }`}
+          >
+            {customerType === "local" ? (
+              <><Users className="h-4 w-4 mr-1.5" /> Local Pricing</>
+            ) : (
+              <><Globe className="h-4 w-4 mr-1.5" /> Foreigner Pricing</>
+            )}
+          </Badge>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
