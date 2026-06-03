@@ -81,6 +81,7 @@ export interface AddItemsToOrderInput {
 export interface OrderListParams {
   status?: OrderStatus;
   order_type?: OrderType;
+  customer_type?: 'local' | 'foreigner';
   customer_name?: string;
   table_number?: string;
   date_from?: string;

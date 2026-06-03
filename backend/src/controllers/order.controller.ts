@@ -42,6 +42,7 @@ export const listOrders = async (req: Request, res: Response) => {
   const result = await orderService.listOrders({
     status: validatedQuery.status,
     order_type: validatedQuery.order_type,
+    customer_type: validatedQuery.customer_type,
     customer_name: validatedQuery.customer_name,
     table_number: validatedQuery.table_number,
     date_from: validatedQuery.date_from ? new Date(validatedQuery.date_from) : undefined,

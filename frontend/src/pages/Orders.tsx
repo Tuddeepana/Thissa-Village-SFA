@@ -44,12 +44,14 @@ import {
   Check,
   X,
   Trash2,
+  Globe,
+  Users,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { orderService } from "@/api/services/orderService";
 import api from "@/api/client";
-import { OrderStatus } from "@/types/order.types";
+import { OrderStatus, OrderType } from "@/types/order.types";
 import type { Order, OrderStatus as OrderStatusType, OrderStats } from "@/types/order.types";
 import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
 import { printBillNewWindow } from "@/lib/billPrinter";
@@ -65,6 +67,8 @@ const Orders = () => {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("PENDING");
+  const [orderTypeFilter, setOrderTypeFilter] = useState<string>("all");
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isAddItemDialogOpen, setIsAddItemDialogOpen] = useState(false);
@@ -108,6 +112,8 @@ const Orders = () => {
     try {
       const result = await orderService.listOrders({
         status: statusFilter !== "all" ? (statusFilter as OrderStatusType) : undefined,
+        order_type: orderTypeFilter !== "all" ? (orderTypeFilter as OrderType) : undefined,
+        customer_type: customerTypeFilter !== "all" ? (customerTypeFilter as 'local' | 'foreigner') : undefined,
         pageSize: 100,
       });
       setOrders(result.orders);
@@ -155,7 +161,7 @@ const Orders = () => {
     fetchStats();
     fetchProducts();
     fetchServiceCharge();
-  }, [statusFilter]);
+  }, [statusFilter, orderTypeFilter, customerTypeFilter]);
 
   // Filter orders (client-side for search) and sort pending to top
   const filteredOrders = useMemo(() => {
@@ -585,8 +591,8 @@ const Orders = () => {
               </div>
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Filter by status" />
+              <SelectTrigger className="w-full md:w-40">
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
@@ -595,7 +601,27 @@ const Orders = () => {
                 <SelectItem value="CANCELLED">Cancelled</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" onClick={() => { setSearchQuery(""); setStatusFilter("PENDING"); fetchOrders(); }}>
+            <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
+              <SelectTrigger className="w-full md:w-40">
+                <SelectValue placeholder="Order Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="DINE_IN">Dine In</SelectItem>
+                <SelectItem value="TAKE_AWAY">Take Away</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={customerTypeFilter} onValueChange={setCustomerTypeFilter}>
+              <SelectTrigger className="w-full md:w-40">
+                <SelectValue placeholder="Customer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Customers</SelectItem>
+                <SelectItem value="local">Local</SelectItem>
+                <SelectItem value="foreigner">Foreigner</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={() => { setSearchQuery(""); setStatusFilter("PENDING"); setOrderTypeFilter("all"); setCustomerTypeFilter("all"); fetchOrders(); }}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
@@ -621,6 +647,7 @@ const Orders = () => {
                 <TableRow>
                   <TableHead>Order #</TableHead>
                   <TableHead>Customer</TableHead>
+                  <TableHead>Customer Type</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Table</TableHead>
                   <TableHead>Items</TableHead>
@@ -633,7 +660,7 @@ const Orders = () => {
               <TableBody>
                 {filteredOrders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       No orders found
                     </TableCell>
                   </TableRow>
@@ -646,6 +673,21 @@ const Orders = () => {
                           <div className="font-medium">{order.customer_name}</div>
                           <div className="text-xs text-muted-foreground">{order.customer_phone}</div>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={order.customer_type === "foreigner"
+                            ? "bg-blue-50 text-blue-700 border-blue-200"
+                            : "bg-green-50 text-green-700 border-green-200"
+                          }
+                        >
+                          {order.customer_type === "foreigner" ? (
+                            <><Globe className="h-3 w-3 mr-1" /> Foreigner</>
+                          ) : (
+                            <><Users className="h-3 w-3 mr-1" /> Local</>
+                          )}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">

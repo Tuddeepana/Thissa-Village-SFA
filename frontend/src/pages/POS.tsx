@@ -365,7 +365,7 @@ const POS = () => {
         steward: stewardName,
         table_name: tableName,
         order_type: kotOrderType,
-        total_amount: total,
+        total_amount: Number(total.toFixed(2)),
         remark: kotRemark || undefined,
         items: unsentItems.map(item => ({
           product_name: item.product.name,
@@ -452,7 +452,9 @@ const POS = () => {
     if (billItems.length > 0) {
       setBillItems(prevItems =>
         prevItems.map(item => {
-          const priceToUse = customerType === "local" ? item.product.localPrice : item.product.foreignerPrice;
+          const localPrice = Number(item.product.localPrice) || 0;
+          const foreignerPrice = Number(item.product.foreignerPrice) || 0;
+          const priceToUse = customerType === "local" ? localPrice : foreignerPrice;
           return {
             ...item,
             subtotal: priceToUse * item.quantity,
@@ -472,7 +474,9 @@ const POS = () => {
     }
 
     const existingItem = billItems.find((item) => item.product.id === product.id);
-    const priceToUse = customerType === "local" ? product.localPrice : product.foreignerPrice;
+    const localPrice = Number(product.localPrice) || 0;
+    const foreignerPrice = Number(product.foreignerPrice) || 0;
+    const priceToUse = customerType === "local" ? localPrice : foreignerPrice;
 
     if (existingItem) {
       // Check if we can add more (skip check for handmade products)
@@ -507,7 +511,9 @@ const POS = () => {
       return;
     }
 
-    const priceToUse = customerType === "local" ? item.product.localPrice : item.product.foreignerPrice;
+    const localPrice = Number(item.product.localPrice) || 0;
+    const foreignerPrice = Number(item.product.foreignerPrice) || 0;
+    const priceToUse = customerType === "local" ? localPrice : foreignerPrice;
 
     setBillItems(
       billItems.map((item) =>
@@ -606,13 +612,17 @@ const POS = () => {
         discount: discountRate,
         terminal_id: currentUser.terminalId,
         cashier_name: currentUser.name,
-        items: billItems.map(item => ({
-          productId: item.product.id,
-          product_name: item.product.name,
-          quantity: item.quantity,
-          unit_price: customerType === "local" ? item.product.localPrice : item.product.foreignerPrice,
-          kot_sent: kotSentItemIds.has(item.product.id),
-        })),
+        items: billItems.map(item => {
+          const localPrice = Number(item.product.localPrice) || 0;
+          const foreignerPrice = Number(item.product.foreignerPrice) || 0;
+          return {
+            productId: item.product.id,
+            product_name: item.product.name,
+            quantity: item.quantity,
+            unit_price: customerType === "local" ? localPrice : foreignerPrice,
+            kot_sent: kotSentItemIds.has(item.product.id),
+          };
+        }),
         unlinkedKotIds: Array.from(unlinkedKotIds),
       });
 
@@ -1039,7 +1049,7 @@ const POS = () => {
                             </span>
                           </h4>
                           <p className="text-xs text-muted-foreground">
-                            Rs. {(customerType === "local" ? item.product.localPrice : item.product.foreignerPrice).toFixed(2)} each
+                            Rs. {(customerType === "local" ? (Number(item.product.localPrice) || 0) : (Number(item.product.foreignerPrice) || 0)).toFixed(2)} each
                           </p>
                         </div>
                         <Button
