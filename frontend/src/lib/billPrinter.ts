@@ -1,6 +1,7 @@
 import { Bill } from '@/types/pos';
 import { format } from 'date-fns';
 import logoUrl from '@/assets/images/resturent_logo.png';
+import pkg from '../../package.json';
 
 // Cache logo data URL to avoid repeated fetches
 let cachedLogoDataUrl: string | null = null;
@@ -228,8 +229,13 @@ const buildBillBody = (
   </div>
   ${bill.customerName ? `
   <div class="info-row">
-    <span class="info-label">Cashier</span>
+    <span class="info-label">Customer</span>
     <span>${bill.customerName}</span>
+  </div>` : ''}
+  ${bill.cashierName ? `
+  <div class="info-row">
+    <span class="info-label">Cashier</span>
+    <span>${bill.cashierName}</span>
   </div>` : ''}
 
   <hr class="div-dashed">
@@ -320,7 +326,7 @@ const buildBillBody = (
     <div class="footer-thanks">Thank You For Your Business!</div>
     <div class="footer-sub">Come Again !</div>
     <hr class="div-dashed" style="margin:4px 12px;">
-    <div class="footer-powered">Powered by Wrenix Pvt Ltd &nbsp;|&nbsp; v.001</div>
+    <div class="footer-powered">Powered by Wrenix Pvt Ltd &nbsp;|&nbsp; v${pkg.version.replace(/[^0-9.]/g, '')}</div>
   </div>
 `;
 

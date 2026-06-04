@@ -33,7 +33,7 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
   const [selectedRooms, setSelectedRooms] = useState<Set<string>>(new Set());
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'CREDIT' | 'OTHER'>('CASH');
+  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'CREDIT'>('CASH');
   const [cashGiven, setCashGiven] = useState(0);
   const [generateBill, setGenerateBill] = useState(true);
 
@@ -584,7 +584,7 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
                   <div className="space-y-4 pl-6">
                     <div className="space-y-2">
                       <Label>Payment Method</Label>
-                      <Select value={paymentMethod} onValueChange={(value: 'CASH' | 'CARD' | 'CREDIT' | 'OTHER') => setPaymentMethod(value)}>
+                      <Select value={paymentMethod} onValueChange={(value: 'CASH' | 'CARD' | 'CREDIT') => setPaymentMethod(value)}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -592,7 +592,6 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
                           <SelectItem value="CASH">Cash</SelectItem>
                           <SelectItem value="CARD">Card</SelectItem>
                           <SelectItem value="CREDIT">Credit</SelectItem>
-                          <SelectItem value="OTHER">Other</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
