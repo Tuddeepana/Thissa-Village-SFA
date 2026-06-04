@@ -85,12 +85,7 @@ export const printerService = {
 
   /** Check if the print agent is online */
   async checkAgentHealth(agentUrl?: string, agentKey?: string): Promise<{ status: string; printer: any }> {
-    let url = agentUrl;
-    if (!url) {
-      const config = await getAgentConfig();
-      if (config) url = config.url;
-    }
-    
+    const url = agentUrl || cachedAgentUrl;
     if (!url) throw new Error('Agent URL not configured');
 
     const res = await fetch(`${url}/health`, {
@@ -103,17 +98,8 @@ export const printerService = {
 
   /** Send test print via the agent */
   async testAgentPrint(agentUrl?: string, agentKey?: string): Promise<{ success: boolean; message: string }> {
-    let url = agentUrl;
-    let key = agentKey;
-    
-    if (!url || !key) {
-      const config = await getAgentConfig();
-      if (config) {
-        url = url || config.url;
-        key = key || config.key;
-      }
-    }
-    
+    const url = agentUrl || cachedAgentUrl;
+    const key = agentKey || cachedAgentKey;
     if (!url || !key) throw new Error('Agent URL or key not configured');
 
     const res = await fetch(`${url}/print-test`, {
