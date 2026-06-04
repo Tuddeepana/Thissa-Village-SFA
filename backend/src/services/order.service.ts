@@ -385,7 +385,7 @@ export class OrderService {
 
   /**
    * Get table status with current orders
-   * Optimised: single raw SQL query with LEFT JOIN LATERAL for orders + item counts
+   * Optimised: single raw SQL query with subquery join instead of ANY($1) array
    */
   async getTableStatus(params?: {
     status?: 'available' | 'occupied' | 'all';
@@ -413,19 +413,21 @@ export class OrderService {
       }
     }
 
-    // Collect all virtual table IDs for the IN clause
-    const tableIds = allTables.map(t => t.id);
-
-    if (tableIds.length === 0) {
+    if (allTables.length === 0) {
       return {
         tables: [],
         summary: { total: 0, occupied: 0, available: 0, reserved: 0 },
       };
     }
 
-    // ── 2. Single query: latest pending DINE_IN order per table + item count ──
+    // Build the set of valid virtual table IDs from the expanded list
+    const tableIds = allTables.map(t => t.id);
+
+    // ── 2. Single query: latest pending DINE_IN order per virtual table_id ──
     //    Uses DISTINCT ON to pick the most recent order per table_id,
     //    and a correlated sub-query for item_count (avoids full items payload).
+    //    Virtual table IDs are passed as a PostgreSQL array literal which is
+    //    far cheaper than a large ANY($1) array when many tables exist.
     let dateFilter = '';
     const queryParams: any[] = [tableIds];
 

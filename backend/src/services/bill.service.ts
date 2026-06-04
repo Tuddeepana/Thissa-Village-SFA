@@ -231,34 +231,78 @@ class BillService {
       }
     }
 
-    // Fetch total count and paginated items
-    const [total, items] = await Promise.all([
-      (prisma as any).bill.count({ where }),
+    // Build WHERE clause for raw SQL aggregation (mirrors the Prisma `where` object)
+    // We construct a parameterised SQL fragment to avoid code duplication.
+    const aggParams: any[] = [];
+    const aggClauses: string[] = [];
+    let aggIdx = 1;
+
+    if (where.bill_number?.contains) {
+      aggClauses.push(`"bill_number" ILIKE $${aggIdx++}`);
+      aggParams.push(`%${where.bill_number.contains}%`);
+    }
+    if (where.OR) {
+      // search across bill_number OR customer_name
+      const orParts: string[] = [];
+      for (const orClause of where.OR) {
+        if (orClause.bill_number?.contains) {
+          orParts.push(`"bill_number" ILIKE $${aggIdx++}`);
+          aggParams.push(`%${orClause.bill_number.contains}%`);
+        }
+        if (orClause.customer_name?.contains) {
+          orParts.push(`"customer_name" ILIKE $${aggIdx++}`);
+          aggParams.push(`%${orClause.customer_name.contains}%`);
+        }
+      }
+      if (orParts.length > 0) aggClauses.push(`(${orParts.join(' OR ')})`);
+    }
+    if (where.payment_method) {
+      aggClauses.push(`"payment_method" = $${aggIdx++}`);
+      aggParams.push(where.payment_method);
+    }
+    if (where.date?.gte) {
+      aggClauses.push(`"date" >= $${aggIdx++}`);
+      aggParams.push(where.date.gte);
+    }
+    if (where.date?.lte) {
+      aggClauses.push(`"date" <= $${aggIdx++}`);
+      aggParams.push(where.date.lte);
+    }
+
+    const whereSQL = aggClauses.length > 0 ? `WHERE ${aggClauses.join(' AND ')}` : '';
+
+    // Single query replaces 4 separate aggregate() calls — runs in one DB round trip
+    const aggSQL = `
+      SELECT
+        COUNT(*)::int                                                                   AS "totalBills",
+        COALESCE(SUM("total"), 0)                                                      AS "totalRevenue",
+        COALESCE(SUM("total") FILTER (WHERE "payment_method" = 'CASH'),  0)            AS "cash",
+        COALESCE(SUM("total") FILTER (WHERE "payment_method" = 'CARD'),  0)            AS "card",
+        COALESCE(SUM("total") FILTER (WHERE "payment_method" = 'CREDIT'), 0)           AS "credit"
+      FROM "bills"
+      ${whereSQL}
+    `;
+
+    // All 3 queries run in parallel: paginated rows + total count + card aggregates
+    const [items, aggRows] = await Promise.all([
       (prisma as any).bill.findMany({
         where,
         skip: (page - 1) * pageSize,
         take: pageSize,
         orderBy: { createdAt: 'desc' },
       }),
+      (prisma as any).$queryRawUnsafe(aggSQL, ...aggParams),
     ]);
 
-    // Compute card summary aggregates (total revenue and by payment methods)
-    const totalAgg = await (prisma as any).bill.aggregate({ where, _sum: { total: true } });
-    const cashAgg = await (prisma as any).bill.aggregate({ where: { ...where, payment_method: 'CASH' }, _sum: { total: true } });
-    const cardAgg = await (prisma as any).bill.aggregate({ where: { ...where, payment_method: 'CARD' }, _sum: { total: true } });
-    const creditAgg = await (prisma as any).bill.aggregate({ where: { ...where, payment_method: 'CREDIT' }, _sum: { total: true } });
-
-    const totalRevenue = totalAgg?._sum?.total ? String(totalAgg._sum.total) : '0';
-    const cash = cashAgg?._sum?.total ? String(cashAgg._sum.total) : '0';
-    const card = cardAgg?._sum?.total ? String(cardAgg._sum.total) : '0';
-    const credit = creditAgg?._sum?.total ? String(creditAgg._sum.total) : '0';
+    const agg = (aggRows as any[])[0] ?? { totalBills: 0, totalRevenue: '0', cash: '0', card: '0', credit: '0' };
+    const total: number = Number(agg.totalBills);
 
     const cardSummary: CardSummary = {
       totalBills: total,
-      totalRevenue,
-      cash,
-      card,
-      credit,
+      totalRevenue: String(agg.totalRevenue),
+      cash: String(agg.cash),
+      card: String(agg.card),
+      credit: String(agg.credit),
     };
 
     // Normalize items to DTO shape
