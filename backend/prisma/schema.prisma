@@ -91,6 +91,7 @@ model RestaurantTable {
   updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
 
+  @@index([deletedAt], name: "idx_restaurant_table_deleted")
   @@map("restaurant_tables")
 }
 
@@ -233,6 +234,9 @@ model Bill {
   updatedAt DateTime @updatedAt
 
   @@index([date], name: "idx_bill_date")
+  @@index([payment_method], name: "idx_bill_payment_method")
+  @@index([date(sort: Desc), payment_method], name: "idx_bill_date_payment")
+  @@index([createdAt(sort: Desc)], name: "idx_bill_created_at")
   @@map("bills")
 }
 
@@ -314,6 +318,8 @@ model Order {
 
   @@index([status, order_type, table_id], name: "idx_order_status_type_table")
   @@index([status, createdAt], name: "idx_order_status_created")
+  // Partial-like index for fast pending DINE_IN table lookups (table-status endpoint)
+  @@index([table_id, createdAt(sort: Desc)], name: "idx_order_table_created")
   @@map("orders")
 }
 

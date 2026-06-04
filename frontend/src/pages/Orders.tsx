@@ -71,10 +71,14 @@ const Orders = () => {
   const [customerTypeFilter, setCustomerTypeFilter] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isLoadingOrder, setIsLoadingOrder] = useState(false);
   const [isAddItemDialogOpen, setIsAddItemDialogOpen] = useState(false);
+  const [isAddingItem, setIsAddingItem] = useState(false);
+  const [isCancellingOrder, setIsCancellingOrder] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [kotRemark, setKotRemark] = useState("");
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isSendingKot, setIsSendingKot] = useState(false);
   const [kotSentOrderItemIds, setKotSentOrderItemIds] = useState<Set<string>>(new Set());
   const [serviceCharge, setServiceCharge] = useState<ServiceCharge | null>(null);
   const [stats, setStats] = useState<OrderStats>({
@@ -205,15 +209,20 @@ const Orders = () => {
   }, [selectedOrder, selectedOrderServiceCharge]);
 
   const handleViewOrder = async (order: Order) => {
+    // Open dialog immediately with loading state (same approach as Bills page)
+    setIsLoadingOrder(true);
+    setSelectedOrder(null);
+    setIsViewDialogOpen(true);
+    setKotSentOrderItemIds(new Set());
     try {
       // Fetch full order details
       const fullOrder = await orderService.getOrderById(order.id);
       setSelectedOrder(fullOrder);
-      setKotSentOrderItemIds(new Set());
-      setIsViewDialogOpen(true);
     } catch (error) {
       console.error("Failed to fetch order details", error);
       toast.error("Failed to load order details");
+    } finally {
+      setIsLoadingOrder(false);
     }
   };
 
@@ -223,6 +232,7 @@ const Orders = () => {
     const product = products.find((p) => p.productId === selectedProductId);
     if (!product) return;
 
+    setIsAddingItem(true);
     try {
       // Get the price based on the order's customer type
       const customerType = selectedOrder.customer_type as "local" | "foreigner";
@@ -249,6 +259,8 @@ const Orders = () => {
       console.error("Failed to add item", error);
       const msg = error?.response?.data?.message ?? "Failed to add item";
       toast.error(msg);
+    } finally {
+      setIsAddingItem(false);
     }
   };
 
@@ -275,9 +287,13 @@ const Orders = () => {
   const handleSendOrderKot = async () => {
     if (!selectedOrder) return;
     const unsentItems = selectedOrder.items.filter(item => !item.kot_sent && !kotSentOrderItemIds.has(item.id));
-    if (unsentItems.length === 0) return;
+    if (unsentItems.length === 0) {
+      toast.error("All items have already been sent to the kitchen");
+      return;
+    }
 
     try {
+      setIsSendingKot(true);
       const stewardName = selectedOrder.steward_name || currentUser.name;
       const tableName = selectedOrder.table_name || "Take Away";
       const kotItems = unsentItems.map(item => {
@@ -324,10 +340,13 @@ const Orders = () => {
     } catch (err) {
       console.error("Failed to send KOT", err);
       toast.error("Failed to send KOT");
+    } finally {
+      setIsSendingKot(false);
     }
   };
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatusType) => {
+    if (newStatus === OrderStatus.CANCELLED) setIsCancellingOrder(true);
     try {
       const updatedOrder = await orderService.updateOrderStatus(orderId, { status: newStatus });
       setOrders(orders.map((o) => (o.id === orderId ? updatedOrder : o)));
@@ -340,6 +359,8 @@ const Orders = () => {
       console.error("Failed to update status", error);
       const msg = error?.response?.data?.message ?? "Failed to update status";
       toast.error(msg);
+    } finally {
+      setIsCancellingOrder(false);
     }
   };
 
@@ -397,7 +418,7 @@ const Orders = () => {
   };
 
   const handleConfirmPayment = async (
-    paymentMethod: 'cash' | 'card' | 'credit' | 'other',
+    paymentMethod: 'cash' | 'card' | 'credit',
     amountPaid: number,
     creditDescription?: string
   ) => {
@@ -743,14 +764,21 @@ const Orders = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ClipboardList className="h-5 w-5" />
-              Order Details - {selectedOrder?.order_number}
+              Order Details{selectedOrder ? ` - ${selectedOrder.order_number}` : ''}
             </DialogTitle>
             <DialogDescription>
               View and manage order details
             </DialogDescription>
           </DialogHeader>
 
-          {selectedOrder && (
+          {isLoadingOrder && (
+            <div className="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
+              <RefreshCw className="h-8 w-8 animate-spin" />
+              <p className="text-sm">Loading order details...</p>
+            </div>
+          )}
+
+          {!isLoadingOrder && selectedOrder && (
             <div className="space-y-4">
               {/* Customer Info */}
               <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
@@ -785,9 +813,13 @@ const Orders = () => {
                       size="sm" 
                       variant="destructive"
                       onClick={() => handleUpdateOrderStatus(selectedOrder.id, OrderStatus.CANCELLED)}
+                      disabled={isCancellingOrder}
                     >
-                      <X className="h-4 w-4 mr-1" />
-                      Cancel Order
+                      {isCancellingOrder ? (
+                        <><RefreshCw className="h-4 w-4 mr-1 animate-spin" />Cancelling...</>
+                      ) : (
+                        <><X className="h-4 w-4 mr-1" />Cancel Order</>
+                      )}
                     </Button>
                   </div>
                 )}
@@ -837,8 +869,10 @@ const Orders = () => {
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => handleDeleteItemFromOrder(item.id)}
+                                disabled={item.kot_sent || kotSentOrderItemIds.has(item.id)}
+                                title={item.kot_sent || kotSentOrderItemIds.has(item.id) ? "Cannot remove item after KOT is sent" : undefined}
                               >
-                                <Trash2 className="h-4 w-4 text-red-500" />
+                                <Trash2 className={`h-4 w-4 ${item.kot_sent || kotSentOrderItemIds.has(item.id) ? 'text-muted-foreground' : 'text-red-500'}`} />
                               </Button>
                             </TableCell>
                           )}
@@ -906,10 +940,10 @@ const Orders = () => {
               <Button
                 className="bg-green-600 hover:bg-green-700 text-white disabled:bg-orange-500 disabled:opacity-100"
                 onClick={handleSendOrderKot}
-                disabled={isPrinting || !hasUnsentOrderItems}
+                disabled={isSendingKot || isPrinting}
               >
                 <UtensilsCrossed className="h-4 w-4 mr-2" />
-                {hasUnsentOrderItems ? "Send KOT" : "KOT Sent ✓"}
+                {isSendingKot ? "Sending..." : (hasUnsentOrderItems ? "Send KOT" : "KOT Sent ✓")}
               </Button>
             )}
             <Button variant="outline" onClick={() => handlePrintBill(selectedOrder!)} disabled={isPrinting}>
@@ -967,11 +1001,15 @@ const Orders = () => {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddItemDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsAddItemDialogOpen(false)} disabled={isAddingItem}>
               Cancel
             </Button>
-            <Button onClick={handleAddItemToOrder} disabled={!selectedProductId}>
-              Add Item
+            <Button onClick={handleAddItemToOrder} disabled={!selectedProductId || isAddingItem}>
+              {isAddingItem ? (
+                <><RefreshCw className="h-4 w-4 mr-1 animate-spin" />Adding...</>
+              ) : (
+                'Add Item'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

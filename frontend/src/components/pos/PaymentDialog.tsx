@@ -24,7 +24,7 @@ interface PaymentDialogProps {
   onOpenChange: (open: boolean) => void;
   total: number;
   onConfirmPayment: (
-    paymentMethod: 'cash' | 'card' | 'credit' | 'other',
+    paymentMethod: 'cash' | 'card' | 'credit',
     amountPaid: number,
     creditDescription?: string
   ) => void;
@@ -38,7 +38,7 @@ export function PaymentDialog({
   onConfirmPayment,
   isPrinting = false,
 }: PaymentDialogProps) {
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'credit' | 'other'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'credit'>('cash');
   const [amountPaid, setAmountPaid] = useState(total.toString());
   const [creditDescription, setCreditDescription] = useState("");
 
@@ -89,7 +89,7 @@ export function PaymentDialog({
             <Label htmlFor="paymentMethod">Payment Method</Label>
             <Select
               value={paymentMethod}
-              onValueChange={(value) => setPaymentMethod(value as 'cash' | 'card' | 'credit' | 'other')}
+              onValueChange={(value) => setPaymentMethod(value as 'cash' | 'card' | 'credit')}
             >
               <SelectTrigger id="paymentMethod">
                 <SelectValue />
@@ -98,7 +98,7 @@ export function PaymentDialog({
                 <SelectItem value="cash">Cash</SelectItem>
                 <SelectItem value="card">Card</SelectItem>
                 <SelectItem value="credit">Credit</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+
               </SelectContent>
             </Select>
           </div>
