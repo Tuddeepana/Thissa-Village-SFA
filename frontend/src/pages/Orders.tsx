@@ -69,6 +69,7 @@ const Orders = () => {
   const [statusFilter, setStatusFilter] = useState<string>("PENDING");
   const [orderTypeFilter, setOrderTypeFilter] = useState<string>("all");
   const [customerTypeFilter, setCustomerTypeFilter] = useState<string>("all");
+  const [todayOnly, setTodayOnly] = useState<boolean>(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isLoadingOrder, setIsLoadingOrder] = useState(false);
@@ -114,12 +115,23 @@ const Orders = () => {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const result = await orderService.listOrders({
+      const queryParams: any = {
         status: statusFilter !== "all" ? (statusFilter as OrderStatusType) : undefined,
         order_type: orderTypeFilter !== "all" ? (orderTypeFilter as OrderType) : undefined,
         customer_type: customerTypeFilter !== "all" ? (customerTypeFilter as 'local' | 'foreigner') : undefined,
         pageSize: 100,
-      });
+      };
+      
+      if (todayOnly) {
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        const end = new Date();
+        end.setHours(23, 59, 59, 999);
+        queryParams.date_from = start.toISOString();
+        queryParams.date_to = end.toISOString();
+      }
+
+      const result = await orderService.listOrders(queryParams);
       setOrders(result.orders);
     } catch (error) {
       console.error("Failed to fetch orders", error);
@@ -165,7 +177,7 @@ const Orders = () => {
     fetchStats();
     fetchProducts();
     fetchServiceCharge();
-  }, [statusFilter, orderTypeFilter, customerTypeFilter]);
+  }, [statusFilter, orderTypeFilter, customerTypeFilter, todayOnly]);
 
   // Filter orders (client-side for search) and sort pending to top
   const filteredOrders = useMemo(() => {
@@ -397,8 +409,11 @@ const Orders = () => {
         taxRate: order.tax > 0 ? (order.tax / order.subtotal) * 100 : 0,
         discount: order.discount,
         discountRate: order.discount > 0 ? (order.discount / order.subtotal) * 100 : 0,
-        total: order.total,
-        customerName: order.customer_name,
+        serviceCharge: order.order_type === "DINE_IN" && serviceCharge?.isActive ? ((Math.max(0, order.subtotal - order.discount) * Number(serviceCharge.percentage || 0)) / 100) : 0,
+        serviceChargeRate: order.order_type === "DINE_IN" && serviceCharge?.isActive ? Number(serviceCharge.percentage || 0) : 0,
+        total: order.total + (order.order_type === "DINE_IN" && serviceCharge?.isActive ? ((Math.max(0, order.subtotal - order.discount) * Number(serviceCharge.percentage || 0)) / 100) : 0),
+        customerName: order.customer_name || undefined,
+        cashierName: order.cashier_name || currentUser.name,
         customerPhone: order.customer_phone,
         paymentMethod: 'cash',
         amountPaid: 0,
@@ -519,7 +534,8 @@ const Orders = () => {
         serviceCharge: serviceChargeAmount,
         serviceChargeRate: serviceChargePercentage,
         total: totalWithServiceCharge,
-        customerName: currentUser.name, // Cashier name shown on receipt
+        customerName: selectedOrder.customer_name || undefined,
+        cashierName: selectedOrder.cashier_name || currentUser.name,
         customerPhone: selectedOrder.customer_phone,
         paymentMethod,
         amountPaid: paymentMethod === "credit" ? 0 : amountPaid,
@@ -642,7 +658,16 @@ const Orders = () => {
                 <SelectItem value="foreigner">Foreigner</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" onClick={() => { setSearchQuery(""); setStatusFilter("PENDING"); setOrderTypeFilter("all"); setCustomerTypeFilter("all"); fetchOrders(); }}>
+            <label className="flex items-center gap-2 text-sm font-medium whitespace-nowrap cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={todayOnly} 
+                onChange={(e) => setTodayOnly(e.target.checked)} 
+                className="rounded border-gray-300 w-4 h-4 cursor-pointer"
+              />
+              Today
+            </label>
+            <Button variant="outline" onClick={() => { setSearchQuery(""); setStatusFilter("PENDING"); setOrderTypeFilter("all"); setCustomerTypeFilter("all"); setTodayOnly(true); fetchOrders(); }}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
