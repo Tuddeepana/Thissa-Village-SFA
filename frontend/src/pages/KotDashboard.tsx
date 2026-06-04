@@ -45,7 +45,8 @@ import { KotLogDTO } from "@/types/kot.types";
 import { User as AppUser } from "@/types/user.types";
 import { ROLES, STORAGE_KEYS } from "@/utils/constants";
 import LocalLoader from "@/components/common/LocalLoader";
-import { formatDistanceToNow, isToday, format } from "date-fns";
+import { formatDistanceToNow, isToday } from "date-fns";
+import { formatSL } from "@/utils/dateUtils";
 import { toast } from "sonner";
 import {
   Breadcrumb,
@@ -314,7 +315,7 @@ const KotDashboard = () => {
                             <TableCell>
                               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <Clock className="h-3 w-3" />
-                                {format(new Date(kot.createdAt), "HH:mm")}
+                                {formatSL(new Date(kot.createdAt), "HH:mm")}
                               </div>
                             </TableCell>
                             <TableCell>
@@ -411,7 +412,7 @@ const KotDashboard = () => {
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Clock className="h-4 w-4 text-muted-foreground" />
-                  {format(new Date(selectedKot.createdAt), "dd/MM/yyyy HH:mm")}
+                  {formatSL(new Date(selectedKot.createdAt), "dd/MM/yyyy HH:mm")}
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <User className="h-4 w-4 text-muted-foreground" />

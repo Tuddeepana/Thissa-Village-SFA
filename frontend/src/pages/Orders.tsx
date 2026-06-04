@@ -47,12 +47,12 @@ import {
   Globe,
   Users,
 } from "lucide-react";
-import { format } from "date-fns";
+import { formatSL, startOfDaySL, endOfDaySL } from "@/utils/dateUtils";
 import { toast } from "sonner";
 import { orderService } from "@/api/services/orderService";
 import api from "@/api/client";
 import { OrderStatus, OrderType } from "@/types/order.types";
-import type { Order, OrderStatus as OrderStatusType, OrderStats } from "@/types/order.types";
+import type { Order, OrderStatus as OrderStatusType } from "@/types/order.types";
 import type { MyStockResponse, MyStockTableRow } from "@/types/mystock";
 import { printBillNewWindow } from "@/lib/billPrinter";
 import { printKotSlip } from "@/lib/kotPrinter";
@@ -82,12 +82,7 @@ const Orders = () => {
   const [isSendingKot, setIsSendingKot] = useState(false);
   const [kotSentOrderItemIds, setKotSentOrderItemIds] = useState<Set<string>>(new Set());
   const [serviceCharge, setServiceCharge] = useState<ServiceCharge | null>(null);
-  const [stats, setStats] = useState<OrderStats>({
-    pending: 0,
-    completed: 0,
-    cancelled: 0,
-    total: 0,
-  });
+
 
   // Products for adding items
   const [products, setProducts] = useState<MyStockTableRow[]>([]);
@@ -111,24 +106,22 @@ const Orders = () => {
     terminalId: "T-001",
   };
 
-  // Fetch orders
+  // Fetch orders — always fetches ALL statuses so stat cards can compute
+  // per-status counts+amounts that respect the current orderType/customerType/date filters.
+  // Status filter is applied client-side in filteredOrders.
   const fetchOrders = async () => {
     setLoading(true);
     try {
       const queryParams: any = {
-        status: statusFilter !== "all" ? (statusFilter as OrderStatusType) : undefined,
+        // No status filter — fetch all statuses so cards are accurate
         order_type: orderTypeFilter !== "all" ? (orderTypeFilter as OrderType) : undefined,
         customer_type: customerTypeFilter !== "all" ? (customerTypeFilter as 'local' | 'foreigner') : undefined,
-        pageSize: 100,
+        pageSize: 500,
       };
-      
+
       if (todayOnly) {
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
-        const end = new Date();
-        end.setHours(23, 59, 59, 999);
-        queryParams.date_from = start.toISOString();
-        queryParams.date_to = end.toISOString();
+        queryParams.date_from = startOfDaySL().toISOString();
+        queryParams.date_to = endOfDaySL().toISOString();
       }
 
       const result = await orderService.listOrders(queryParams);
@@ -138,16 +131,6 @@ const Orders = () => {
       toast.error("Failed to load orders");
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Fetch stats
-  const fetchStats = async () => {
-    try {
-      const data = await orderService.getOrderStats();
-      setStats(data);
-    } catch (error) {
-      console.error("Failed to fetch stats", error);
     }
   };
 
@@ -174,34 +157,45 @@ const Orders = () => {
 
   useEffect(() => {
     fetchOrders();
-    fetchStats();
     fetchProducts();
     fetchServiceCharge();
-  }, [statusFilter, orderTypeFilter, customerTypeFilter, todayOnly]);
+  // statusFilter intentionally excluded — it is applied client-side so no re-fetch needed
+  }, [orderTypeFilter, customerTypeFilter, todayOnly]);
 
-  // Filter orders (client-side for search) and sort pending to top
+  // Filter orders: apply status filter client-side + search query
   const filteredOrders = useMemo(() => {
     const filtered = orders.filter((order) => {
+      const matchesStatus = statusFilter === "all" || order.status === statusFilter;
       const matchesSearch =
         order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
         order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         order.customer_phone.includes(searchQuery);
-      return matchesSearch;
+      return matchesStatus && matchesSearch;
     });
 
     // Sort: PENDING status first, then by creation time (newest first)
     return filtered.sort((a, b) => {
-      // If one is PENDING and the other isn't, PENDING comes first
-      if (a.status === OrderStatus.PENDING && b.status !== OrderStatus.PENDING) {
-        return -1;
-      }
-      if (a.status !== OrderStatus.PENDING && b.status === OrderStatus.PENDING) {
-        return 1;
-      }
-      // If both are PENDING or both are non-PENDING, sort by creation time (newest first)
+      if (a.status === OrderStatus.PENDING && b.status !== OrderStatus.PENDING) return -1;
+      if (a.status !== OrderStatus.PENDING && b.status === OrderStatus.PENDING) return 1;
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
-  }, [orders, searchQuery]);
+  }, [orders, searchQuery, statusFilter]);
+
+  // Per-status stats derived from the full orders list (already filtered by orderType/customerType/date)
+  const pendingStats = useMemo(() => {
+    const list = orders.filter(o => o.status === OrderStatus.PENDING);
+    return { count: list.length, amount: list.reduce((s, o) => s + o.total, 0) };
+  }, [orders]);
+
+  const completedStats = useMemo(() => {
+    const list = orders.filter(o => o.status === OrderStatus.COMPLETED);
+    return { count: list.length, amount: list.reduce((s, o) => s + o.total, 0) };
+  }, [orders]);
+
+  const cancelledStats = useMemo(() => {
+    const list = orders.filter(o => o.status === OrderStatus.CANCELLED);
+    return { count: list.length, amount: list.reduce((s, o) => s + o.total, 0) };
+  }, [orders]);
 
   // Calculate service charge for selected order (for display in view dialog)
   const selectedOrderServiceCharge = useMemo(() => {
@@ -366,7 +360,6 @@ const Orders = () => {
         setSelectedOrder(updatedOrder);
       }
       toast.success(`Order status updated to ${newStatus}`);
-      fetchStats(); // Refresh stats
     } catch (error: any) {
       console.error("Failed to update status", error);
       const msg = error?.response?.data?.message ?? "Failed to update status";
@@ -585,29 +578,32 @@ const Orders = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardHeader className="p-4 pb-2">
+      <div className="grid grid-cols-3 gap-4">
+        <Card className={`cursor-pointer transition-all ${statusFilter === "PENDING" ? "ring-2 ring-yellow-400" : ""}`} onClick={() => setStatusFilter(statusFilter === "PENDING" ? "all" : "PENDING")}>
+          <CardHeader className="p-4 pb-1">
             <CardTitle className="text-sm font-medium text-yellow-600">Pending</CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold">{stats.pending}</div>
+            <div className="text-2xl font-bold">{pendingStats.count}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Rs. {pendingStats.amount.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="p-4 pb-2">
+        <Card className={`cursor-pointer transition-all ${statusFilter === "COMPLETED" ? "ring-2 ring-green-400" : ""}`} onClick={() => setStatusFilter(statusFilter === "COMPLETED" ? "all" : "COMPLETED")}>
+          <CardHeader className="p-4 pb-1">
             <CardTitle className="text-sm font-medium text-green-600">Completed</CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold">{stats.completed}</div>
+            <div className="text-2xl font-bold">{completedStats.count}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Rs. {completedStats.amount.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="p-4 pb-2">
+        <Card className={`cursor-pointer transition-all ${statusFilter === "CANCELLED" ? "ring-2 ring-red-400" : ""}`} onClick={() => setStatusFilter(statusFilter === "CANCELLED" ? "all" : "CANCELLED")}>
+          <CardHeader className="p-4 pb-1">
             <CardTitle className="text-sm font-medium text-red-600">Cancelled</CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold">{stats.cancelled}</div>
+            <div className="text-2xl font-bold">{cancelledStats.count}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Rs. {cancelledStats.amount.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </CardContent>
         </Card>
       </div>
@@ -659,10 +655,10 @@ const Orders = () => {
               </SelectContent>
             </Select>
             <label className="flex items-center gap-2 text-sm font-medium whitespace-nowrap cursor-pointer">
-              <input 
-                type="checkbox" 
-                checked={todayOnly} 
-                onChange={(e) => setTodayOnly(e.target.checked)} 
+              <input
+                type="checkbox"
+                checked={todayOnly}
+                onChange={(e) => setTodayOnly(e.target.checked)}
                 className="rounded border-gray-300 w-4 h-4 cursor-pointer"
               />
               Today
@@ -689,95 +685,95 @@ const Orders = () => {
           ) : (
             <div className="rounded-md border">
               <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order #</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Customer Type</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Table</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredOrders.length === 0 ? (
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                      No orders found
-                    </TableCell>
+                    <TableHead>Order #</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Customer Type</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Table</TableHead>
+                    <TableHead>Items</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ) : (
-                  filteredOrders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-medium">{order.order_number}</TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{order.customer_name}</div>
-                          <div className="text-xs text-muted-foreground">{order.customer_phone}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={order.customer_type === "foreigner"
-                            ? "bg-blue-50 text-blue-700 border-blue-200"
-                            : "bg-green-50 text-green-700 border-green-200"
-                          }
-                        >
-                          {order.customer_type === "foreigner" ? (
-                            <><Globe className="h-3 w-3 mr-1" /> Foreigner</>
-                          ) : (
-                            <><Users className="h-3 w-3 mr-1" /> Local</>
-                          )}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {order.order_type === "DINE_IN" ? (
-                            <><UtensilsCrossed className="h-3 w-3 mr-1" /> Dine In</>
-                          ) : (
-                            <><Package className="h-3 w-3 mr-1" /> Take Away</>
-                          )}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {order.table_name ? order.table_name : order.order_type === "DINE_IN" ? "Table -" : "-"}
-                      </TableCell>
-                      <TableCell>{order.items.length} items</TableCell>
-                      <TableCell className="font-medium">Rs.{order.total.toFixed(0)}</TableCell>
-                      <TableCell>{getStatusBadge(order.status)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          {format(new Date(order.createdAt), "HH:mm")}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleViewOrder(order)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handlePrintBill(order)}
-                            disabled={isPrinting}
-                          >
-                            <Printer className="h-4 w-4" />
-                          </Button>
-                        </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredOrders.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                        No orders found
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
+                  ) : (
+                    filteredOrders.map((order) => (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-medium">{order.order_number}</TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{order.customer_name}</div>
+                            <div className="text-xs text-muted-foreground">{order.customer_phone}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={order.customer_type === "foreigner"
+                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                              : "bg-green-50 text-green-700 border-green-200"
+                            }
+                          >
+                            {order.customer_type === "foreigner" ? (
+                              <><Globe className="h-3 w-3 mr-1" /> Foreigner</>
+                            ) : (
+                              <><Users className="h-3 w-3 mr-1" /> Local</>
+                            )}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {order.order_type === "DINE_IN" ? (
+                              <><UtensilsCrossed className="h-3 w-3 mr-1" /> Dine In</>
+                            ) : (
+                              <><Package className="h-3 w-3 mr-1" /> Take Away</>
+                            )}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {order.table_name ? order.table_name : order.order_type === "DINE_IN" ? "Table -" : "-"}
+                        </TableCell>
+                        <TableCell>{order.items.length} items</TableCell>
+                        <TableCell className="font-medium">Rs.{order.total.toFixed(0)}</TableCell>
+                        <TableCell>{getStatusBadge(order.status)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                                        {formatSL(new Date(order.createdAt), "HH:mm")}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleViewOrder(order)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handlePrintBill(order)}
+                              disabled={isPrinting}
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -824,7 +820,7 @@ const Orders = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span>{format(new Date(selectedOrder.createdAt), "dd/MM/yyyy HH:mm")}</span>
+                  <span>{formatSL(new Date(selectedOrder.createdAt), "dd/MM/yyyy HH:mm")}</span>
                 </div>
               </div>
 
@@ -834,8 +830,8 @@ const Orders = () => {
                 {getStatusBadge(selectedOrder.status)}
                 {selectedOrder.status === "PENDING" && (
                   <div className="flex gap-2 ml-auto">
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       variant="destructive"
                       onClick={() => handleUpdateOrderStatus(selectedOrder.id, OrderStatus.CANCELLED)}
                       disabled={isCancellingOrder}
