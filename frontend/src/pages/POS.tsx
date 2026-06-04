@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -127,6 +127,10 @@ const POS = () => {
   const [isPrinting, setIsPrinting] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
+  // Refs for performance: AbortController for fetch cancellation, dedup guard
+  const tableAbortRef = useRef<AbortController | null>(null);
+  const tableFetchInProgressRef = useRef(false);
+
   // Get current user info
   const currentUser = {
     name: (() => {
@@ -142,25 +146,32 @@ const POS = () => {
     terminalId: "T-001", // Hardcoded terminal ID
   };
 
-  // Persist POS cart to localStorage
+  // Persist cart data immediately (critical — must not lose items on crash)
   useEffect(() => {
     localStorage.setItem("pos_billItems", JSON.stringify(billItems));
     localStorage.setItem("pos_kotSentItemIds", JSON.stringify(Array.from(kotSentItemIds)));
-    localStorage.setItem("pos_customerName", customerName);
-    localStorage.setItem("pos_customerPhone", customerPhone);
-    localStorage.setItem("pos_customerType", customerType);
-    localStorage.setItem("pos_orderType", orderType);
-    if (selectedTable) {
-      localStorage.setItem("pos_selectedTable", selectedTable);
-    } else {
-      localStorage.removeItem("pos_selectedTable");
-    }
-    localStorage.setItem("pos_taxRate", taxRate.toString());
-    localStorage.setItem("pos_discountRate", discountRate.toString());
-    localStorage.setItem("pos_selectedSteward", selectedSteward);
-    localStorage.setItem("pos_kotRemark", kotRemark);
     localStorage.setItem("pos_unlinkedKotIds", JSON.stringify(Array.from(unlinkedKotIds)));
-  }, [billItems, kotSentItemIds, unlinkedKotIds, customerName, customerPhone, customerType, orderType, selectedTable, taxRate, discountRate, selectedSteward, kotRemark]);
+  }, [billItems, kotSentItemIds, unlinkedKotIds]);
+
+  // Persist form fields with debounce (500ms) — prevents 12 localStorage writes per keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      localStorage.setItem("pos_customerName", customerName);
+      localStorage.setItem("pos_customerPhone", customerPhone);
+      localStorage.setItem("pos_customerType", customerType);
+      localStorage.setItem("pos_orderType", orderType);
+      if (selectedTable) {
+        localStorage.setItem("pos_selectedTable", selectedTable);
+      } else {
+        localStorage.removeItem("pos_selectedTable");
+      }
+      localStorage.setItem("pos_taxRate", taxRate.toString());
+      localStorage.setItem("pos_discountRate", discountRate.toString());
+      localStorage.setItem("pos_selectedSteward", selectedSteward);
+      localStorage.setItem("pos_kotRemark", kotRemark);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [customerName, customerPhone, customerType, orderType, selectedTable, taxRate, discountRate, selectedSteward, kotRemark]);
 
   // Fetch stewards
   useEffect(() => {
@@ -177,11 +188,24 @@ const POS = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // Function to refresh table status from server
-  const refreshTableStatus = async () => {
+  // Unified table fetch function — used on mount, polling, and after order creation
+  // Uses AbortController to cancel stale requests and a dedup ref to prevent overlap
+  const fetchTables = useCallback(async (showErrorToast = false) => {
+    // Deduplication: skip if a fetch is already in progress
+    if (tableFetchInProgressRef.current) return;
+    tableFetchInProgressRef.current = true;
+
+    // Cancel any previous in-flight request
+    if (tableAbortRef.current) {
+      tableAbortRef.current.abort();
+    }
+    const abortController = new AbortController();
+    tableAbortRef.current = abortController;
+
     try {
       // Get table status which includes occupancy information
       const statusResponse = await orderService.getTableStatus({ status: 'all' });
+      if (abortController.signal.aborted) return;
 
       // Extract table info from status response
       const tableStatusMap = new Map(
@@ -190,6 +214,7 @@ const POS = () => {
 
       // Also get the base table structure
       const baseResponse = await tableService.getExpanded();
+      if (abortController.signal.aborted) return;
 
       const expandedTables: ExpandedTableItem[] = baseResponse.tables || [];
       const mappedTables: TableInfo[] = expandedTables.map((t) => ({
@@ -202,54 +227,45 @@ const POS = () => {
         orderId: undefined,
       }));
       setTables(mappedTables);
-    } catch (err) {
-      console.error("Failed to refresh tables", err);
+    } catch (err: any) {
+      // Don't log or toast for intentionally aborted requests
+      if (err?.name === 'AbortError' || abortController.signal.aborted) return;
+      console.error("Failed to load tables", err);
+      if (showErrorToast) toast.error("Failed to load tables");
+    } finally {
+      tableFetchInProgressRef.current = false;
     }
-  };
+  }, []);
 
-  // Fetch tables from API
+  // Fetch tables on mount + poll every 60s (reduced from 30s)
+  // Pauses polling when tab is hidden to save server resources
   useEffect(() => {
-    let cancelled = false;
-    const fetchTables = async () => {
-      try {
-        // Get table status which includes occupancy information
-        const statusResponse = await orderService.getTableStatus({ status: 'all' });
-        if (cancelled) return;
+    // Initial fetch
+    fetchTables(true);
 
-        // Extract table info from status response
-        const tableStatusMap = new Map(
-          (statusResponse.tables || []).map((t: any) => [t.table_id, t.status])
-        );
+    // Polling interval — 60s instead of 30s to halve server load
+    let interval = setInterval(() => fetchTables(), 60000);
 
-        // Also get the base table structure
-        const baseResponse = await tableService.getExpanded();
-        if (cancelled) return;
-
-        const expandedTables: ExpandedTableItem[] = baseResponse.tables || [];
-        const mappedTables: TableInfo[] = expandedTables.map((t) => ({
-          id: t.id,
-          displayName: t.displayName,
-          baseName: t.baseName,
-          tableNumber: t.tableNumber,
-          table_type: t.table_type,
-          status: (tableStatusMap.get(t.id) === 'occupied' ? 'occupied' : 'free') as 'free' | 'occupied',
-          orderId: undefined,
-        }));
-        setTables(mappedTables);
-      } catch (err) {
-        console.error("Failed to load tables", err);
-        toast.error("Failed to load tables");
+    // Pause/resume polling based on tab visibility
+    const handleVisibility = () => {
+      if (document.hidden) {
+        // Tab hidden — stop polling
+        clearInterval(interval);
+      } else {
+        // Tab visible again — fetch immediately and restart polling
+        fetchTables();
+        interval = setInterval(() => fetchTables(), 60000);
       }
     };
-    fetchTables();
+    document.addEventListener('visibilitychange', handleVisibility);
 
-    // Set up interval to refresh table status every 30 seconds to catch status changes
-    const interval = setInterval(fetchTables, 30000);
     return () => {
-      cancelled = true;
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      // Abort any in-flight request on unmount
+      if (tableAbortRef.current) tableAbortRef.current.abort();
     };
-  }, []);
+  }, [fetchTables]);
 
   // Fetch products from /api/mystock and map to POS Product shape
   useEffect(() => {
@@ -648,7 +664,7 @@ const POS = () => {
 
       // Refresh table status from server to ensure it's up-to-date
       setTimeout(() => {
-        refreshTableStatus();
+        fetchTables();
       }, 500);
 
       // Clear the form silently before navigating so state doesn't persist
