@@ -27,10 +27,12 @@ import {
 import {
     Sidebar,
     SidebarContent,
+    SidebarFooter,
     SidebarGroup,
     SidebarGroupContent,
     SidebarMenu,
     SidebarMenuItem,
+    useSidebar,
 } from "@/components/ui/sidebar";
 import resturentLogo from "@/assets/images/village-bar-logo.png";
 import { cn } from "@/lib/utils";
@@ -184,6 +186,7 @@ function CollapsibleMenuGroup({ group }: { group: MenuGroup }) {
 export function AppSidebar() {
     const location = useLocation();
     const [selectedModule, setSelectedModule] = useState<string | null>(null);
+    const { state } = useSidebar();
 
     useEffect(() => {
         const module = localStorage.getItem("selectedModule");
@@ -243,6 +246,20 @@ export function AppSidebar() {
                     </SidebarGroupContent>
                 </SidebarGroup>
             </SidebarContent>
+            <SidebarFooter className="p-3 border-t bg-sidebar/50 backdrop-blur-sm">
+                <div className={cn(
+                    "flex items-center text-xs text-muted-foreground transition-all duration-200",
+                    state === "collapsed" ? "justify-center" : "justify-between"
+                )}>
+                    {state !== "collapsed" && <span className="font-medium tracking-wide text-muted-foreground/75">System Version</span>}
+                    <span className={cn(
+                        "px-2 py-0.5 rounded-full bg-muted font-mono font-semibold text-foreground/80 border border-border/50",
+                        state === "collapsed" && "text-[10px] px-1"
+                    )}>
+                        v{__APP_VERSION__}
+                    </span>
+                </div>
+            </SidebarFooter>
         </Sidebar>
     );
 }
