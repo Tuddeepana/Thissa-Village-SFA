@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,6 +47,12 @@ import { ROLES, STORAGE_KEYS } from "@/utils/constants";
 import LocalLoader from "@/components/common/LocalLoader";
 import { formatDistanceToNow, isToday, format } from "date-fns";
 import { toast } from "sonner";
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 const KotDashboard = () => {
   const navigate = useNavigate();
@@ -58,6 +64,31 @@ const KotDashboard = () => {
     const raw = localStorage.getItem(STORAGE_KEYS.user);
     try { return raw ? (JSON.parse(raw) as AppUser) : null; } catch { return null; }
   }, []);
+
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const firstName = authUser?.name ? authUser.name.split(" ")[0] : "User";
+
+  const formattedDate = currentTime.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  const formattedTime = currentTime.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  const formattedDateTime = `${formattedDate} · ${formattedTime}`;
 
   const isAdmin = authUser?.role === ROLES.ADMIN;
   const filterSteward = isAdmin ? undefined : authUser?.name;
@@ -116,7 +147,35 @@ const KotDashboard = () => {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Modules
           </Button>
-          <h2 className="text-sm md:text-lg font-semibold text-foreground truncate">
+          
+          {/* Desktop breadcrumb */}
+          <div className="hidden md:block">
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <span className="font-semibold text-foreground text-sm md:text-base">
+                    Restaurant Management
+                  </span>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <span className="text-muted-foreground text-xs md:text-sm font-normal">
+                    {formattedDateTime}
+                  </span>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <span className="text-foreground text-xs md:text-sm font-medium flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    {firstName}
+                  </span>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
+
+          {/* Mobile title */}
+          <h2 className="text-sm font-semibold text-foreground truncate md:hidden">
             Restaurant Management
           </h2>
         </div>

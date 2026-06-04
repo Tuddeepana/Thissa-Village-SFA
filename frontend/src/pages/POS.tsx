@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -126,6 +126,11 @@ const POS = () => {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isSendingKot, setIsSendingKot] = useState(false);
+
+  // Refs for performance: AbortController for fetch cancellation, dedup guard
+  const tableAbortRef = useRef<AbortController | null>(null);
+  const tableFetchInProgressRef = useRef(false);
 
   // Get current user info
   const currentUser = {
@@ -142,25 +147,32 @@ const POS = () => {
     terminalId: "T-001", // Hardcoded terminal ID
   };
 
-  // Persist POS cart to localStorage
+  // Persist cart data immediately (critical — must not lose items on crash)
   useEffect(() => {
     localStorage.setItem("pos_billItems", JSON.stringify(billItems));
     localStorage.setItem("pos_kotSentItemIds", JSON.stringify(Array.from(kotSentItemIds)));
-    localStorage.setItem("pos_customerName", customerName);
-    localStorage.setItem("pos_customerPhone", customerPhone);
-    localStorage.setItem("pos_customerType", customerType);
-    localStorage.setItem("pos_orderType", orderType);
-    if (selectedTable) {
-      localStorage.setItem("pos_selectedTable", selectedTable);
-    } else {
-      localStorage.removeItem("pos_selectedTable");
-    }
-    localStorage.setItem("pos_taxRate", taxRate.toString());
-    localStorage.setItem("pos_discountRate", discountRate.toString());
-    localStorage.setItem("pos_selectedSteward", selectedSteward);
-    localStorage.setItem("pos_kotRemark", kotRemark);
     localStorage.setItem("pos_unlinkedKotIds", JSON.stringify(Array.from(unlinkedKotIds)));
-  }, [billItems, kotSentItemIds, unlinkedKotIds, customerName, customerPhone, customerType, orderType, selectedTable, taxRate, discountRate, selectedSteward, kotRemark]);
+  }, [billItems, kotSentItemIds, unlinkedKotIds]);
+
+  // Persist form fields with debounce (500ms) — prevents 12 localStorage writes per keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      localStorage.setItem("pos_customerName", customerName);
+      localStorage.setItem("pos_customerPhone", customerPhone);
+      localStorage.setItem("pos_customerType", customerType);
+      localStorage.setItem("pos_orderType", orderType);
+      if (selectedTable) {
+        localStorage.setItem("pos_selectedTable", selectedTable);
+      } else {
+        localStorage.removeItem("pos_selectedTable");
+      }
+      localStorage.setItem("pos_taxRate", taxRate.toString());
+      localStorage.setItem("pos_discountRate", discountRate.toString());
+      localStorage.setItem("pos_selectedSteward", selectedSteward);
+      localStorage.setItem("pos_kotRemark", kotRemark);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [customerName, customerPhone, customerType, orderType, selectedTable, taxRate, discountRate, selectedSteward, kotRemark]);
 
   // Fetch stewards
   useEffect(() => {
@@ -177,11 +189,24 @@ const POS = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // Function to refresh table status from server
-  const refreshTableStatus = async () => {
+  // Unified table fetch function — used on mount, polling, and after order creation
+  // Uses AbortController to cancel stale requests and a dedup ref to prevent overlap
+  const fetchTables = useCallback(async (showErrorToast = false) => {
+    // Deduplication: skip if a fetch is already in progress
+    if (tableFetchInProgressRef.current) return;
+    tableFetchInProgressRef.current = true;
+
+    // Cancel any previous in-flight request
+    if (tableAbortRef.current) {
+      tableAbortRef.current.abort();
+    }
+    const abortController = new AbortController();
+    tableAbortRef.current = abortController;
+
     try {
       // Get table status which includes occupancy information
       const statusResponse = await orderService.getTableStatus({ status: 'all' });
+      if (abortController.signal.aborted) return;
 
       // Extract table info from status response
       const tableStatusMap = new Map(
@@ -190,6 +215,7 @@ const POS = () => {
 
       // Also get the base table structure
       const baseResponse = await tableService.getExpanded();
+      if (abortController.signal.aborted) return;
 
       const expandedTables: ExpandedTableItem[] = baseResponse.tables || [];
       const mappedTables: TableInfo[] = expandedTables.map((t) => ({
@@ -202,54 +228,45 @@ const POS = () => {
         orderId: undefined,
       }));
       setTables(mappedTables);
-    } catch (err) {
-      console.error("Failed to refresh tables", err);
+    } catch (err: any) {
+      // Don't log or toast for intentionally aborted requests
+      if (err?.name === 'AbortError' || abortController.signal.aborted) return;
+      console.error("Failed to load tables", err);
+      if (showErrorToast) toast.error("Failed to load tables");
+    } finally {
+      tableFetchInProgressRef.current = false;
     }
-  };
+  }, []);
 
-  // Fetch tables from API
+  // Fetch tables on mount + poll every 60s (reduced from 30s)
+  // Pauses polling when tab is hidden to save server resources
   useEffect(() => {
-    let cancelled = false;
-    const fetchTables = async () => {
-      try {
-        // Get table status which includes occupancy information
-        const statusResponse = await orderService.getTableStatus({ status: 'all' });
-        if (cancelled) return;
+    // Initial fetch
+    fetchTables(true);
 
-        // Extract table info from status response
-        const tableStatusMap = new Map(
-          (statusResponse.tables || []).map((t: any) => [t.table_id, t.status])
-        );
+    // Polling interval — 60s instead of 30s to halve server load
+    let interval = setInterval(() => fetchTables(), 60000);
 
-        // Also get the base table structure
-        const baseResponse = await tableService.getExpanded();
-        if (cancelled) return;
-
-        const expandedTables: ExpandedTableItem[] = baseResponse.tables || [];
-        const mappedTables: TableInfo[] = expandedTables.map((t) => ({
-          id: t.id,
-          displayName: t.displayName,
-          baseName: t.baseName,
-          tableNumber: t.tableNumber,
-          table_type: t.table_type,
-          status: (tableStatusMap.get(t.id) === 'occupied' ? 'occupied' : 'free') as 'free' | 'occupied',
-          orderId: undefined,
-        }));
-        setTables(mappedTables);
-      } catch (err) {
-        console.error("Failed to load tables", err);
-        toast.error("Failed to load tables");
+    // Pause/resume polling based on tab visibility
+    const handleVisibility = () => {
+      if (document.hidden) {
+        // Tab hidden — stop polling
+        clearInterval(interval);
+      } else {
+        // Tab visible again — fetch immediately and restart polling
+        fetchTables();
+        interval = setInterval(() => fetchTables(), 60000);
       }
     };
-    fetchTables();
+    document.addEventListener('visibilitychange', handleVisibility);
 
-    // Set up interval to refresh table status every 30 seconds to catch status changes
-    const interval = setInterval(fetchTables, 30000);
     return () => {
-      cancelled = true;
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      // Abort any in-flight request on unmount
+      if (tableAbortRef.current) tableAbortRef.current.abort();
     };
-  }, []);
+  }, [fetchTables]);
 
   // Fetch products from /api/mystock and map to POS Product shape
   useEffect(() => {
@@ -345,8 +362,16 @@ const POS = () => {
   const allKotSent = billItems.length > 0 && !hasUnsentItems;
 
   const handleSendKot = async () => {
+    if (billItems.length === 0) {
+      toast.error("Please add items to the order first");
+      return;
+    }
     if (!selectedSteward) {
       toast.error("Please select a steward before sending KOT");
+      return;
+    }
+    if (orderType === "dine_in" && !selectedTable) {
+      toast.error("Please select a table before sending KOT");
       return;
     }
 
@@ -354,6 +379,7 @@ const POS = () => {
     if (unsentItems.length === 0) return;
 
     try {
+      setIsSendingKot(true);
       const selectedTableInfo = orderType === "dine_in"
         ? tables.find(t => t.id === selectedTable)
         : null;
@@ -412,6 +438,8 @@ const POS = () => {
     } catch (err) {
       console.error("Failed to send KOT", err);
       toast.error("Failed to send KOT");
+    } finally {
+      setIsSendingKot(false);
     }
   };
 
@@ -482,6 +510,10 @@ const POS = () => {
     const priceToUse = customerType === "local" ? localPrice : foreignerPrice;
 
     if (existingItem) {
+      if (kotSentItemIds.has(product.id)) {
+        toast.error("Cannot modify item after KOT is sent");
+        return;
+      }
       // Check if we can add more (skip check for handmade products)
       if (!isHandmade && existingItem.quantity >= product.stock) {
         toast.error("Cannot add more than available stock!");
@@ -489,6 +521,11 @@ const POS = () => {
       }
       handleUpdateQuantity(product.id, existingItem.quantity + 1);
     } else {
+      // Block adding new items once any KOT has been sent
+      if (kotSentItemIds.size > 0) {
+        toast.error("Cannot add new items after KOT is sent");
+        return;
+      }
       // Add new item with appropriate price
       const newItem: BillItem = {
         product,
@@ -502,6 +539,11 @@ const POS = () => {
 
   const handleUpdateQuantity = (productId: string, newQuantity: number) => {
     if (newQuantity < 1) return;
+
+    if (kotSentItemIds.has(productId)) {
+      toast.error("Cannot modify item after KOT is sent");
+      return;
+    }
 
     const item = billItems.find((item) => item.product.id === productId);
     if (!item) return;
@@ -532,6 +574,11 @@ const POS = () => {
   };
 
   const handleRemoveItem = (productId: string) => {
+    if (kotSentItemIds.has(productId)) {
+      toast.error("Cannot remove item after KOT is sent");
+      return;
+    }
+
     setBillItems(billItems.filter((item) => item.product.id !== productId));
     setKotSentItemIds(prev => {
       const newSet = new Set(prev);
@@ -648,7 +695,7 @@ const POS = () => {
 
       // Refresh table status from server to ensure it's up-to-date
       setTimeout(() => {
-        refreshTableStatus();
+        fetchTables();
       }, 500);
 
       // Clear the form silently before navigating so state doesn't persist
@@ -676,7 +723,7 @@ const POS = () => {
   };
 
   const handleConfirmPayment = (
-    paymentMethod: 'cash' | 'card' | 'credit' | 'other',
+    paymentMethod: 'cash' | 'card' | 'credit',
     amountPaid: number,
     creditDescription?: string
   ) => {
@@ -979,7 +1026,7 @@ const POS = () => {
                   Current Order
                 </span>
                 {billItems.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={handleClearOrder}>
+                  <Button variant="ghost" size="sm" onClick={handleClearOrder} disabled={kotSentItemIds.size > 0} title={kotSentItemIds.size > 0 ? "Cannot clear order with sent KOTs" : undefined}>
                     Clear All
                   </Button>
                 )}
@@ -994,7 +1041,7 @@ const POS = () => {
                     <Label className="flex items-center gap-2 text-xs">
                       <Crown className="h-3 w-3" /> Steward <span className="text-red-500">*</span>
                     </Label>
-                    <Select value={selectedSteward} onValueChange={setSelectedSteward}>
+                    <Select value={selectedSteward} onValueChange={setSelectedSteward} disabled={kotSentItemIds.size > 0}>
                       <SelectTrigger className="h-8">
                         <SelectValue placeholder="Select Steward" />
                       </SelectTrigger>
@@ -1016,6 +1063,7 @@ const POS = () => {
                       placeholder="E.g., Less spicy, no onions"
                       value={kotRemark}
                       onChange={(e) => setKotRemark(e.target.value)}
+                      disabled={kotSentItemIds.size > 0}
                     />
                   </div>
                   <div className="space-y-1">
@@ -1028,6 +1076,7 @@ const POS = () => {
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                       className="h-8"
+                      disabled={kotSentItemIds.size > 0}
                     />
                   </div>
                   <div className="space-y-1">
@@ -1038,9 +1087,23 @@ const POS = () => {
                       id="customer-phone"
                       placeholder="Enter phone number"
                       value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      className="h-8"
+                      onChange={(e) => {
+                        // Only allow digits
+                        const digits = e.target.value.replace(/\D/g, "");
+                        setCustomerPhone(digits);
+                      }}
+                      onBlur={() => {
+                        if (customerPhone && customerPhone.length !== 10) {
+                          toast.error("Phone number must be exactly 10 digits");
+                        }
+                      }}
+                      maxLength={10}
+                      className={`h-8 ${customerPhone && customerPhone.length !== 10 ? "border-red-400 focus-visible:ring-red-400" : ""}`}
+                      disabled={kotSentItemIds.size > 0}
                     />
+                    {customerPhone && customerPhone.length !== 10 && (
+                      <p className="text-xs text-red-500">Must be 10 digits ({customerPhone.length}/10)</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1090,8 +1153,9 @@ const POS = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRemoveItem(item.product.id)}
+                          disabled={kotSentItemIds.has(item.product.id)}
                         >
-                          <Trash2 className="h-4 w-4 text-red-500" />
+                          <Trash2 className={`h-4 w-4 ${kotSentItemIds.has(item.product.id) ? 'text-muted-foreground' : 'text-red-500'}`} />
                         </Button>
                       </div>
 
@@ -1103,7 +1167,7 @@ const POS = () => {
                             onClick={() =>
                               handleUpdateQuantity(item.product.id, item.quantity - 1)
                             }
-                            disabled={item.quantity <= 1}
+                            disabled={item.quantity <= 1 || kotSentItemIds.has(item.product.id)}
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
@@ -1117,8 +1181,8 @@ const POS = () => {
                               handleUpdateQuantity(item.product.id, item.quantity + 1)
                             }
                             disabled={
-                              item.product.product_type !== 'HANDMADE' &&
-                              item.quantity >= item.product.stock
+                              kotSentItemIds.has(item.product.id) ||
+                              (item.product.product_type !== 'HANDMADE' && item.quantity >= item.product.stock)
                             }
                           >
                             <Plus className="h-3 w-3" />
@@ -1145,7 +1209,8 @@ const POS = () => {
                       min="0"
                       max="100"
                       step="0.1"
-                      value={taxRate}
+                      value={taxRate === 0 ? "" : taxRate}
+                      placeholder="0"
                       onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
                       className="w-20"
                     />
@@ -1165,7 +1230,8 @@ const POS = () => {
                       min="0"
                       max="100"
                       step="0.1"
-                      value={discountRate}
+                      value={discountRate === 0 ? "" : discountRate}
+                      placeholder="0"
                       onChange={(e) => setDiscountRate(parseFloat(e.target.value) || 0)}
                       className="w-20"
                     />
@@ -1211,22 +1277,15 @@ const POS = () => {
                       className="w-full bg-green-600 hover:bg-green-700 text-white disabled:bg-orange-500 disabled:opacity-100"
                       size="lg"
                       onClick={handleSendKot}
-                      disabled={!hasUnsentItems || billItems.length === 0 || !selectedSteward || (orderType === "dine_in" && !selectedTable)}
-                      title={
-                        !selectedSteward
-                          ? "Please select a steward first"
-                          : orderType === "dine_in" && !selectedTable
-                          ? "Please select a table first"
-                          : undefined
-                      }
+                      disabled={isSendingKot || !hasUnsentItems || billItems.length === 0}
                     >
                       <UtensilsCrossed className="h-4 w-4 mr-2" />
-                      {hasUnsentItems ? "Send KOT" : (billItems.length > 0 ? "KOT Sent ✓" : "Send KOT")}
+                      {isSendingKot ? "Sending..." : (hasUnsentItems ? "Send KOT" : (billItems.length > 0 ? "KOT Sent ✓" : "Send KOT"))}
                     </Button>
 
                     {orderType === "dine_in" ? (
                       <div className="grid grid-cols-2 gap-2">
-                        <Button className="w-full" size="lg" variant="outline" onClick={handleCreateOrder} disabled={isPrinting || isSending}>
+                        <Button className="w-full" size="lg" variant="outline" onClick={handleCreateOrder} disabled={isPrinting || isSending || !allKotSent} title={!allKotSent ? "Send KOT first" : undefined}>
                           <Send className="h-4 w-4 mr-2" />
                           {isSending ? "Sending..." : "Send"}
                         </Button>
