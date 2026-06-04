@@ -88,21 +88,14 @@ class BillService {
         data: { bill_number: finalBillNumber },
       });
 
-      const inventoryRecords: InventoryDTO[] = [];
+      // Batch all inventory movements in 2 queries (instead of 2N)
+      const bulkItems = input.items.map((item) => ({
+        productId: item.productId,
+        billId: billForInventory.id,
+        quantity_moved: item.quantityMoved > 0 ? -Math.abs(item.quantityMoved) : item.quantityMoved,
+      }));
 
-      for (const item of input.items) {
-        // Ensure negative quantity for outgoing stock
-        const qty = item.quantityMoved > 0 ? -Math.abs(item.quantityMoved) : item.quantityMoved;
-        const rec = await inventoryService.createMovement(
-          {
-            productId: item.productId,
-            billId: billForInventory.id,
-            quantity_moved: qty,
-          },
-          tx
-        );
-        inventoryRecords.push(rec);
-      }
+      const inventoryRecords = await inventoryService.createBulkMovements(bulkItems, tx);
 
       return { bill: billForInventory as BillDTO, inventory: inventoryRecords };
     });

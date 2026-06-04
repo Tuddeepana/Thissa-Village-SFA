@@ -1,6 +1,7 @@
 import 'express-async-errors';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import prisma from './lib/prisma';
 import userRoutes from './routes/user.routes';
@@ -36,8 +37,26 @@ app.use(cors({
     origin: process.env.CORS_ORIGIN || 'http://localhost:8080',
     credentials: true,
 }));
+
+// Compress all responses — reduces payload sizes by 60-80% for JSON
+app.use(compression());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Request timeout middleware — prevents zombie connections from holding the pool
+// during peak hours. Returns 408 after 30 seconds.
+app.use((req: Request, res: Response, next: NextFunction) => {
+    const timeout = setTimeout(() => {
+        if (!res.headersSent) {
+            console.warn(`⚠️ Request timeout: ${req.method} ${req.path}`);
+            res.status(408).json({ message: 'Request timeout' });
+        }
+    }, 30000);
+    res.on('finish', () => clearTimeout(timeout));
+    res.on('close', () => clearTimeout(timeout));
+    next();
+});
 
 // Request logging middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
