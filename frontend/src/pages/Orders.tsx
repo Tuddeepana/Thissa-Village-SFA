@@ -78,6 +78,7 @@ const Orders = () => {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [kotRemark, setKotRemark] = useState("");
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isSendingKot, setIsSendingKot] = useState(false);
   const [kotSentOrderItemIds, setKotSentOrderItemIds] = useState<Set<string>>(new Set());
   const [serviceCharge, setServiceCharge] = useState<ServiceCharge | null>(null);
   const [stats, setStats] = useState<OrderStats>({
@@ -286,9 +287,13 @@ const Orders = () => {
   const handleSendOrderKot = async () => {
     if (!selectedOrder) return;
     const unsentItems = selectedOrder.items.filter(item => !item.kot_sent && !kotSentOrderItemIds.has(item.id));
-    if (unsentItems.length === 0) return;
+    if (unsentItems.length === 0) {
+      toast.error("All items have already been sent to the kitchen");
+      return;
+    }
 
     try {
+      setIsSendingKot(true);
       const stewardName = selectedOrder.steward_name || currentUser.name;
       const tableName = selectedOrder.table_name || "Take Away";
       const kotItems = unsentItems.map(item => {
@@ -335,6 +340,8 @@ const Orders = () => {
     } catch (err) {
       console.error("Failed to send KOT", err);
       toast.error("Failed to send KOT");
+    } finally {
+      setIsSendingKot(false);
     }
   };
 
@@ -863,9 +870,9 @@ const Orders = () => {
                                 variant="ghost"
                                 onClick={() => handleDeleteItemFromOrder(item.id)}
                                 disabled={item.kot_sent || kotSentOrderItemIds.has(item.id)}
-                                title={item.kot_sent || kotSentOrderItemIds.has(item.id) ? "Cannot delete: KOT already sent" : "Remove item"}
+                                title={item.kot_sent || kotSentOrderItemIds.has(item.id) ? "Cannot remove item after KOT is sent" : undefined}
                               >
-                                <Trash2 className={`h-4 w-4 ${(item.kot_sent || kotSentOrderItemIds.has(item.id)) ? 'text-muted-foreground' : 'text-red-500'}`} />
+                                <Trash2 className={`h-4 w-4 ${item.kot_sent || kotSentOrderItemIds.has(item.id) ? 'text-muted-foreground' : 'text-red-500'}`} />
                               </Button>
                             </TableCell>
                           )}
@@ -933,10 +940,10 @@ const Orders = () => {
               <Button
                 className="bg-green-600 hover:bg-green-700 text-white disabled:bg-orange-500 disabled:opacity-100"
                 onClick={handleSendOrderKot}
-                disabled={isPrinting || !hasUnsentOrderItems}
+                disabled={isSendingKot || isPrinting}
               >
                 <UtensilsCrossed className="h-4 w-4 mr-2" />
-                {hasUnsentOrderItems ? "Send KOT" : "KOT Sent ✓"}
+                {isSendingKot ? "Sending..." : (hasUnsentOrderItems ? "Send KOT" : "KOT Sent ✓")}
               </Button>
             )}
             <Button variant="outline" onClick={() => handlePrintBill(selectedOrder!)} disabled={isPrinting}>

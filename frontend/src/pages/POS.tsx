@@ -126,6 +126,7 @@ const POS = () => {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isSendingKot, setIsSendingKot] = useState(false);
 
   // Refs for performance: AbortController for fetch cancellation, dedup guard
   const tableAbortRef = useRef<AbortController | null>(null);
@@ -361,8 +362,16 @@ const POS = () => {
   const allKotSent = billItems.length > 0 && !hasUnsentItems;
 
   const handleSendKot = async () => {
+    if (billItems.length === 0) {
+      toast.error("Please add items to the order first");
+      return;
+    }
     if (!selectedSteward) {
       toast.error("Please select a steward before sending KOT");
+      return;
+    }
+    if (orderType === "dine_in" && !selectedTable) {
+      toast.error("Please select a table before sending KOT");
       return;
     }
 
@@ -370,6 +379,7 @@ const POS = () => {
     if (unsentItems.length === 0) return;
 
     try {
+      setIsSendingKot(true);
       const selectedTableInfo = orderType === "dine_in"
         ? tables.find(t => t.id === selectedTable)
         : null;
@@ -428,6 +438,8 @@ const POS = () => {
     } catch (err) {
       console.error("Failed to send KOT", err);
       toast.error("Failed to send KOT");
+    } finally {
+      setIsSendingKot(false);
     }
   };
 
@@ -498,6 +510,10 @@ const POS = () => {
     const priceToUse = customerType === "local" ? localPrice : foreignerPrice;
 
     if (existingItem) {
+      if (kotSentItemIds.has(product.id)) {
+        toast.error("Cannot modify item after KOT is sent");
+        return;
+      }
       // Check if we can add more (skip check for handmade products)
       if (!isHandmade && existingItem.quantity >= product.stock) {
         toast.error("Cannot add more than available stock!");
@@ -505,6 +521,11 @@ const POS = () => {
       }
       handleUpdateQuantity(product.id, existingItem.quantity + 1);
     } else {
+      // Block adding new items once any KOT has been sent
+      if (kotSentItemIds.size > 0) {
+        toast.error("Cannot add new items after KOT is sent");
+        return;
+      }
       // Add new item with appropriate price
       const newItem: BillItem = {
         product,
@@ -518,6 +539,11 @@ const POS = () => {
 
   const handleUpdateQuantity = (productId: string, newQuantity: number) => {
     if (newQuantity < 1) return;
+
+    if (kotSentItemIds.has(productId)) {
+      toast.error("Cannot modify item after KOT is sent");
+      return;
+    }
 
     const item = billItems.find((item) => item.product.id === productId);
     if (!item) return;
@@ -548,6 +574,11 @@ const POS = () => {
   };
 
   const handleRemoveItem = (productId: string) => {
+    if (kotSentItemIds.has(productId)) {
+      toast.error("Cannot remove item after KOT is sent");
+      return;
+    }
+
     setBillItems(billItems.filter((item) => item.product.id !== productId));
     setKotSentItemIds(prev => {
       const newSet = new Set(prev);
@@ -995,7 +1026,7 @@ const POS = () => {
                   Current Order
                 </span>
                 {billItems.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={handleClearOrder}>
+                  <Button variant="ghost" size="sm" onClick={handleClearOrder} disabled={kotSentItemIds.size > 0} title={kotSentItemIds.size > 0 ? "Cannot clear order with sent KOTs" : undefined}>
                     Clear All
                   </Button>
                 )}
@@ -1010,7 +1041,7 @@ const POS = () => {
                     <Label className="flex items-center gap-2 text-xs">
                       <Crown className="h-3 w-3" /> Steward <span className="text-red-500">*</span>
                     </Label>
-                    <Select value={selectedSteward} onValueChange={setSelectedSteward}>
+                    <Select value={selectedSteward} onValueChange={setSelectedSteward} disabled={kotSentItemIds.size > 0}>
                       <SelectTrigger className="h-8">
                         <SelectValue placeholder="Select Steward" />
                       </SelectTrigger>
@@ -1032,6 +1063,7 @@ const POS = () => {
                       placeholder="E.g., Less spicy, no onions"
                       value={kotRemark}
                       onChange={(e) => setKotRemark(e.target.value)}
+                      disabled={kotSentItemIds.size > 0}
                     />
                   </div>
                   <div className="space-y-1">
@@ -1044,6 +1076,7 @@ const POS = () => {
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                       className="h-8"
+                      disabled={kotSentItemIds.size > 0}
                     />
                   </div>
                   <div className="space-y-1">
@@ -1054,9 +1087,23 @@ const POS = () => {
                       id="customer-phone"
                       placeholder="Enter phone number"
                       value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      className="h-8"
+                      onChange={(e) => {
+                        // Only allow digits
+                        const digits = e.target.value.replace(/\D/g, "");
+                        setCustomerPhone(digits);
+                      }}
+                      onBlur={() => {
+                        if (customerPhone && customerPhone.length !== 10) {
+                          toast.error("Phone number must be exactly 10 digits");
+                        }
+                      }}
+                      maxLength={10}
+                      className={`h-8 ${customerPhone && customerPhone.length !== 10 ? "border-red-400 focus-visible:ring-red-400" : ""}`}
+                      disabled={kotSentItemIds.size > 0}
                     />
+                    {customerPhone && customerPhone.length !== 10 && (
+                      <p className="text-xs text-red-500">Must be 10 digits ({customerPhone.length}/10)</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1106,8 +1153,9 @@ const POS = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRemoveItem(item.product.id)}
+                          disabled={kotSentItemIds.has(item.product.id)}
                         >
-                          <Trash2 className="h-4 w-4 text-red-500" />
+                          <Trash2 className={`h-4 w-4 ${kotSentItemIds.has(item.product.id) ? 'text-muted-foreground' : 'text-red-500'}`} />
                         </Button>
                       </div>
 
@@ -1119,7 +1167,7 @@ const POS = () => {
                             onClick={() =>
                               handleUpdateQuantity(item.product.id, item.quantity - 1)
                             }
-                            disabled={item.quantity <= 1}
+                            disabled={item.quantity <= 1 || kotSentItemIds.has(item.product.id)}
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
@@ -1133,8 +1181,8 @@ const POS = () => {
                               handleUpdateQuantity(item.product.id, item.quantity + 1)
                             }
                             disabled={
-                              item.product.product_type !== 'HANDMADE' &&
-                              item.quantity >= item.product.stock
+                              kotSentItemIds.has(item.product.id) ||
+                              (item.product.product_type !== 'HANDMADE' && item.quantity >= item.product.stock)
                             }
                           >
                             <Plus className="h-3 w-3" />
@@ -1161,7 +1209,8 @@ const POS = () => {
                       min="0"
                       max="100"
                       step="0.1"
-                      value={taxRate}
+                      value={taxRate === 0 ? "" : taxRate}
+                      placeholder="0"
                       onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
                       className="w-20"
                     />
@@ -1181,7 +1230,8 @@ const POS = () => {
                       min="0"
                       max="100"
                       step="0.1"
-                      value={discountRate}
+                      value={discountRate === 0 ? "" : discountRate}
+                      placeholder="0"
                       onChange={(e) => setDiscountRate(parseFloat(e.target.value) || 0)}
                       className="w-20"
                     />
@@ -1227,22 +1277,15 @@ const POS = () => {
                       className="w-full bg-green-600 hover:bg-green-700 text-white disabled:bg-orange-500 disabled:opacity-100"
                       size="lg"
                       onClick={handleSendKot}
-                      disabled={!hasUnsentItems || billItems.length === 0 || !selectedSteward || (orderType === "dine_in" && !selectedTable)}
-                      title={
-                        !selectedSteward
-                          ? "Please select a steward first"
-                          : orderType === "dine_in" && !selectedTable
-                          ? "Please select a table first"
-                          : undefined
-                      }
+                      disabled={isSendingKot || !hasUnsentItems || billItems.length === 0}
                     >
                       <UtensilsCrossed className="h-4 w-4 mr-2" />
-                      {hasUnsentItems ? "Send KOT" : (billItems.length > 0 ? "KOT Sent ✓" : "Send KOT")}
+                      {isSendingKot ? "Sending..." : (hasUnsentItems ? "Send KOT" : (billItems.length > 0 ? "KOT Sent ✓" : "Send KOT"))}
                     </Button>
 
                     {orderType === "dine_in" ? (
                       <div className="grid grid-cols-2 gap-2">
-                        <Button className="w-full" size="lg" variant="outline" onClick={handleCreateOrder} disabled={isPrinting || isSending}>
+                        <Button className="w-full" size="lg" variant="outline" onClick={handleCreateOrder} disabled={isPrinting || isSending || !allKotSent} title={!allKotSent ? "Send KOT first" : undefined}>
                           <Send className="h-4 w-4 mr-2" />
                           {isSending ? "Sending..." : "Send"}
                         </Button>
