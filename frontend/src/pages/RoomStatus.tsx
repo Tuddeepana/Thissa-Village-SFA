@@ -618,7 +618,7 @@ const RoomStatus = () => {
                         <span className="font-medium">{room.roomName}</span>
                       </div>
                       <span className="text-sm text-muted-foreground">
-                        ${Number(room.pricePerNight).toFixed(2)}
+                        Rs. {Number(room.pricePerNight).toFixed(2)}
                       </span>
                     </div>
                   ))}
@@ -662,7 +662,7 @@ const RoomStatus = () => {
                     <div>
                       <p className="text-xs text-muted-foreground">Total Amount</p>
                       <p className="font-bold text-lg text-primary">
-                        ${Number(selectedBooking.totalAmount).toFixed(2)}
+                        Rs. {Number(selectedBooking.totalAmount).toFixed(2)}
                       </p>
                     </div>
                   </div>

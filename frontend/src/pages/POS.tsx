@@ -692,7 +692,7 @@ const POS = () => {
   };
 
   const handleConfirmPayment = (
-    paymentMethod: 'cash' | 'card' | 'credit' | 'other',
+    paymentMethod: 'cash' | 'card' | 'credit',
     amountPaid: number,
     creditDescription?: string
   ) => {

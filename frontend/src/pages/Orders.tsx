@@ -411,7 +411,7 @@ const Orders = () => {
   };
 
   const handleConfirmPayment = async (
-    paymentMethod: 'cash' | 'card' | 'credit' | 'other',
+    paymentMethod: 'cash' | 'card' | 'credit',
     amountPaid: number,
     creditDescription?: string
   ) => {
