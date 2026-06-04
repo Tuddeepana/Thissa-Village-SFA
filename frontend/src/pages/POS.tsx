@@ -132,10 +132,6 @@ const POS = () => {
   const tableAbortRef = useRef<AbortController | null>(null);
   const tableFetchInProgressRef = useRef(false);
 
-  // Refs for performance: AbortController for fetch cancellation, dedup guard
-  const tableAbortRef = useRef<AbortController | null>(null);
-  const tableFetchInProgressRef = useRef(false);
-
   // Get current user info
   const currentUser = {
     name: (() => {
