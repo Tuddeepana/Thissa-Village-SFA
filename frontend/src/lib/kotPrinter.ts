@@ -311,7 +311,8 @@ export const printKotSlip = async (data: KotSlipData): Promise<void> => {
     </html>
   `;
 
-  printWindow.document.write(kotHTML);
-  printWindow.document.close();
+    printWindow.document.write(kotHTML);
+    printWindow.document.close();
+  }
 };
 
