@@ -93,7 +93,6 @@ export class OrderService {
   async listOrders(params: {
     status?: OrderStatus;
     order_type?: OrderType;
-    customer_type?: 'local' | 'foreigner';
     customer_name?: string;
     table_number?: string;
     date_from?: Date;
@@ -104,7 +103,6 @@ export class OrderService {
     const {
       status,
       order_type,
-      customer_type,
       customer_name,
       table_number,
       date_from,
@@ -121,10 +119,6 @@ export class OrderService {
 
     if (order_type) {
       where.order_type = order_type;
-    }
-
-    if (customer_type) {
-      where.customer_type = customer_type;
     }
 
     if (customer_name) {

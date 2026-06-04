@@ -54,7 +54,6 @@ export const deleteOrderItemSchema = z.object({
 export const orderQuerySchema = z.object({
   status: z.nativeEnum(OrderStatus).optional(),
   order_type: z.nativeEnum(OrderType).optional(),
-  customer_type: z.enum(['local', 'foreigner']).optional(),
   customer_name: z.string().optional(),
   table_number: z.string().optional(),
   date_from: z.string().datetime().optional(),
