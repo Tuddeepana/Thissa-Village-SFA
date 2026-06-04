@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import logoUrl from '@/assets/images/resturent_logo.png';
+import pkg from '../../package.json';
 import { printerService } from '@/api/services/printerService';
 
 // Reuse the same logo caching pattern from billPrinter
@@ -256,6 +257,7 @@ const buildKotSlipBody = (data: KotSlipData, logoDataUrl: string): string => `
 
   <div class="footer">
     <div class="footer-label">*** Kitchen Copy ***</div>
+    <div style="font-size: 9px; font-weight: normal; margin-top: 5px;">v${pkg.version.replace(/[^0-9.]/g, '')}</div>
   </div>
 `;
 

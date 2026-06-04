@@ -625,6 +625,10 @@ const POS = () => {
       toast.error("Please add items to the order");
       return false;
     }
+    if (orderType === "take_away" && !customerName.trim()) {
+      toast.error("Please enter a customer name for Take Away orders");
+      return false;
+    }
     if (orderType === "dine_in" && !selectedTable) {
       toast.error("Please select a table for dine-in order");
       return false;
@@ -773,10 +777,10 @@ const POS = () => {
           discountRate,
           // @ts-ignore - optional extra fields used by printer/UI
           serviceCharge: serviceChargeAmount,
-          // @ts-ignore
-          serviceChargeRate: serviceCharge?.isActive ? Number(serviceCharge.percentage || 0) : 0,
+          serviceChargeRate: orderType === "dine_in" && serviceCharge?.isActive ? Number(serviceCharge.percentage || 0) : 0,
           total,
-          customerName: currentUser.name,  // Cashier name shown on receipt
+          customerName: customerName.trim() || undefined,
+          cashierName: currentUser.name,
           customerPhone,
           paymentMethod,
           amountPaid,
@@ -1068,7 +1072,7 @@ const POS = () => {
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="customer-name" className="flex items-center gap-2 text-xs">
-                      <User className="h-3 w-3" /> Name
+                      <User className="h-3 w-3" /> Name {orderType === "take_away" && <span className="text-red-500">*</span>}
                     </Label>
                     <Input
                       id="customer-name"
@@ -1277,7 +1281,7 @@ const POS = () => {
                       className="w-full bg-green-600 hover:bg-green-700 text-white disabled:bg-orange-500 disabled:opacity-100"
                       size="lg"
                       onClick={handleSendKot}
-                      disabled={isSendingKot || !hasUnsentItems || billItems.length === 0}
+                      disabled={isSendingKot || !hasUnsentItems || billItems.length === 0 || (orderType === "take_away" && !customerName.trim())}
                     >
                       <UtensilsCrossed className="h-4 w-4 mr-2" />
                       {isSendingKot ? "Sending..." : (hasUnsentItems ? "Send KOT" : (billItems.length > 0 ? "KOT Sent ✓" : "Send KOT"))}
