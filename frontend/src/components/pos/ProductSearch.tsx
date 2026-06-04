@@ -157,7 +157,7 @@ export function ProductSearch({ products, onAddProduct, customerType }: ProductS
                         Foreigner:
                       </span>
                       <span className={`${customerType === "foreigner" ? "font-bold text-primary text-base" : "text-muted-foreground"}`}>
-                        Rs. {product.foreignerPrice.toFixed(2)}
+                        Rs. {(Number(product.foreignerPrice) || 0).toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -165,7 +165,7 @@ export function ProductSearch({ products, onAddProduct, customerType }: ProductS
                         Local:
                       </span>
                       <span className={`${customerType === "local" ? "font-bold text-green-600 text-base" : "text-muted-foreground"}`}>
-                        Rs. {product.localPrice.toFixed(2)}
+                        Rs. {(Number(product.localPrice) || 0).toFixed(2)}
                       </span>
                     </div>
                   </div>
