@@ -850,8 +850,8 @@ const POS = () => {
           <Badge
             variant="outline"
             className={`text-sm px-3 py-1 ${customerType === "local"
-                ? "bg-green-100 text-green-700 border-green-300"
-                : "bg-blue-100 text-blue-700 border-blue-300"
+              ? "bg-green-100 text-green-700 border-green-300"
+              : "bg-blue-100 text-blue-700 border-blue-300"
               }`}
           >
             {customerType === "local" ? (
@@ -943,14 +943,14 @@ const POS = () => {
                           key={table.id}
                           variant={selectedTable === table.id ? "default" : "outline"}
                           className={`h-20 ${table.status === "occupied"
-                              ? "opacity-50 cursor-not-allowed bg-red-50 border-red-200"
-                              : selectedTable === table.id
-                                ? table.table_type === "VIP"
-                                  ? "bg-amber-600 hover:bg-amber-700"
-                                  : ""
-                                : table.table_type === "VIP"
-                                  ? "hover:bg-amber-50 hover:border-amber-300 border-amber-200"
-                                  : "hover:bg-green-50 hover:border-green-200"
+                            ? "opacity-50 cursor-not-allowed bg-red-50 border-red-200"
+                            : selectedTable === table.id
+                              ? table.table_type === "VIP"
+                                ? "bg-amber-600 hover:bg-amber-700"
+                                : ""
+                              : table.table_type === "VIP"
+                                ? "hover:bg-amber-50 hover:border-amber-300 border-amber-200"
+                                : "hover:bg-green-50 hover:border-green-200"
                             }`}
                           disabled={table.status === "occupied"}
                           onClick={() => setSelectedTable(table.id)}
@@ -1030,7 +1030,7 @@ const POS = () => {
                   Current Order
                 </span>
                 {billItems.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={handleClearOrder} disabled={kotSentItemIds.size > 0} title={kotSentItemIds.size > 0 ? "Cannot clear order with sent KOTs" : undefined}>
+                  <Button variant="ghost" size="sm" onClick={handleClearOrder}>
                     Clear All
                   </Button>
                 )}
@@ -1299,10 +1299,16 @@ const POS = () => {
                         </Button>
                       </div>
                     ) : (
-                      <Button className="w-full" size="lg" onClick={handleTakeAwayPayment} disabled={isPrinting || !allKotSent} title={!allKotSent ? "Send KOT first" : undefined}>
-                        <Printer className="h-4 w-4 mr-2" />
-                        {isPrinting ? "Printing..." : "Print & Pay"}
-                      </Button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button className="w-full" size="lg" variant="outline" onClick={handleCreateOrder} disabled={isPrinting || isSending || !allKotSent} title={!allKotSent ? "Send KOT first" : undefined}>
+                          <Send className="h-4 w-4 mr-2" />
+                          {isSending ? "Sending..." : "Send"}
+                        </Button>
+                        <Button className="w-full" size="lg" onClick={handleTakeAwayPayment} disabled={isPrinting || !allKotSent} title={!allKotSent ? "Send KOT first" : undefined}>
+                          <Printer className="h-4 w-4 mr-2" />
+                          {isPrinting ? "Printing..." : "Print & Pay"}
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>

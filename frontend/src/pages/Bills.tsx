@@ -44,7 +44,7 @@ import {
   Clock,
   Monitor,
 } from "lucide-react";
-import { format } from "date-fns";
+import { formatSL } from "@/utils/dateUtils";
 import { Bill } from "@/types/pos";
 import api from '@/api/client';
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
@@ -316,7 +316,7 @@ const Bills = () => {
     // Prepare CSV rows
     const rows = bills.map((bill) => [
       bill.billNumber || '-',
-      format(new Date(bill.createdAt), 'dd/MM/yyyy HH:mm'),
+      formatSL(new Date(bill.createdAt), 'dd/MM/yyyy HH:mm'),
       bill.customerName || 'Not Provided',
       bill.cashierName || '-',
       bill.subtotal.toFixed(2),
@@ -338,7 +338,7 @@ const Bills = () => {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `bills-export-${format(new Date(), 'dd-MM-yyyy-HH-mm')}.csv`);
+    link.setAttribute('download', `bills-export-${formatSL(new Date(), 'dd-MM-yyyy-HH-mm')}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -648,11 +648,11 @@ const Bills = () => {
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3 text-muted-foreground" />
-                          {format(bill.createdAt, "MMM dd, yyyy")}
+                          {formatSL(bill.createdAt, "dd/MM/yyyy")}
                         </div>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Clock className="h-3 w-3" />
-                          {format(bill.createdAt, "hh:mm a")}
+                          {formatSL(bill.createdAt, "HH:mm")}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -714,7 +714,7 @@ const Bills = () => {
                     <div>
                       <p className="font-mono text-sm font-medium">{bill.billNumber || bill.id}</p>
                       <p className="text-xs text-muted-foreground">
-                        {format(bill.createdAt, "MMM dd, yyyy hh:mm a")}
+                         {formatSL(bill.createdAt, "dd/MM/yyyy HH:mm")}
                       </p>
                     </div>
                     {getPaymentMethodBadge(bill.paymentMethod)}
