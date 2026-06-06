@@ -9,8 +9,9 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
+import { AsyncCategoryCombobox } from "@/components/ui/async-category-combobox";
 import {
   Table,
   TableBody,
@@ -42,10 +43,10 @@ const SalesSummary = () => {
   const [filterToday, setFilterToday] = useState(false);
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedCategoryLabel, setSelectedCategoryLabel] = useState<string>("All Categories");
   const [selectedProduct, setSelectedProduct] = useState<string>("all");
 
   // Data for dropdowns
-  const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
 
@@ -57,19 +58,15 @@ const SalesSummary = () => {
   const [volumeWiseCurrentPage, setVolumeWiseCurrentPage] = useState(1);
   const [volumeWisePageSize] = useState(20);
 
-  // Fetch categories and products on mount
+  // Fetch products on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [categoriesRes, productsRes] = await Promise.all([
-          categoryService.list(),
-          productService.list({ limit: 1000 }), // Fetch all products
-        ]);
-        setCategories(categoriesRes.categories || []);
+        const productsRes = await productService.list({ limit: 1000 }); // Fetch all products
         setProducts(productsRes.items || []);
         setFilteredProducts(productsRes.items || []);
       } catch (err) {
-        console.error('Failed to fetch categories/products', err);
+        console.error('Failed to fetch products', err);
       }
     };
     fetchData();
@@ -166,6 +163,7 @@ const SalesSummary = () => {
     setFilterToday(false);
     setSelectedYear(new Date().getFullYear().toString());
     setSelectedCategory("all");
+    setSelectedCategoryLabel("All Categories");
     setSelectedProduct("all");
     setCurrentPage(1);
     setVolumeWiseCurrentPage(1);
@@ -397,35 +395,36 @@ const SalesSummary = () => {
             </div>
 
             {/* Category */}
-            <div className="space-y-2">
+            <div className="space-y-2 flex flex-col">
               <Label className="text-xs md:text-sm">Category</Label>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="h-9 md:h-10">
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  {categories.map(cat => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <AsyncCategoryCombobox
+                defaultOptions={[{ label: "All", value: "all" }]}
+                value={selectedCategory}
+                onValueChange={(val, label) => {
+                  setSelectedCategory(val);
+                  setSelectedCategoryLabel(label);
+                }}
+                selectedLabel={selectedCategoryLabel}
+                placeholder="All Categories"
+                searchPlaceholder="Search category..."
+                className="h-9 md:h-10"
+              />
             </div>
 
             {/* Product */}
-            <div className="space-y-2">
+            <div className="space-y-2 flex flex-col">
               <Label className="text-xs md:text-sm">Product</Label>
-              <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                <SelectTrigger className="h-9 md:h-10">
-                  <SelectValue placeholder="All Products" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  {filteredProducts.map(prod => (
-                    <SelectItem key={prod.id} value={prod.id}>{prod.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                options={[
+                  { label: "All", value: "all" },
+                  ...filteredProducts.map(prod => ({ label: prod.name, value: prod.id! }))
+                ]}
+                value={selectedProduct}
+                onValueChange={setSelectedProduct}
+                placeholder="All Products"
+                searchPlaceholder="Search product..."
+                className="h-9 md:h-10"
+              />
             </div>
           </div>
 

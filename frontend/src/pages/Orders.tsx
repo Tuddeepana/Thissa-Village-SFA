@@ -408,9 +408,8 @@ const Orders = () => {
         customerName: order.customer_name || undefined,
         cashierName: order.cashier_name || currentUser.name,
         customerPhone: order.customer_phone,
-        paymentMethod: 'cash',
-        amountPaid: 0,
-        change: 0,
+        tableNumber: order.table_name || undefined,
+        orderType: order.order_type === "DINE_IN" ? "dine_in" : "take_away",
         createdAt: new Date(order.createdAt),
       };
 
@@ -534,6 +533,8 @@ const Orders = () => {
         amountPaid: paymentMethod === "credit" ? 0 : amountPaid,
         change: Math.max(0, changeWithServiceCharge),
         creditDescription: paymentMethod === 'credit' ? (creditDescription || null) : null,
+        tableNumber: selectedOrder.table_name || undefined,
+        orderType: selectedOrder.order_type === "DINE_IN" ? "dine_in" : "take_away",
         createdAt: now,
       };
 

@@ -26,19 +26,23 @@ const SL_TIMEZONE = "Asia/Colombo";
  * Format a date in Sri Lanka timezone using a date-fns-style format string.
  * Supported tokens:
  *   yyyy  – 4-digit year
+ *   MMMM  – full month name (e.g. "June")
+ *   MMM   – short month name (e.g. "Jun")
  *   MM    – 2-digit month
  *   dd    – 2-digit day
  *   HH    – 24-hour hour
+ *   hh    – 12-hour hour (with leading zero)
  *   mm    – minutes
  *   ss    – seconds
+ *   a     – AM/PM
  */
 export function formatSL(date: Date | string | null | undefined, pattern: string): string {
   if (!date) return "";
   const d = typeof date === "string" ? new Date(date) : date;
   if (isNaN(d.getTime())) return "";
 
-  // Extract parts in SL timezone via Intl
-  const parts = new Intl.DateTimeFormat("en-GB", {
+  // Extract parts in SL timezone via Intl (24-hour for numeric parts)
+  const parts24 = new Intl.DateTimeFormat("en-GB", {
     timeZone: SL_TIMEZONE,
     year: "numeric",
     month: "2-digit",
@@ -49,15 +53,37 @@ export function formatSL(date: Date | string | null | undefined, pattern: string
     hour12: false,
   }).formatToParts(d);
 
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
+  const get = (type: string) => parts24.find((p) => p.type === type)?.value ?? "00";
+
+  // Full month name in SL timezone
+  const fullMonth = new Intl.DateTimeFormat("en-US", {
+    timeZone: SL_TIMEZONE,
+    month: "long",
+  }).format(d);
+
+  // Short month name in SL timezone
+  const shortMonth = new Intl.DateTimeFormat("en-US", {
+    timeZone: SL_TIMEZONE,
+    month: "short",
+  }).format(d);
+
+  // 12-hour clock value and AM/PM
+  const hour24 = parseInt(get("hour"), 10);
+  const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+  const hh = String(hour12).padStart(2, "0");
+  const ampm = hour24 < 12 ? "AM" : "PM";
 
   return pattern
     .replace("yyyy", get("year"))
+    .replace("MMMM", fullMonth)
+    .replace("MMM", shortMonth)
     .replace("MM", get("month"))
     .replace("dd", get("day"))
     .replace("HH", get("hour"))
+    .replace("hh", hh)
     .replace("mm", get("minute"))
-    .replace("ss", get("second"));
+    .replace("ss", get("second"))
+    .replace("a", ampm);
 }
 
 // ─── "Today" Range in SL Time ──────────────────────────────────────────────────
