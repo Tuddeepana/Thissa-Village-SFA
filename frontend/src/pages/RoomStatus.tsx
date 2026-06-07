@@ -744,11 +744,35 @@ const RoomStatus = () => {
                     <span className="text-lg mt-0.5">💵</span>
                     <div>
                       <p className="text-xs text-muted-foreground">Total Amount</p>
-                      <p className="font-bold text-lg text-primary">
+                      <p className="font-bold text-lg text-foreground">
                         Rs. {Number(selectedBooking.totalAmount).toFixed(2)}
                       </p>
                     </div>
                   </div>
+
+                  {selectedBooking.paymentType === 'ADVANCE_PAYMENT' && (
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg mt-0.5">💰</span>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Advance Paid</p>
+                        <p className="font-bold text-lg text-foreground">
+                          Rs. {Number(selectedBooking.paidAmount).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedBooking.paidAmount < selectedBooking.totalAmount && (
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg mt-0.5">❗</span>
+                      <div>
+                        <p className="text-xs text-red-600 font-medium">Due Amount</p>
+                        <p className="font-bold text-lg text-red-600">
+                          Rs. {(selectedBooking.totalAmount - selectedBooking.paidAmount).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex items-start gap-2">
                     <span className="text-lg mt-0.5">💳</span>
@@ -759,11 +783,7 @@ const RoomStatus = () => {
                           {selectedBooking.paymentType === 'FULL_PAYMENT' ? 'Full Payment' :
                            selectedBooking.paymentType === 'ADVANCE_PAYMENT' ? 'Advance Payment' : 'On-Call Booking'}
                         </span>
-                        {selectedBooking.paidAmount < selectedBooking.totalAmount ? (
-                          <span className="text-sm text-red-600">
-                            Due: Rs. {(selectedBooking.totalAmount - selectedBooking.paidAmount).toFixed(2)}
-                          </span>
-                        ) : (
+                        {selectedBooking.paidAmount >= selectedBooking.totalAmount && (
                           <span className="text-sm text-green-600">Fully Paid</span>
                         )}
                       </div>

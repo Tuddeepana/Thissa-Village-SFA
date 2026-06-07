@@ -600,6 +600,12 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
                           placeholder="Enter advance amount"
                           required
                         />
+                        {advanceAmount > 0 && (
+                          <p className="text-sm mt-1">
+                            <span className="text-muted-foreground">Due Amount: </span>
+                            <strong className="text-red-600">Rs. {Math.max(0, calculateTotal() - advanceAmount).toFixed(2)}</strong>
+                          </p>
+                        )}
                       </div>
                     )}
 
@@ -617,7 +623,7 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
                       </Select>
                     </div>
 
-                    {paymentMethod === 'CASH' && (
+                    {paymentMethod === 'CASH' && paymentType !== 'ADVANCE_PAYMENT' && (
                       <div className="space-y-2">
                         <Label htmlFor="cashGiven">Cash Given</Label>
                         <Input

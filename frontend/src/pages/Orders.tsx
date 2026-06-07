@@ -61,6 +61,7 @@ import { kotService } from "@/api/services/kotService";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import { serviceChargeService } from "@/api/services/serviceChargeService";
 import type { ServiceCharge } from "@/types/service-charge";
+import { AsyncProductCombobox } from "@/components/ui/async-product-combobox";
 
 const Orders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -89,6 +90,7 @@ const Orders = () => {
 
   // Add item form state
   const [selectedProductId, setSelectedProductId] = useState("");
+  const [selectedProductItem, setSelectedProductItem] = useState<MyStockTableRow | null>(null);
   const [quantity, setQuantity] = useState(1);
 
   // Get current user info
@@ -230,7 +232,7 @@ const Orders = () => {
   const handleAddItemToOrder = async () => {
     if (!selectedOrder || !selectedProductId || quantity < 1) return;
 
-    const product = products.find((p) => p.productId === selectedProductId);
+    const product = selectedProductItem || products.find((p) => p.productId === selectedProductId);
     if (!product) return;
 
     setIsAddingItem(true);
@@ -254,6 +256,7 @@ const Orders = () => {
       setSelectedOrder(updatedOrder);
       setIsAddItemDialogOpen(false);
       setSelectedProductId("");
+      setSelectedProductItem(null);
       setQuantity(1);
       toast.success(`Added ${product.productName} to order`);
     } catch (error: any) {
@@ -967,7 +970,14 @@ const Orders = () => {
       </Dialog>
 
       {/* Add Item Dialog */}
-      <Dialog open={isAddItemDialogOpen} onOpenChange={setIsAddItemDialogOpen}>
+      <Dialog open={isAddItemDialogOpen} onOpenChange={(open) => {
+        setIsAddItemDialogOpen(open);
+        if (!open) {
+          setSelectedProductId("");
+          setSelectedProductItem(null);
+          setQuantity(1);
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Item to Order</DialogTitle>
@@ -979,22 +989,14 @@ const Orders = () => {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Select Product</Label>
-              <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a product" />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map((product) => {
-                    const customerType = selectedOrder?.customer_type as "local" | "foreigner";
-                    const priceToShow = customerType === "local" ? (product.localPrice ?? 0) : (product.foreignerPrice ?? 0);
-                    return (
-                      <SelectItem key={product.productId} value={product.productId}>
-                        {product.productName} - Rs.{priceToShow.toFixed(0)}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+              <AsyncProductCombobox
+                value={selectedProductId}
+                onValueChange={(val, label, product) => {
+                  setSelectedProductId(val);
+                  if (product) setSelectedProductItem(product);
+                }}
+                customerType={selectedOrder?.customer_type as "local" | "foreigner"}
+              />
             </div>
 
             <div className="space-y-2">
