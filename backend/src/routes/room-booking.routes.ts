@@ -61,4 +61,11 @@ router.patch(
   roomBookingController.cancelBooking
 );
 
+// Settle remaining balance
+router.patch(
+  '/:id/settle-balance',
+  authenticate,
+  roomBookingController.settleBalance
+);
+
 export default router;
