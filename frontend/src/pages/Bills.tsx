@@ -130,7 +130,7 @@ const Bills = () => {
         if (dateFrom) params.dateFrom = dateFrom;
         if (dateTo) params.dateTo = dateTo;
 
-  const resp = await api.get('/bills', { params, signal: controller.signal, meta: { showLoader: 'local', loaderKey: 'bills' } });
+        const resp = await api.get('/bills', { params, signal: controller.signal, meta: { showLoader: 'local', loaderKey: 'bills' } });
         const respData = resp.data;
         const list = respData?.billsResponse?.data ?? respData?.data ?? [];
         const pagination = respData?.billsResponse?.pagination ?? {};
@@ -258,6 +258,8 @@ const Bills = () => {
             ? 0
             : (balanceGivenNum !== undefined && !Number.isNaN(balanceGivenNum) ? balanceGivenNum : 0),
           creditDescription: detailed.creditNote ?? undefined,
+          tableNumber: detailed.table_number || detailed.tableNumber || undefined,
+          orderType: detailed.order_type || detailed.orderType || undefined,
           createdAt: detailed.dateTime ? new Date(detailed.dateTime) : bill.createdAt,
         };
 
@@ -391,6 +393,8 @@ const Bills = () => {
         amountPaid,
         change,
         creditDescription,
+        tableNumber: billForPayment.tableNumber,
+        orderType: billForPayment.orderType,
         createdAt: now,
       };
       printBillNewWindow(printable);
@@ -434,60 +438,60 @@ const Bills = () => {
           </div>
         )}
       >
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
-        <Card>
-          <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
-              Total Bills
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-xl md:text-2xl font-bold">{stats.totalBills}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
-              Total Revenue
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-xl md:text-2xl font-bold text-green-600">
-              Rs.{stats.totalRevenue.toFixed(0)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
-              Cash
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-xl md:text-2xl font-bold">{stats.cashBills}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
-              Card
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-xl md:text-2xl font-bold">{stats.cardBills}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
-              Credit
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-xl md:text-2xl font-bold text-yellow-600">{stats.creditBills}</div>
-          </CardContent>
-        </Card>
-      </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
+          <Card>
+            <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+                Total Bills
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-xl md:text-2xl font-bold">{stats.totalBills}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+                Total Revenue
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-xl md:text-2xl font-bold text-green-600">
+                Rs.{stats.totalRevenue.toFixed(0)}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+                Cash
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-xl md:text-2xl font-bold">{stats.cashBills}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+                Card
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-xl md:text-2xl font-bold">{stats.cardBills}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+                Credit
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-xl md:text-2xl font-bold text-yellow-600">{stats.creditBills}</div>
+            </CardContent>
+          </Card>
+        </div>
       </LocalLoader>
 
       {/* Filters */}
@@ -616,144 +620,144 @@ const Bills = () => {
         </CardHeader>
         <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
           <LocalLoader loaderKey="bills">
-          {/* Desktop Table */}
-          <div className="hidden md:block rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Bill ID</TableHead>
-                  <TableHead>Date & Time</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-center">Payment</TableHead>
-                  <TableHead className="text-center">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedBills.length === 0 ? (
+            {/* Desktop Table */}
+            <div className="hidden md:block rounded-md border overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <Receipt className="h-12 w-12" />
-                        <p>No bills found</p>
-                        <p className="text-sm">Try adjusting your filters</p>
-                      </div>
-                    </TableCell>
+                    <TableHead>Bill ID</TableHead>
+                    <TableHead>Date & Time</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Items</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-center">Payment</TableHead>
+                    <TableHead className="text-center">Action</TableHead>
                   </TableRow>
-                ) : (
-                  paginatedBills.map((bill) => (
-                    <TableRow key={bill.id}>
-                      <TableCell className="font-mono text-sm">{bill.billNumber || bill.id}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                          {formatSL(bill.createdAt, "dd/MM/yyyy")}
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          {formatSL(bill.createdAt, "HH:mm")}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {bill.customerName || <span className="text-muted-foreground">Not Provided</span>}
-                      </TableCell>
-                      <TableCell>{bill.items.length} items</TableCell>
-                      <TableCell className="text-right font-semibold">
-                        Rs.{bill.total.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {getPaymentMethodBadge(bill.paymentMethod)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewBill(bill)}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
-                          {selectedModule === 'pos' && bill.paymentMethod === 'credit' && (
-                            <Button
-                              variant="default"
-                              size="sm"
-                              onClick={() => handleOpenPayment(bill)}
-                              aria-label="Collect Payment"
-                              title="Collect Payment"
-                              className="p-2"
-                            >
-                              <Banknote className="h-4 w-4" />
-                            </Button>
-                          )}
+                </TableHeader>
+                <TableBody>
+                  {paginatedBills.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8">
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                          <Receipt className="h-12 w-12" />
+                          <p>No bills found</p>
+                          <p className="text-sm">Try adjusting your filters</p>
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                  ) : (
+                    paginatedBills.map((bill) => (
+                      <TableRow key={bill.id}>
+                        <TableCell className="font-mono text-sm">{bill.billNumber || bill.id}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-muted-foreground" />
+                            {formatSL(bill.createdAt, "dd/MM/yyyy")}
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            {formatSL(bill.createdAt, "HH:mm")}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {bill.customerName || <span className="text-muted-foreground">Not Provided</span>}
+                        </TableCell>
+                        <TableCell>{bill.items.length} items</TableCell>
+                        <TableCell className="text-right font-semibold">
+                          Rs.{bill.total.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {getPaymentMethodBadge(bill.paymentMethod)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewBill(bill)}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                            {selectedModule === 'pos' && bill.paymentMethod === 'credit' && (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => handleOpenPayment(bill)}
+                                aria-label="Collect Payment"
+                                title="Collect Payment"
+                                className="p-2"
+                              >
+                                <Banknote className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
 
-          {/* Mobile Card View */}
-          <div className="md:hidden space-y-3">
-            {paginatedBills.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 text-muted-foreground py-8">
-                <Receipt className="h-12 w-12" />
-                <p>No bills found</p>
-                <p className="text-sm">Try adjusting your filters</p>
-              </div>
-            ) : (
-              paginatedBills.map((bill) => (
-                <div
-                  key={bill.id}
-                  className="border rounded-lg p-3 space-y-2 bg-card"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-mono text-sm font-medium">{bill.billNumber || bill.id}</p>
-                      <p className="text-xs text-muted-foreground">
-                         {formatSL(bill.createdAt, "dd/MM/yyyy HH:mm")}
-                      </p>
-                    </div>
-                    {getPaymentMethodBadge(bill.paymentMethod)}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <p className="text-muted-foreground text-xs">Customer</p>
-                      <p className="font-medium">{bill.customerName || "Not Provided"}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Total</p>
-                      <p className="font-semibold text-green-600">Rs.{bill.total.toFixed(2)}</p>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center pt-2 border-t">
-                    <span className="text-xs text-muted-foreground">{bill.items.length} items</span>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleViewBill(bill)}>
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
-                      {selectedModule === 'pos' && bill.paymentMethod === 'credit' && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleOpenPayment(bill)}
-                          aria-label="Collect Payment"
-                          title="Collect Payment"
-                          className="p-2"
-                          disabled={isPrinting}
-                        >
-                          <Banknote className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-3">
+              {paginatedBills.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 text-muted-foreground py-8">
+                  <Receipt className="h-12 w-12" />
+                  <p>No bills found</p>
+                  <p className="text-sm">Try adjusting your filters</p>
                 </div>
-              ))
-            )}
-          </div>
+              ) : (
+                paginatedBills.map((bill) => (
+                  <div
+                    key={bill.id}
+                    className="border rounded-lg p-3 space-y-2 bg-card"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-mono text-sm font-medium">{bill.billNumber || bill.id}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatSL(bill.createdAt, "dd/MM/yyyy HH:mm")}
+                        </p>
+                      </div>
+                      {getPaymentMethodBadge(bill.paymentMethod)}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-muted-foreground text-xs">Customer</p>
+                        <p className="font-medium">{bill.customerName || "Not Provided"}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs">Total</p>
+                        <p className="font-semibold text-green-600">Rs.{bill.total.toFixed(2)}</p>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t">
+                      <span className="text-xs text-muted-foreground">{bill.items.length} items</span>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleViewBill(bill)}>
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
+                        {selectedModule === 'pos' && bill.paymentMethod === 'credit' && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleOpenPayment(bill)}
+                            aria-label="Collect Payment"
+                            title="Collect Payment"
+                            className="p-2"
+                            disabled={isPrinting}
+                          >
+                            <Banknote className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </LocalLoader>
 
           {/* Pagination */}
@@ -873,7 +877,7 @@ const Bills = () => {
               <div>Loading bill...</div>
             </div>
           ) : selectedBill ? (
-             <div className="space-y-4">
+            <div className="space-y-4">
               {/* Bill Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
@@ -882,13 +886,25 @@ const Bills = () => {
                     Date & Time
                   </p>
                   <p className="font-medium">
-                    {format(selectedBill.createdAt, "MMMM dd, yyyy hh:mm a")}
+                    {formatSL(selectedBill.createdAt, "MMMM dd, yyyy hh:mm a")}
                   </p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Payment Method</p>
                   {getPaymentMethodBadge(selectedBill.paymentMethod)}
                 </div>
+                {selectedBill.orderType && (
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Order Type</p>
+                    <p className="font-medium capitalize">{selectedBill.orderType.replace('_', ' ')}</p>
+                  </div>
+                )}
+                {selectedBill.tableNumber && (
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Table</p>
+                    <p className="font-medium">{selectedBill.tableNumber}</p>
+                  </div>
+                )}
               </div>
 
               {/* Customer Info */}
@@ -1024,8 +1040,8 @@ const Bills = () => {
           ) : (
             <div className="py-8 text-center text-muted-foreground">No bill selected</div>
           )}
-         </DialogContent>
-       </Dialog>
+        </DialogContent>
+      </Dialog>
 
       {/* Payment Dialog for POS */}
       <PaymentDialog
@@ -1035,9 +1051,9 @@ const Bills = () => {
         onConfirmPayment={handleConfirmPayment}
         isPrinting={isPrinting}
       />
-     </div>
-   );
- };
+    </div>
+  );
+};
 
- export default Bills;
+export default Bills;
 

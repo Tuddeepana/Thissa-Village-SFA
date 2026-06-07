@@ -227,6 +227,16 @@ const buildBillBody = (
     <span class="info-label">Date</span>
     <span>${format(bill.createdAt, 'dd/MM/yyyy HH:mm:ss')}</span>
   </div>
+  ${bill.orderType ? `
+  <div class="info-row">
+    <span class="info-label">Order Type</span>
+    <span>${bill.orderType === 'dine_in' ? 'Dine In' : 'Take Away'}</span>
+  </div>` : ''}
+  ${bill.tableNumber ? `
+  <div class="info-row">
+    <span class="info-label">Table</span>
+    <span>${bill.tableNumber}</span>
+  </div>` : ''}
   ${bill.customerName ? `
   <div class="info-row">
     <span class="info-label">Customer</span>
@@ -294,6 +304,7 @@ const buildBillBody = (
     </div>
   </div>
 
+  ${bill.paymentMethod ? `
   <div class="payment-section">
     <div class="payment-row">
       <span class="payment-label">Payment</span>
@@ -302,12 +313,12 @@ const buildBillBody = (
     ${bill.paymentMethod !== 'credit' ? `
     <div class="payment-row">
       <span class="payment-label">Amount Paid</span>
-      <span>Rs. ${bill.amountPaid.toFixed(2)}</span>
+      <span>Rs. ${(bill.amountPaid ?? 0).toFixed(2)}</span>
     </div>
-    ${bill.change > 0 ? `
+    ${(bill.change ?? 0) > 0 ? `
     <div class="payment-row">
       <span class="payment-label">Change</span>
-      <span>Rs. ${bill.change.toFixed(2)}</span>
+      <span>Rs. ${(bill.change ?? 0).toFixed(2)}</span>
     </div>` : ''}` : `
     <div class="payment-row">
       <span class="payment-label">Status</span>
@@ -318,7 +329,7 @@ const buildBillBody = (
       <div class="credit-note-title">Credit Note:</div>
       <div>${bill.creditDescription}</div>
     </div>` : ''}`}
-  </div>
+  </div>` : ''}
 
   <hr class="div-thick">
 

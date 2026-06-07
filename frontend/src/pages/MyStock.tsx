@@ -18,6 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
+import { AsyncCategoryCombobox } from "@/components/ui/async-category-combobox";
 import { Badge } from "@/components/ui/badge";
 import { Download, Search, Package, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import api from "@/api/client";
@@ -31,7 +33,7 @@ import { format } from "date-fns";
 const MyStock = () => {
   const [searchProduct, setSearchProduct] = useState("");
   const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategoryLabel, setSelectedCategoryLabel] = useState<string>("All categories");
   const ALL_CATEGORY_VALUE = '__ALL__';
   const ALL_STOCK_VALUE = 'ALL_STOCK';
   const [stockFilter, setStockFilter] = useState<string>(ALL_STOCK_VALUE);
@@ -78,21 +80,6 @@ const MyStock = () => {
     fetchData();
     return () => { cancelled = true; };
   }, [currentPage, itemsPerPage, searchProduct, categoryId, stockFilter]);
-
-  // Fetch categories for dropdown
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const { categories } = await categoryService.list({ page: 1, limit: 100 });
-        if (!mounted) return;
-        setCategories(categories || []);
-      } catch (err) {
-        console.error('Failed to load categories', err);
-      }
-    })();
-    return () => { mounted = false; };
-  }, []);
 
   // Apply client-side item name filter on server rows
   const filteredItems = useMemo<MyStockTableRow[]>(() => {
@@ -209,6 +196,7 @@ const MyStock = () => {
   const clearFilters = () => {
     setSearchProduct("");
     setCategoryId(undefined);
+    setSelectedCategoryLabel("All categories");
     setStockFilter(ALL_STOCK_VALUE);
     setCurrentPage(1);
   };
@@ -315,19 +303,20 @@ const MyStock = () => {
                 className="h-9 md:h-10"
               />
             </div>
-            <div className="space-y-2 col-span-2 md:col-span-1">
+            <div className="space-y-2 col-span-2 md:col-span-1 flex flex-col">
               <Label htmlFor="categorySelect" className="text-xs md:text-sm">Category</Label>
-              <Select value={categoryId || ALL_CATEGORY_VALUE} onValueChange={(val) => setCategoryId(val === ALL_CATEGORY_VALUE ? undefined : val)}>
-                <SelectTrigger id="categorySelect" className="h-9 md:h-10">
-                  <SelectValue placeholder="All categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_CATEGORY_VALUE}>All categories</SelectItem>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <AsyncCategoryCombobox
+                defaultOptions={[{ label: "All categories", value: ALL_CATEGORY_VALUE }]}
+                value={categoryId || ALL_CATEGORY_VALUE}
+                onValueChange={(val, label) => {
+                  setCategoryId(val === ALL_CATEGORY_VALUE ? undefined : val);
+                  setSelectedCategoryLabel(label);
+                }}
+                selectedLabel={selectedCategoryLabel}
+                placeholder="All categories"
+                searchPlaceholder="Search category..."
+                className="h-9 md:h-10"
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-xs md:text-sm">Stock Filter</Label>

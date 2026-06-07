@@ -1,48 +1,76 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AsyncCategoryCombobox } from "@/components/ui/async-category-combobox";
 import { Search, Plus, AlertTriangle } from "lucide-react";
 import { Product } from "@/types/pos";
+import api from "@/api/client";
+import { MyStockResponse, MyStockTableRow } from "@/types/mystock";
+import { useDebounce } from "@/hooks/use-debounce";
+import LocalLoader from "@/components/common/LocalLoader";
 
 interface ProductSearchProps {
-  products: Product[];
   onAddProduct: (product: Product) => void;
   customerType: "local" | "foreigner";
 }
 
-export function ProductSearch({ products, onAddProduct, customerType }: ProductSearchProps) {
+export function ProductSearch({ onAddProduct, customerType }: ProductSearchProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(searchQuery, 300);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedCategoryLabel, setSelectedCategoryLabel] = useState<string>("All Categories");
 
-  // Extract unique categories
-  const categories = useMemo(() => {
-    const categorySet = new Set(products.map((p) => p.category));
-    return ["all", ...Array.from(categorySet).sort()];
-  }, [products]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  // Filter products based on search and category
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.description?.toLowerCase().includes(searchQuery.toLowerCase());
+  // Reset page when search or category changes
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, selectedCategory]);
 
-      const matchesCategory =
-        selectedCategory === "all" || product.category === selectedCategory;
+  // Fetch products from API
+  useEffect(() => {
+    let cancelled = false;
+    const fetchProducts = async () => {
+      setLoading(true);
+      try {
+        const params: any = { page, pageSize: 24 }; // 24 is a good grid size
+        if (debouncedSearch) params.search = debouncedSearch;
+        if (selectedCategory && selectedCategory !== "all") params.categoryId = selectedCategory;
 
-      return matchesSearch && matchesCategory;
-    });
-  }, [products, searchQuery, selectedCategory]);
+        const res = await api.get<MyStockResponse>('/mystock', { params, meta: { showLoader: 'local', loaderKey: 'pos-products' } });
+        if (cancelled) return;
+        
+        const rows: MyStockTableRow[] = res.data.tableResponse?.data ?? [];
+        const mapped: Product[] = rows.map((r) => ({
+          id: r.productId,
+          name: r.productName,
+          category: r.category?.name ?? '',
+          product_type: r.productType,
+          unit: r.unitType ?? null,
+          foreignerPrice: r.foreignerPrice ?? 0,
+          localPrice: r.localPrice ?? 0,
+          cost: r.foreignerPrice ?? 0,
+          stock: r.availableQuantity,
+          minStock: r.minStock ?? 0,
+          createdAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
+          updatedAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
+        }));
+        setProducts(mapped);
+        setTotalPages(res.data.tableResponse?.pagination?.totalPages ?? 1);
+      } catch (err) {
+        console.error('Failed to load products for POS', err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    fetchProducts();
+    return () => { cancelled = true; };
+  }, [page, debouncedSearch, selectedCategory]);
 
   const isLowStock = (product: Product) => {
     // Handmade products don't have stock tracking
@@ -58,6 +86,31 @@ export function ProductSearch({ products, onAddProduct, customerType }: ProductS
 
   return (
     <div className="space-y-4">
+      {/* Header and Pagination */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-sm text-muted-foreground">
+          Showing page {page} of {totalPages}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            Prev
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+
       {/* Search and Filter */}
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
@@ -69,28 +122,31 @@ export function ProductSearch({ products, onAddProduct, customerType }: ProductS
             className="pl-10"
           />
         </div>
-        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-          <SelectTrigger className="w-full sm:w-[200px]">
-            <SelectValue placeholder="Category" />
-          </SelectTrigger>
-          <SelectContent>
-            {categories.map((category) => (
-              <SelectItem key={category} value={category}>
-                {category === "all" ? "All Categories" : category}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="w-full sm:w-[200px]">
+          <AsyncCategoryCombobox
+            defaultOptions={[{ label: "All Categories", value: "all" }]}
+            value={selectedCategory}
+            onValueChange={(val, label) => {
+              setSelectedCategory(val);
+              setSelectedCategoryLabel(label);
+            }}
+            selectedLabel={selectedCategoryLabel}
+            placeholder="Category"
+            searchPlaceholder="Search category..."
+            className="w-full"
+          />
+        </div>
       </div>
 
       {/* Product Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
-        {filteredProducts.length === 0 ? (
-          <div className="col-span-full text-center py-8 text-muted-foreground">
-            No products found
-          </div>
-        ) : (
-          filteredProducts.map((product) => (
+      <LocalLoader loaderKey="pos-products">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
+          {products.length === 0 && !loading ? (
+            <div className="col-span-full text-center py-8 text-muted-foreground">
+              No products found
+            </div>
+          ) : (
+            products.map((product) => (
             <Card
               key={product.id}
               className={`hover:shadow-md transition-shadow ${
@@ -200,7 +256,11 @@ export function ProductSearch({ products, onAddProduct, customerType }: ProductS
             </Card>
           ))
         )}
-      </div>
+        </div>
+      </LocalLoader>
+      {loading && (
+        <p className="text-xs text-muted-foreground mt-2">Loading products...</p>
+      )}
     </div>
   );
 }

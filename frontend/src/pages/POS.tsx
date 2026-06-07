@@ -50,9 +50,17 @@ import {
   Globe,
   Users,
   TestTube2,
+  WifiOff,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
 } from "lucide-react";
+import { configService } from "@/api/services/configService";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 1000;
+
+type AgentStatus = "unknown" | "checking" | "online" | "offline";
 
 // Table status for dine-in
 interface TableInfo {
@@ -79,9 +87,9 @@ const POS = () => {
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [stewards, setStewards] = useState<AppUser[]>([]);
   const [isTestingPrinter, setIsTestingPrinter] = useState(false);
+  const [agentStatus, setAgentStatus] = useState<AgentStatus>("unknown");
 
   // Products and Cart
-  const [products, setProducts] = useState<Product[]>([]);
   const [billItems, setBillItems] = useState<BillItem[]>(() => {
     try {
       const saved = localStorage.getItem("pos_billItems");
@@ -121,9 +129,6 @@ const POS = () => {
   const [serviceCharge, setServiceCharge] = useState<{ percentage: number; isActive: boolean } | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isRoomBookingDialogOpen, setIsRoomBookingDialogOpen] = useState(false);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loadingProducts, setLoadingProducts] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isSendingKot, setIsSendingKot] = useState(false);
@@ -173,6 +178,26 @@ const POS = () => {
     }, 500);
     return () => clearTimeout(timer);
   }, [customerName, customerPhone, customerType, orderType, selectedTable, taxRate, discountRate, selectedSteward, kotRemark]);
+
+  // Check agent health on mount
+  const checkAgentHealth = useCallback(async () => {
+    setAgentStatus("checking");
+    try {
+      const urlConfig = await configService.get("PRINT_AGENT_URL");
+      if (urlConfig?.value) {
+        await printerService.checkAgentHealth(urlConfig.value);
+        setAgentStatus("online");
+      } else {
+        setAgentStatus("unknown");
+      }
+    } catch {
+      setAgentStatus("offline");
+    }
+  }, []);
+
+  useEffect(() => {
+    checkAgentHealth();
+  }, [checkAgentHealth]);
 
   // Fetch stewards
   useEffect(() => {
@@ -267,45 +292,6 @@ const POS = () => {
       if (tableAbortRef.current) tableAbortRef.current.abort();
     };
   }, [fetchTables]);
-
-  // Fetch products from /api/mystock and map to POS Product shape
-  useEffect(() => {
-    let cancelled = false;
-    const fetchProducts = async () => {
-      setLoadingProducts(true);
-      try {
-        const res = await api.get<MyStockResponse>('/mystock', { params: { page, pageSize: PAGE_SIZE }, meta: { showLoader: 'local', loaderKey: 'pos-products' } });
-        if (cancelled) return;
-        const rows: MyStockTableRow[] = res.data.tableResponse?.data ?? [];
-        const mapped: Product[] = rows.map((r) => ({
-          id: r.productId,
-          name: r.productName,
-          category: r.category?.name ?? '',
-          product_type: r.productType,
-          unit: r.unitType ?? null,
-          foreignerPrice: r.foreignerPrice ?? 0,
-          localPrice: r.localPrice ?? 0,
-          cost: r.foreignerPrice ?? 0, // Use foreigner price as default for cost calculation
-          stock: r.availableQuantity,
-          minStock: r.minStock ?? 0,
-          image: undefined,
-          description: undefined,
-          createdAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
-          updatedAt: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
-        }));
-        setProducts(mapped);
-        const pagination = res.data.tableResponse?.pagination;
-        setTotalPages(pagination?.totalPages ?? 1);
-      } catch (err) {
-        console.error('Failed to load products for POS', err);
-        toast.error('Failed to load products');
-      } finally {
-        if (!cancelled) setLoadingProducts(false);
-      }
-    };
-    fetchProducts();
-    return () => { cancelled = true; };
-  }, [page]);
 
   // Fetch service charge config (SFA setting)
   useEffect(() => {
@@ -766,6 +752,10 @@ const POS = () => {
       .post('/bills', payload)
       .then((res) => {
         const createdBillNumber = res?.data?.data?.bill?.bill_number || res?.data?.data?.billNumber || res?.data?.data?.bill_number || billNumber;
+        const selectedTableInfo = orderType === "dine_in"
+          ? tables.find(t => t.id === selectedTable)
+          : null;
+
         // Prepare printable bill object
         const bill: Bill = {
           id: createdBillNumber,
@@ -786,6 +776,8 @@ const POS = () => {
           amountPaid,
           change,
           creditDescription,
+          tableNumber: selectedTableInfo?.displayName,
+          orderType: orderType,
           createdAt: now,
         };
         printBillNewWindow(bill);
@@ -814,6 +806,7 @@ const POS = () => {
       const result = await printerService.testAgentPrint();
       if (result.success) {
         toast.success("Test print sent!", { description: result.message });
+        setAgentStatus("online");
       } else {
         toast.error("Test print failed", { description: result.message });
       }
@@ -822,6 +815,7 @@ const POS = () => {
       toast.error("Test print failed", {
         description: error.message || "Could not reach the print agent. Make sure it is configured in Printer Setup.",
       });
+      setAgentStatus("offline");
     } finally {
       setIsTestingPrinter(false);
     }
@@ -837,15 +831,50 @@ const POS = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {(() => {
+            const statusConfig = {
+              unknown: { icon: WifiOff, label: "Printer Unconfigured", color: "text-muted-foreground", bg: "bg-muted" },
+              checking: { icon: Loader2, label: "Checking Printer...", color: "text-yellow-600", bg: "bg-yellow-50 dark:bg-yellow-950" },
+              online: { icon: CheckCircle2, label: "Printer Online", color: "text-green-600", bg: "bg-green-50 dark:bg-green-950" },
+              offline: { icon: XCircle, label: "Printer Offline", color: "text-red-600", bg: "bg-red-50 dark:bg-red-950" },
+            };
+            const currentStatus = statusConfig[agentStatus];
+            const StatusIcon = currentStatus.icon;
+            return (
+              <div
+                className={`flex items-center gap-2 px-3 py-1.5 rounded border ${currentStatus.bg}`}
+              >
+                <StatusIcon
+                  className={`h-4 w-4 ${currentStatus.color} ${
+                    agentStatus === "checking" ? "animate-spin" : ""
+                  }`}
+                />
+                <span className={`font-medium text-xs ${currentStatus.color}`}>
+                  {currentStatus.label}
+                </span>
+                {agentStatus !== "checking" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 w-5 p-0 ml-1"
+                    onClick={checkAgentHealth}
+                    title="Refresh printer status"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            );
+          })()}
           <Button
             variant="outline"
             size="sm"
             onClick={handleTestPrint}
             disabled={isTestingPrinter}
-            className="text-muted-foreground"
+            className="text-muted-foreground h-8"
           >
             <TestTube2 className="h-4 w-4 mr-2" />
-            {isTestingPrinter ? "Testing..." : "Test Agent Print"}
+            {isTestingPrinter ? "Testing..." : "Test"}
           </Button>
           <Badge
             variant="outline"
@@ -983,39 +1012,10 @@ const POS = () => {
           {/* Product Search */}
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-sm text-muted-foreground">
-                  Showing page {page} of {totalPages}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                  >
-                    Prev
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-              <LocalLoader loaderKey="pos-products">
-                <ProductSearch
-                  products={products}
-                  onAddProduct={handleAddProduct}
-                  customerType={customerType}
-                />
-              </LocalLoader>
-              {loadingProducts && (
-                <p className="text-xs text-muted-foreground mt-2">Loading products...</p>
-              )}
+              <ProductSearch
+                onAddProduct={handleAddProduct}
+                customerType={customerType}
+              />
             </CardContent>
           </Card>
         </div>

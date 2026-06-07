@@ -41,6 +41,7 @@ class DashboardService {
         by: ['date'],
         where: { date: { gte: weekStart, lte: weekEnd } },
         _sum: { total: true },
+        _count: { id: true },
       }),
 
       // 3. Monthly income grouped by month using raw SQL (1 query instead of 12 + 1)
@@ -97,13 +98,24 @@ class DashboardService {
       saturday: '0',
       sunday: '0',
     };
+    const weeklyBillCounts: Record<string, number> = {
+      monday: 0,
+      tuesday: 0,
+      wensday: 0,
+      thursday: 0,
+      friday: 0,
+      saturday: 0,
+      sunday: 0,
+    };
     let weeklyTotal = 0;
 
     for (const row of weeklyGrouped) {
       const d = new Date(row.date);
       const dayName = DAY_NAMES[d.getDay()];
       const sum = row._sum?.total ? Number(row._sum.total) : 0;
-      weeklySums[dayName] = sum.toFixed(2);
+      const count = row._count?.id ? Number(row._count.id) : 0;
+      weeklySums[dayName] = (Number(weeklySums[dayName]) + sum).toFixed(2);
+      weeklyBillCounts[dayName] += count;
       weeklyTotal += sum;
     }
 
@@ -146,6 +158,7 @@ class DashboardService {
       monthlyIncome: monthlyTotal.toFixed(2),
       weeklyIncomeResponse: weeklySums,
       monthlyIncomeResponse: monthlySums,
+      weeklyBillCountResponse: weeklyBillCounts,
       TotalProduct: totalProducts,
       lowStockItemsCount: lowStockItems.length,
       lowStockItems,

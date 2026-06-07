@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, Package, AlertCircle } from "lucide-react";
+import { DollarSign, TrendingUp, Package, AlertCircle, Receipt } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -16,6 +16,7 @@ import {
 import api from '@/api/client';
 import LocalLoader from '@/components/common/LocalLoader';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatSL } from '@/utils/dateUtils';
 
 // color palette for pie slices
 const COLOR_VARS = [
@@ -38,6 +39,8 @@ const Dashboard = () => {
   const [categoryData, setCategoryData] = useState<Array<{ name: string; value: number; color: string }>>([]);
 
   const [weeklyIncome, setWeeklyIncome] = useState<string>('0');
+  const [dailyIncome, setDailyIncome] = useState<string>('0');
+  const [todayBillCount, setTodayBillCount] = useState<number>(0);
   const [monthlyIncome, setMonthlyIncome] = useState<string>('0');
   const [totalProducts, setTotalProducts] = useState<number>(0);
   const [lowStockCount, setLowStockCount] = useState<number>(0);
@@ -61,6 +64,11 @@ const Dashboard = () => {
         setMonthlyIncome(payload.monthlyIncome ?? '0');
         setTotalProducts(Number(payload.TotalProduct ?? 0));
         setLowStockCount((payload.lowStockItems ?? []).length ?? 0);
+
+        const DAY_ORDER_BACKEND = ['sunday', 'monday', 'tuesday', 'wensday', 'thursday', 'friday', 'saturday'];
+        const todayKey = DAY_ORDER_BACKEND[new Date().getDay()];
+        setDailyIncome(payload.weeklyIncomeResponse?.[todayKey] ?? '0');
+        setTodayBillCount(payload.weeklyBillCountResponse?.[todayKey] ?? 0);
 
         // Weekly chart mapping
         const wResp = payload.weeklyIncomeResponse ?? {};
@@ -106,8 +114,8 @@ const Dashboard = () => {
       <LocalLoader
         loaderKey="dashboard-stats"
         renderSkeleton={() => (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, i) => (
               <Card key={i}>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <Skeleton className="h-4 w-24" />
@@ -122,18 +130,29 @@ const Dashboard = () => {
           </div>
         )}
       >
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Weekly Income</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Daily Revenue</CardTitle>
             <DollarSign className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">Rs.{Number(weeklyIncome || '0').toFixed(2)}</div>
-            <p className="text-xs text-success flex items-center gap-1 mt-1">
-              <TrendingUp className="h-3 w-3" />
-              {/* Placeholder percent; could be derived from previous week */}
-              +{weeklyData.length ? Math.round(((weeklyData.reduce((s, d) => s + d.income, 0) / (weeklyData.length || 1)) / 100) * 100) : 0}% from last week
+            <div className="text-2xl font-bold text-foreground">Rs.{Number(dailyIncome || '0').toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Colombo', month: 'short', day: '2-digit', year: 'numeric' }).format(new Date())}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Today Bills</CardTitle>
+            <Receipt className="h-4 w-4 text-accent" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{todayBillCount}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Colombo', month: 'short', day: '2-digit', year: 'numeric' }).format(new Date())}
             </p>
           </CardContent>
         </Card>
@@ -145,9 +164,8 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">Rs.{Number(monthlyIncome || '0').toFixed(2)}</div>
-            <p className="text-xs text-success flex items-center gap-1 mt-1">
-              <TrendingUp className="h-3 w-3" />
-              +{monthlyData.length ? Math.round(((monthlyData.reduce((s, d) => s + d.revenue, 0) / (monthlyData.length || 1)) / 100) * 100) : 0}% from last month
+            <p className="text-xs text-muted-foreground mt-1">
+              {new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Colombo', month: 'long', year: 'numeric' }).format(new Date())}
             </p>
           </CardContent>
         </Card>

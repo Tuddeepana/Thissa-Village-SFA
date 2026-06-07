@@ -18,6 +18,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
+import { AsyncCategoryCombobox } from "@/components/ui/async-category-combobox";
 import { Pencil, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -43,18 +45,13 @@ type ProductListResult = {
 const Products = () => {
     const { toast } = useToast();
     const [products, setProducts] = useState<Product[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
     const [units, setUnits] = useState<Unit[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
+    const [selectedCategoryLabel, setSelectedCategoryLabel] = useState<string>("All categories");
     const [isAddSubmitting, setIsAddSubmitting] = useState(false);
     const [isEditSubmitting, setIsEditSubmitting] = useState(false);
     const ALL_CATEGORY_VALUE = '__ALL__';
-    const categoryNameById = useMemo(() => {
-        const map: Record<string, string> = {};
-        categories.forEach(c => { if (c.id) map[c.id] = c.name; });
-        return map;
-    }, [categories]);
 
     const [open, setOpen] = useState(false);
 
@@ -65,10 +62,13 @@ const Products = () => {
     const [editingForeignerPrice, setEditingForeignerPrice] = useState<number | "">("");
     const [editingLocalPrice, setEditingLocalPrice] = useState<number | "">("");
     const [editingProductType, setEditingProductType] = useState<'HANDMADE' | 'PURCHASE'>('PURCHASE');
+    const [editingCategoryId, setEditingCategoryId] = useState<string>("");
+    const [editingCategoryLabel, setEditingCategoryLabel] = useState<string>("");
 
     // Controlled form state for minimal add form
     const [newName, setNewName] = useState("");
     const [newCategory, setNewCategory] = useState("");
+    const [newCategoryLabel, setNewCategoryLabel] = useState("");
     const [newProductType, setNewProductType] = useState<'HANDMADE' | 'PURCHASE'>('PURCHASE');
     const [newBarcode, setNewBarcode] = useState("");
     const [newUnitType, setNewUnitType] = useState("");
@@ -95,6 +95,8 @@ const Products = () => {
         setEditingForeignerPrice(Number.parseFloat(product.foreigner_price));
         setEditingLocalPrice(Number.parseFloat(product.local_price));
         setEditingProductType(product.product_type);
+        setEditingCategoryId(product.categoryId);
+        setEditingCategoryLabel(product.categoryName ?? "");
     };
 
     const cancelEditing = () => {
@@ -104,6 +106,8 @@ const Products = () => {
         setEditingForeignerPrice("");
         setEditingLocalPrice("");
         setEditingProductType('PURCHASE');
+        setEditingCategoryId("");
+        setEditingCategoryLabel("");
     };
 
     const saveEditing = async () => {
@@ -119,6 +123,7 @@ const Products = () => {
                 cost_price: Number.isNaN(costPriceNum) ? undefined : costPriceNum.toFixed(2),
                 foreigner_price: Number.isNaN(foreignerPriceNum) ? undefined : foreignerPriceNum.toFixed(2),
                 local_price: Number.isNaN(localPriceNum) ? undefined : localPriceNum.toFixed(2),
+                categoryId: editingCategoryId || undefined,
             });
             toast({ title: "Updated", description: "Product details updated" });
             cancelEditing();
@@ -131,6 +136,7 @@ const Products = () => {
     const resetForm = () => {
         setNewName("");
         setNewCategory("");
+        setNewCategoryLabel("");
         setNewProductType('PURCHASE');
         setNewBarcode("");
         setNewUnitType("");
@@ -143,6 +149,7 @@ const Products = () => {
     const clearFilters = () => {
         setSearchQuery("");
         setSelectedCategory(undefined);
+        setSelectedCategoryLabel("All categories");
         setCurrentPage(1);
     };
 
@@ -153,8 +160,8 @@ const Products = () => {
     // Fetch products with pagination and filters
     const { data: productResult, refetch: refetchProducts, isFetching } = useQuery<ProductListResult, Error, ProductListResult>({
         queryKey: ["products", { page: currentPage, limit: itemsPerPage, search: searchQuery, categoryId: selectedCategory }],
-        queryFn: async () => productService.list({ 
-            page: currentPage, 
+        queryFn: async () => productService.list({
+            page: currentPage,
             limit: itemsPerPage,
             search: searchQuery || undefined,
             categoryId: selectedCategory || undefined,
@@ -173,20 +180,6 @@ const Products = () => {
     const limit = pr?.limit ?? itemsPerPage;
     const total = pr?.total ?? (products?.length ?? 0);
     const totalPages = pr?.totalPages ?? Math.max(1, Math.ceil((total || 1) / (limit || 1)));
-
-    // Fetch categories for select and name mapping
-    const { data: categoryList } = useQuery({
-        queryKey: ["categories-all"],
-        queryFn: async () => {
-            const { categories } = await categoryService.list();
-            return categories;
-        },
-        staleTime: 30_000,
-    });
-
-    useEffect(() => {
-        if (categoryList) setCategories(categoryList);
-    }, [categoryList]);
 
     // Fetch units for unit type select
     const { data: unitList } = useQuery({
@@ -262,18 +255,15 @@ const Products = () => {
                             <DialogTitle>Add New Product</DialogTitle>
                         </DialogHeader>
                         <form className="space-y-4" onSubmit={handleAddSubmit}>
-                            <div className="space-y-2">
+                            <div className="space-y-2 flex flex-col">
                                 <Label htmlFor="category">Category</Label>
-                                <Select value={newCategory} onValueChange={(val) => setNewCategory(val)}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select category" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {categories.map((c) => (
-                                            <SelectItem key={c.id} value={c.id!}>{c.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <AsyncCategoryCombobox
+                                    value={newCategory}
+                                    onValueChange={(val, label) => { setNewCategory(val); setNewCategoryLabel(label); }}
+                                    selectedLabel={newCategoryLabel}
+                                    placeholder="Select category..."
+                                    searchPlaceholder="Search category..."
+                                />
                             </div>
 
                             <div className="space-y-2">
@@ -413,22 +403,21 @@ const Products = () => {
                                 className="h-9 md:h-10"
                             />
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-2 flex flex-col">
                             <Label htmlFor="categoryFilter" className="text-xs md:text-sm">Category</Label>
-                            <Select value={selectedCategory || ALL_CATEGORY_VALUE} onValueChange={(val) => {
-                                setSelectedCategory(val === ALL_CATEGORY_VALUE ? undefined : val);
-                                setCurrentPage(1);
-                            }}>
-                                <SelectTrigger id="categoryFilter" className="h-9 md:h-10">
-                                    <SelectValue placeholder="All categories" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value={ALL_CATEGORY_VALUE}>All categories</SelectItem>
-                                    {categories.map((c) => (
-                                        <SelectItem key={c.id} value={c.id!}>{c.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <AsyncCategoryCombobox
+                                defaultOptions={[{ label: "All categories", value: ALL_CATEGORY_VALUE }]}
+                                value={selectedCategory || ALL_CATEGORY_VALUE}
+                                onValueChange={(val, label) => {
+                                    setSelectedCategory(val === ALL_CATEGORY_VALUE ? undefined : val);
+                                    setSelectedCategoryLabel(label);
+                                    setCurrentPage(1);
+                                }}
+                                selectedLabel={selectedCategoryLabel}
+                                placeholder="All categories"
+                                searchPlaceholder="Search category..."
+                                className="h-9 md:h-10"
+                            />
                         </div>
                         <div className="space-y-2">
                             <Label className="text-xs md:text-sm hidden md:block">&nbsp;</Label>
@@ -457,125 +446,141 @@ const Products = () => {
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
                     <LocalLoader loaderKey="products">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Category</TableHead>
-                                <TableHead>Product Type</TableHead>
-                                <TableHead>Barcode</TableHead>
-                                <TableHead>Unit Type</TableHead>
-                                <TableHead>Product Price</TableHead>
-                                <TableHead>Selling Price (Foreigner)</TableHead>
-                                <TableHead>Selling Price (Local)</TableHead>
-                                <TableHead>Low Stock Alert</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {products.map((product) => (
-                                <TableRow key={product.id}>
-                                    <TableCell className="font-medium">{product.name}</TableCell>
-                                    <TableCell>{categoryNameById[product.categoryId] ?? "-"}</TableCell>
-                                    <TableCell>
-                                        {editingId === product.id ? (
-                                            <Select value={editingProductType} onValueChange={(val) => setEditingProductType(val as 'HANDMADE' | 'PURCHASE')}>
-                                                <SelectTrigger className="w-32">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="PURCHASE">Purchase</SelectItem>
-                                                    <SelectItem value="HANDMADE">HandMade</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        ) : (
-                                            product.product_type === 'HANDMADE' ? 'HandMade' : 'Purchase'
-                                        )}
-                                    </TableCell>
-                                    <TableCell>{product.barcode ?? "-"}</TableCell>
-                                    <TableCell>{product.unit_type ?? "-"}</TableCell>
-                                    <TableCell>
-                                        {editingId === product.id ? (
-                                            <Input
-                                                className="w-24"
-                                                type="number"
-                                                value={editingCostPrice === "" ? "" : String(editingCostPrice)}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setEditingCostPrice(val === "" ? "" : Number(val));
-                                                }}
-                                            />
-                                        ) : (
-                                            product.cost_price
-                                        )}
-                                    </TableCell>
-                                    <TableCell>
-                                        {editingId === product.id ? (
-                                            <Input
-                                                className="w-24"
-                                                type="number"
-                                                value={editingForeignerPrice === "" ? "" : String(editingForeignerPrice)}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setEditingForeignerPrice(val === "" ? "" : Number(val));
-                                                }}
-                                            />
-                                        ) : (
-                                            product.foreigner_price
-                                        )}
-                                    </TableCell>
-                                    <TableCell>
-                                        {editingId === product.id ? (
-                                            <Input
-                                                className="w-24"
-                                                type="number"
-                                                value={editingLocalPrice === "" ? "" : String(editingLocalPrice)}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setEditingLocalPrice(val === "" ? "" : Number(val));
-                                                }}
-                                            />
-                                        ) : (
-                                            product.local_price ?? "-"
-                                        )}
-                                    </TableCell>
-                                    <TableCell>
-                                        {editingId === product.id ? (
-                                            <Input
-                                                className="w-24"
-                                                type="number"
-                                                value={editingLow === "" ? "" : String(editingLow)}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setEditingLow(val === "" ? "" : Number(val));
-                                                }}
-                                            />
-                                        ) : (
-                                            product.low_stock ?? "-"
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex justify-end gap-2">
-                                            {editingId === product.id ? (
-                                                <>
-                                                    <Button type="button" size="sm" onClick={saveEditing}>Save</Button>
-                                                    <Button type="button" size="sm" variant="ghost" onClick={cancelEditing}>Cancel</Button>
-                                                </>
-                                            ) : (
-                                                <Button type="button" variant="ghost" size="icon" onClick={() => startEditing(product)}>
-                                                    <Pencil className="h-4 w-4" />
-                                                </Button>
-                                            )}
-                                            <DeleteButton
-                                                onDelete={() => handleDelete(product.id)}
-                                                itemName={product.name}
-                                            />
-                                        </div>
-                                    </TableCell>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Category</TableHead>
+                                    <TableHead>Product Type</TableHead>
+                                    <TableHead>Barcode</TableHead>
+                                    <TableHead>Unit Type</TableHead>
+                                    <TableHead>Product Price</TableHead>
+                                    <TableHead>Selling Price (Foreigner)</TableHead>
+                                    <TableHead>Selling Price (Local)</TableHead>
+                                    <TableHead>Low Stock Alert</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {products.map((product) => (
+                                    <TableRow key={product.id}>
+                                        <TableCell className="font-medium">{product.name}</TableCell>
+                                        <TableCell>
+                                            {editingId === product.id ? (
+                                                <AsyncCategoryCombobox
+                                                    value={editingCategoryId}
+                                                    onValueChange={(val, label) => {
+                                                        setEditingCategoryId(val);
+                                                        setEditingCategoryLabel(label);
+                                                    }}
+                                                    selectedLabel={editingCategoryLabel}
+                                                    placeholder="Select category..."
+                                                    searchPlaceholder="Search category..."
+                                                    className="w-40"
+                                                />
+                                            ) : (
+                                                product.categoryName ?? "-"
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            {editingId === product.id ? (
+                                                <Select value={editingProductType} onValueChange={(val) => setEditingProductType(val as 'HANDMADE' | 'PURCHASE')}>
+                                                    <SelectTrigger className="w-32">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="PURCHASE">Purchase</SelectItem>
+                                                        <SelectItem value="HANDMADE">HandMade</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            ) : (
+                                                product.product_type === 'HANDMADE' ? 'HandMade' : 'Purchase'
+                                            )}
+                                        </TableCell>
+                                        <TableCell>{product.barcode ?? "-"}</TableCell>
+                                        <TableCell>{product.unit_type ?? "-"}</TableCell>
+                                        <TableCell>
+                                            {editingId === product.id ? (
+                                                <Input
+                                                    className="w-24"
+                                                    type="number"
+                                                    value={editingCostPrice === "" ? "" : String(editingCostPrice)}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setEditingCostPrice(val === "" ? "" : Number(val));
+                                                    }}
+                                                />
+                                            ) : (
+                                                product.cost_price
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            {editingId === product.id ? (
+                                                <Input
+                                                    className="w-24"
+                                                    type="number"
+                                                    value={editingForeignerPrice === "" ? "" : String(editingForeignerPrice)}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setEditingForeignerPrice(val === "" ? "" : Number(val));
+                                                    }}
+                                                />
+                                            ) : (
+                                                product.foreigner_price
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            {editingId === product.id ? (
+                                                <Input
+                                                    className="w-24"
+                                                    type="number"
+                                                    value={editingLocalPrice === "" ? "" : String(editingLocalPrice)}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setEditingLocalPrice(val === "" ? "" : Number(val));
+                                                    }}
+                                                />
+                                            ) : (
+                                                product.local_price ?? "-"
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            {editingId === product.id ? (
+                                                <Input
+                                                    className="w-24"
+                                                    type="number"
+                                                    value={editingLow === "" ? "" : String(editingLow)}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setEditingLow(val === "" ? "" : Number(val));
+                                                    }}
+                                                />
+                                            ) : (
+                                                product.low_stock ?? "-"
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex justify-end gap-2">
+                                                {editingId === product.id ? (
+                                                    <>
+                                                        <Button type="button" size="sm" onClick={saveEditing}>Save</Button>
+                                                        <Button type="button" size="sm" variant="ghost" onClick={cancelEditing}>Cancel</Button>
+                                                    </>
+                                                ) : (
+                                                    <Button type="button" variant="ghost" size="icon" onClick={() => startEditing(product)}>
+                                                        <Pencil className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                                <DeleteButton
+                                                    onDelete={() => handleDelete(product.id)}
+                                                    itemName={product.name}
+                                                />
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
                     </LocalLoader>
                     {/* Pagination */}
                     {totalPages > 1 && (
