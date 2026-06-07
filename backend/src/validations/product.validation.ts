@@ -8,12 +8,13 @@ export const createProductSchema = z.object({
   description: z.string().optional().nullable(),
   barcode: z.string().optional().nullable(),
   unit_type: z.string().optional().nullable(),
-  product_type: z.enum(['HANDMADE', 'PURCHASE']).optional().default('PURCHASE'),
+  product_type: z.enum(['HANDMADE', 'PURCHASE', 'NA_PURCHASE']).optional().default('PURCHASE'),
   cost_price: decimalNumber.min(0, 'Cost price must be >= 0'),
   foreigner_price: decimalNumber.min(0, 'Foreigner price must be >= 0'),
   local_price: decimalNumber.min(0, 'Local price must be >= 0'),
   low_stock: z.number().int().nonnegative('Low stock must be >= 0').optional().nullable(),
   categoryId: z.string().uuid('Invalid category id'),
+  initial_quantity: z.number().int().nonnegative('Initial quantity must be >= 0').optional().nullable(),
 });
 
 export const updateProductSchema = z.object({
@@ -21,7 +22,7 @@ export const updateProductSchema = z.object({
   description: z.string().optional().nullable(),
   barcode: z.string().optional().nullable(),
   unit_type: z.string().optional().nullable(),
-  product_type: z.enum(['HANDMADE', 'PURCHASE']).optional(),
+  product_type: z.enum(['HANDMADE', 'PURCHASE', 'NA_PURCHASE']).optional(),
   cost_price: decimalNumber.min(0, 'Cost price must be >= 0').optional(),
   foreigner_price: decimalNumber.min(0, 'Foreigner price must be >= 0').optional(),
   local_price: decimalNumber.min(0, 'Local price must be >= 0').optional(),

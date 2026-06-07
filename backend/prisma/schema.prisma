@@ -31,6 +31,7 @@ enum PaidStatus {
 enum ProductType {
   HANDMADE
   PURCHASE
+  NA_PURCHASE
 }
 
 enum TableType {
@@ -121,6 +122,8 @@ model RoomBooking {
   checkInDate     DateTime
   checkOutDate    DateTime
   totalAmount     Decimal  @db.Decimal(10, 2)
+  paymentType     String   @default("FULL_PAYMENT") // FULL_PAYMENT, ADVANCE_PAYMENT, ON_CALL
+  paidAmount      Decimal  @default(0) @db.Decimal(10, 2)
   status          String   @default("ACTIVE") // ACTIVE, CHECKED_OUT, CANCELLED
   cashierName     String
   createdAt       DateTime @default(now())

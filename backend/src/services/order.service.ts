@@ -9,8 +9,6 @@ import {
   OrderStatus,
   OrderType,
 } from '../types/order.types';
-import { billService } from './bill.service';
-import type { BillCreateWithItemsInput } from '../types/bill.types';
 
 export class OrderService {
   /**
@@ -172,56 +170,25 @@ export class OrderService {
 
   /**
    * Update order status
-   * When status is COMPLETED, creates a bill automatically
+   * Note: Bill creation is handled by the frontend via POST /bills
+   * before calling this endpoint, so we only update the status here.
    */
   async updateOrderStatus(orderId: string, input: UpdateOrderStatusInput): Promise<OrderDTO> {
-    // Get existing order with items before updating
+    // Get existing order to verify it exists
     const existingOrder = await prisma.order.findUnique({
       where: { id: orderId },
-      include: { items: true },
     });
 
     if (!existingOrder) {
       throw new Error('Order not found');
     }
 
-    // Update order status
+    // Update order status only — bill is already created by the caller
     const order = await prisma.order.update({
       where: { id: orderId },
       data: { status: input.status },
       include: { items: true },
     });
-
-    // If order is completed, create a bill
-    if (input.status === OrderStatus.COMPLETED) {
-      // Generate unique bill number using timestamp
-      const billNumber = `BILL-${Date.now().toString().slice(-8)}`;
-
-      // Calculate item count
-      const itemCount = existingOrder.items.reduce((sum, item) => sum + item.quantity, 0);
-
-      // Prepare bill input
-      const billInput: BillCreateWithItemsInput = {
-        bill_number: billNumber,
-        date: new Date(),
-        payment_method: 'CASH', // Default payment method, can be updated later
-        customer_name: order.customer_name || null,
-        total: Number(order.total),
-        cashier_name: order.cashier_name,
-        item_count: itemCount,
-        credit_note: null,
-        cash_given: Number(order.total), // Assuming exact payment for now
-        balance_given: 0,
-        tax: Number(order.tax),
-        items: existingOrder.items.map((item) => ({
-          productId: item.productId,
-          quantityMoved: item.quantity,
-        })),
-      };
-
-      // Create bill with inventory movements
-      await billService.createBillWithItems(billInput);
-    }
 
     return this.mapToDTO(order);
   }
@@ -389,8 +356,6 @@ export class OrderService {
    */
   async getTableStatus(params?: {
     status?: 'available' | 'occupied' | 'all';
-    date_from?: Date;
-    date_to?: Date;
   }) {
     // ── 1. Fetch restaurant tables (lightweight, no items) ──────────
     const expandedTables = await (prisma as any).restaurantTable.findMany({
@@ -424,24 +389,8 @@ export class OrderService {
     const tableIds = allTables.map(t => t.id);
 
     // ── 2. Single query: latest pending DINE_IN order per virtual table_id ──
-    //    Uses DISTINCT ON to pick the most recent order per table_id,
-    //    and a correlated sub-query for item_count (avoids full items payload).
-    //    Virtual table IDs are passed as a PostgreSQL array literal which is
-    //    far cheaper than a large ANY($1) array when many tables exist.
-    let dateFilter = '';
-    const queryParams: any[] = [tableIds];
-
-    if (params?.date_from && params?.date_to) {
-      dateFilter = `AND o."createdAt" >= $2 AND o."createdAt" <= $3`;
-      queryParams.push(params.date_from, params.date_to);
-    } else if (params?.date_from) {
-      dateFilter = `AND o."createdAt" >= $2`;
-      queryParams.push(params.date_from);
-    } else if (params?.date_to) {
-      dateFilter = `AND o."createdAt" <= $2`;
-      queryParams.push(params.date_to);
-    }
-
+    //    No date filter — a table is occupied if it has ANY pending dine-in
+    //    order right now, regardless of when the order was created.
     const orderRows: any[] = await (prisma as any).$queryRawUnsafe(`
       SELECT DISTINCT ON (o."table_id")
         o."id",
@@ -473,9 +422,8 @@ export class OrderService {
       WHERE o."status" = 'PENDING'
         AND o."order_type" = 'DINE_IN'
         AND o."table_id" = ANY($1)
-        ${dateFilter}
       ORDER BY o."table_id", o."createdAt" DESC
-    `, ...queryParams);
+    `, tableIds);
 
     // ── 3. Build a lookup map: table_id → order row ─────────────────
     const ordersByTable = new Map<string, any>();
