@@ -2,10 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -21,7 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Utensils, Clock, Eye, Filter, X, Users } from "lucide-react";
-import { format, startOfDay, endOfDay } from "date-fns";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { orderService } from "@/api/services/orderService";
@@ -70,33 +68,19 @@ const TableStatus = () => {
   const [tables, setTables] = useState<TableWithStatus[]>([]);
   const [summary, setSummary] = useState({ total: 0, occupied: 0, available: 0, reserved: 0 });
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [dateFilter, setDateFilter] = useState<string>("");
-  const [todayFilter, setTodayFilter] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<TableOrder | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
 
-  // Fetch table status from API
+  // Fetch table status from API — real-time, no date filter
   const { data } = useQuery({
-    queryKey: ["table-status", statusFilter, dateFilter, todayFilter],
+    queryKey: ["table-status", statusFilter],
     queryFn: async () => {
       const params: {
         status?: 'available' | 'occupied' | 'all';
-        date_from?: string;
-        date_to?: string;
       } = {};
 
       if (statusFilter !== "all") {
         params.status = statusFilter as 'available' | 'occupied';
-      }
-
-      if (todayFilter) {
-        const today = new Date();
-        params.date_from = startOfDay(today).toISOString();
-        params.date_to = endOfDay(today).toISOString();
-      } else if (dateFilter) {
-        const selectedDate = new Date(dateFilter);
-        params.date_from = startOfDay(selectedDate).toISOString();
-        params.date_to = endOfDay(selectedDate).toISOString();
       }
 
       return await orderService.getTableStatus(params);
@@ -119,22 +103,6 @@ const TableStatus = () => {
 
   const clearFilters = () => {
     setStatusFilter("all");
-    setDateFilter("");
-    setTodayFilter(true);
-  };
-
-  const handleDateChange = (value: string) => {
-    setDateFilter(value);
-    if (value) {
-      setTodayFilter(false);
-    }
-  };
-
-  const handleTodayChange = (checked: boolean) => {
-    setTodayFilter(checked);
-    if (checked) {
-      setDateFilter("");
-    }
   };
 
   const handleViewOrder = async (table: TableWithStatus) => {
@@ -234,7 +202,7 @@ const TableStatus = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Status Filter */}
             <div className="space-y-2">
               <Label>Table Status</Label>
@@ -249,37 +217,6 @@ const TableStatus = () => {
                   <SelectItem value="reserved">Reserved</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-
-            {/* Today Filter */}
-            <div className="space-y-2">
-              <Label>&nbsp;</Label>
-              <div className="flex items-center space-x-2 h-10 px-3 border rounded-md bg-background">
-                <Checkbox
-                  id="today"
-                  checked={todayFilter}
-                  onCheckedChange={handleTodayChange}
-                />
-                <label
-                  htmlFor="today"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                >
-                  ✓ Today
-                </label>
-              </div>
-            </div>
-
-            {/* Date Filter */}
-            <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
-              <Input
-                id="date"
-                type="date"
-                value={dateFilter}
-                onChange={(e) => handleDateChange(e.target.value)}
-                disabled={todayFilter}
-                className="disabled:opacity-50"
-              />
             </div>
 
             {/* Clear Filters */}

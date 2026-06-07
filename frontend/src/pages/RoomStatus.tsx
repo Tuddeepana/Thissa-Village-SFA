@@ -10,6 +10,7 @@ import type { ExpandedRoomItem } from "@/types/room.types";
 import type { RoomBooking } from "@/types/room-booking.types";
 import { useQuery } from "@tanstack/react-query";
 import LocalLoader from "@/components/common/LocalLoader";
+import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import { format, differenceInHours, differenceInDays, isToday, startOfDay, endOfDay } from "date-fns";
 import {
   Table,
@@ -42,6 +43,22 @@ const RoomStatus = () => {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [releaseDialogOpen, setReleaseDialogOpen] = useState(false);
   const [bookingToRelease, setBookingToRelease] = useState<RoomBooking | null>(null);
+
+  // Payment settlement states
+  const currentUser = {
+    name: (() => {
+      try {
+        const raw = localStorage.getItem("authUser");
+        if (!raw) return "Cashier";
+        const user = JSON.parse(raw);
+        return user?.name ?? "Cashier";
+      } catch {
+        return "Cashier";
+      }
+    })(),
+  };
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [bookingToSettle, setBookingToSettle] = useState<RoomBooking | null>(null);
 
   // Filter states
   const [roomStatusFilter, setRoomStatusFilter] = useState<string>("all");
@@ -181,6 +198,38 @@ const RoomStatus = () => {
     setRoomStatusFilter("all");
     setDateFilter("");
     setTodayFilter(true);
+  };
+
+  const handleSettleBalance = (booking: RoomBooking) => {
+    setBookingToSettle(booking);
+    setPaymentDialogOpen(true);
+  };
+
+  const confirmSettleBalance = async (
+    paymentMethod: 'cash' | 'card' | 'credit',
+    amountPaid: number,
+    creditDescription?: string
+  ) => {
+    if (!bookingToSettle) return;
+
+    try {
+      const result = await roomBookingService.settleBalance(bookingToSettle.id, {
+        paymentMethod: paymentMethod.toUpperCase(),
+        cashGiven: amountPaid,
+        cashierName: currentUser.name,
+      });
+
+      toast.success("Balance settled successfully", {
+        description: `Bill #${result.bill.bill_number} created`,
+      });
+      setPaymentDialogOpen(false);
+      setBookingToSettle(null);
+      // Refetch data
+      window.location.reload();
+    } catch (error) {
+      console.error("Failed to settle balance:", error);
+      toast.error("Failed to settle balance");
+    }
   };
 
   return (
@@ -334,6 +383,7 @@ const RoomStatus = () => {
                       <TableHead className="font-semibold">From Date</TableHead>
                       <TableHead className="font-semibold">To Date</TableHead>
                       <TableHead className="font-semibold">Booking Type</TableHead>
+                      <TableHead className="font-semibold">Payment Status</TableHead>
                       <TableHead className="font-semibold">Room Status</TableHead>
                       <TableHead className="text-center font-semibold">Actions</TableHead>
                     </TableRow>
@@ -407,6 +457,28 @@ const RoomStatus = () => {
                           )}
                         </TableCell>
 
+                        {/* Payment Status */}
+                        <TableCell>
+                          {room.booking ? (
+                            <div className="flex flex-col gap-1">
+                              <Badge variant="outline" className="w-fit text-xs">
+                                {room.booking.paymentType === 'FULL_PAYMENT' ? 'Full' :
+                                 room.booking.paymentType === 'ADVANCE_PAYMENT' ? 'Advance' : 'On-Call'}
+                              </Badge>
+                              {room.booking.paymentType !== 'FULL_PAYMENT' && room.booking.paidAmount < room.booking.totalAmount && (
+                                <span className="text-xs text-red-600 font-medium whitespace-nowrap">
+                                  Due: Rs. {(room.booking.totalAmount - room.booking.paidAmount).toFixed(2)}
+                                </span>
+                              )}
+                              {room.booking.paidAmount >= room.booking.totalAmount && (
+                                <span className="text-xs text-green-600 font-medium">Fully Paid</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+
                         {/* Room Status */}
                         <TableCell>
                           {room.status === 'available' ? (
@@ -433,6 +505,17 @@ const RoomStatus = () => {
                                 >
                                   <Eye className="h-4 w-4" />
                                 </Button>
+                                {room.booking.paidAmount < room.booking.totalAmount && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleSettleBalance(room.booking!)}
+                                    title="Settle Balance"
+                                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                  >
+                                    <span className="text-lg leading-none">💰</span>
+                                  </Button>
+                                )}
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -666,6 +749,26 @@ const RoomStatus = () => {
                       </p>
                     </div>
                   </div>
+
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg mt-0.5">💳</span>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Payment Status</p>
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          {selectedBooking.paymentType === 'FULL_PAYMENT' ? 'Full Payment' :
+                           selectedBooking.paymentType === 'ADVANCE_PAYMENT' ? 'Advance Payment' : 'On-Call Booking'}
+                        </span>
+                        {selectedBooking.paidAmount < selectedBooking.totalAmount ? (
+                          <span className="text-sm text-red-600">
+                            Due: Rs. {(selectedBooking.totalAmount - selectedBooking.paidAmount).toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-green-600">Fully Paid</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -678,6 +781,15 @@ const RoomStatus = () => {
             </div>
           </DialogContent>
         </Dialog>
+      )}
+      {/* Payment Dialog for Settling Balance */}
+      {bookingToSettle && (
+        <PaymentDialog
+          open={paymentDialogOpen}
+          onOpenChange={setPaymentDialogOpen}
+          total={bookingToSettle.totalAmount - bookingToSettle.paidAmount}
+          onConfirmPayment={confirmSettleBalance}
+        />
       )}
     </div>
   );

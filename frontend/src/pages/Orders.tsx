@@ -47,7 +47,7 @@ import {
   Globe,
   Users,
 } from "lucide-react";
-import { formatSL, startOfDaySL, endOfDaySL } from "@/utils/dateUtils";
+import { formatSL } from "@/utils/dateUtils";
 import { toast } from "sonner";
 import { orderService } from "@/api/services/orderService";
 import api from "@/api/client";
@@ -69,7 +69,7 @@ const Orders = () => {
   const [statusFilter, setStatusFilter] = useState<string>("PENDING");
   const [orderTypeFilter, setOrderTypeFilter] = useState<string>("all");
   const [customerTypeFilter, setCustomerTypeFilter] = useState<string>("all");
-  const [todayOnly, setTodayOnly] = useState<boolean>(true);
+
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isLoadingOrder, setIsLoadingOrder] = useState(false);
@@ -119,11 +119,6 @@ const Orders = () => {
         pageSize: 500,
       };
 
-      if (todayOnly) {
-        queryParams.date_from = startOfDaySL().toISOString();
-        queryParams.date_to = endOfDaySL().toISOString();
-      }
-
       const result = await orderService.listOrders(queryParams);
       setOrders(result.orders);
     } catch (error) {
@@ -160,7 +155,7 @@ const Orders = () => {
     fetchProducts();
     fetchServiceCharge();
   // statusFilter intentionally excluded — it is applied client-side so no re-fetch needed
-  }, [orderTypeFilter, customerTypeFilter, todayOnly]);
+  }, [orderTypeFilter, customerTypeFilter]);
 
   // Filter orders: apply status filter client-side + search query
   const filteredOrders = useMemo(() => {
@@ -655,16 +650,7 @@ const Orders = () => {
                 <SelectItem value="foreigner">Foreigner</SelectItem>
               </SelectContent>
             </Select>
-            <label className="flex items-center gap-2 text-sm font-medium whitespace-nowrap cursor-pointer">
-              <input
-                type="checkbox"
-                checked={todayOnly}
-                onChange={(e) => setTodayOnly(e.target.checked)}
-                className="rounded border-gray-300 w-4 h-4 cursor-pointer"
-              />
-              Today
-            </label>
-            <Button variant="outline" onClick={() => { setSearchQuery(""); setStatusFilter("PENDING"); setOrderTypeFilter("all"); setCustomerTypeFilter("all"); setTodayOnly(true); fetchOrders(); }}>
+            <Button variant="outline" onClick={() => { setSearchQuery(""); setStatusFilter("PENDING"); setOrderTypeFilter("all"); setCustomerTypeFilter("all"); fetchOrders(); }}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>

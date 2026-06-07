@@ -356,8 +356,6 @@ export class OrderService {
    */
   async getTableStatus(params?: {
     status?: 'available' | 'occupied' | 'all';
-    date_from?: Date;
-    date_to?: Date;
   }) {
     // ── 1. Fetch restaurant tables (lightweight, no items) ──────────
     const expandedTables = await (prisma as any).restaurantTable.findMany({
@@ -391,24 +389,8 @@ export class OrderService {
     const tableIds = allTables.map(t => t.id);
 
     // ── 2. Single query: latest pending DINE_IN order per virtual table_id ──
-    //    Uses DISTINCT ON to pick the most recent order per table_id,
-    //    and a correlated sub-query for item_count (avoids full items payload).
-    //    Virtual table IDs are passed as a PostgreSQL array literal which is
-    //    far cheaper than a large ANY($1) array when many tables exist.
-    let dateFilter = '';
-    const queryParams: any[] = [tableIds];
-
-    if (params?.date_from && params?.date_to) {
-      dateFilter = `AND o."createdAt" >= $2 AND o."createdAt" <= $3`;
-      queryParams.push(params.date_from, params.date_to);
-    } else if (params?.date_from) {
-      dateFilter = `AND o."createdAt" >= $2`;
-      queryParams.push(params.date_from);
-    } else if (params?.date_to) {
-      dateFilter = `AND o."createdAt" <= $2`;
-      queryParams.push(params.date_to);
-    }
-
+    //    No date filter — a table is occupied if it has ANY pending dine-in
+    //    order right now, regardless of when the order was created.
     const orderRows: any[] = await (prisma as any).$queryRawUnsafe(`
       SELECT DISTINCT ON (o."table_id")
         o."id",
@@ -440,9 +422,8 @@ export class OrderService {
       WHERE o."status" = 'PENDING'
         AND o."order_type" = 'DINE_IN'
         AND o."table_id" = ANY($1)
-        ${dateFilter}
       ORDER BY o."table_id", o."createdAt" DESC
-    `, ...queryParams);
+    `, tableIds);
 
     // ── 3. Build a lookup map: table_id → order row ─────────────────
     const ordersByTable = new Map<string, any>();
