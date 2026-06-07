@@ -36,10 +36,12 @@ export interface Bill {
   customerName?: string;
   customerPhone?: string;
   cashierName?: string; // Name of the cashier who created the bill
-  paymentMethod: 'cash' | 'card' | 'credit' | 'other';
-  amountPaid: number;
-  change: number;
+  paymentMethod?: 'cash' | 'card' | 'credit' | 'other';
+  amountPaid?: number;
+  change?: number;
   creditDescription?: string; // Description when payment method is credit
+  tableNumber?: string | number;
+  orderType?: 'dine_in' | 'take_away';
   createdAt: Date;
 }
 
