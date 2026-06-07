@@ -47,7 +47,7 @@ import {
   Globe,
   Users,
 } from "lucide-react";
-import { formatSL, startOfDaySL, endOfDaySL } from "@/utils/dateUtils";
+import { formatSL } from "@/utils/dateUtils";
 import { toast } from "sonner";
 import { orderService } from "@/api/services/orderService";
 import api from "@/api/client";
@@ -61,6 +61,7 @@ import { kotService } from "@/api/services/kotService";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import { serviceChargeService } from "@/api/services/serviceChargeService";
 import type { ServiceCharge } from "@/types/service-charge";
+import { AsyncProductCombobox } from "@/components/ui/async-product-combobox";
 
 const Orders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -69,7 +70,7 @@ const Orders = () => {
   const [statusFilter, setStatusFilter] = useState<string>("PENDING");
   const [orderTypeFilter, setOrderTypeFilter] = useState<string>("all");
   const [customerTypeFilter, setCustomerTypeFilter] = useState<string>("all");
-  const [todayOnly, setTodayOnly] = useState<boolean>(true);
+
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isLoadingOrder, setIsLoadingOrder] = useState(false);
@@ -89,6 +90,7 @@ const Orders = () => {
 
   // Add item form state
   const [selectedProductId, setSelectedProductId] = useState("");
+  const [selectedProductItem, setSelectedProductItem] = useState<MyStockTableRow | null>(null);
   const [quantity, setQuantity] = useState(1);
 
   // Get current user info
@@ -118,11 +120,6 @@ const Orders = () => {
         customer_type: customerTypeFilter !== "all" ? (customerTypeFilter as 'local' | 'foreigner') : undefined,
         pageSize: 500,
       };
-
-      if (todayOnly) {
-        queryParams.date_from = startOfDaySL().toISOString();
-        queryParams.date_to = endOfDaySL().toISOString();
-      }
 
       const result = await orderService.listOrders(queryParams);
       setOrders(result.orders);
@@ -160,7 +157,7 @@ const Orders = () => {
     fetchProducts();
     fetchServiceCharge();
   // statusFilter intentionally excluded — it is applied client-side so no re-fetch needed
-  }, [orderTypeFilter, customerTypeFilter, todayOnly]);
+  }, [orderTypeFilter, customerTypeFilter]);
 
   // Filter orders: apply status filter client-side + search query
   const filteredOrders = useMemo(() => {
@@ -235,7 +232,7 @@ const Orders = () => {
   const handleAddItemToOrder = async () => {
     if (!selectedOrder || !selectedProductId || quantity < 1) return;
 
-    const product = products.find((p) => p.productId === selectedProductId);
+    const product = selectedProductItem || products.find((p) => p.productId === selectedProductId);
     if (!product) return;
 
     setIsAddingItem(true);
@@ -259,6 +256,7 @@ const Orders = () => {
       setSelectedOrder(updatedOrder);
       setIsAddItemDialogOpen(false);
       setSelectedProductId("");
+      setSelectedProductItem(null);
       setQuantity(1);
       toast.success(`Added ${product.productName} to order`);
     } catch (error: any) {
@@ -655,16 +653,7 @@ const Orders = () => {
                 <SelectItem value="foreigner">Foreigner</SelectItem>
               </SelectContent>
             </Select>
-            <label className="flex items-center gap-2 text-sm font-medium whitespace-nowrap cursor-pointer">
-              <input
-                type="checkbox"
-                checked={todayOnly}
-                onChange={(e) => setTodayOnly(e.target.checked)}
-                className="rounded border-gray-300 w-4 h-4 cursor-pointer"
-              />
-              Today
-            </label>
-            <Button variant="outline" onClick={() => { setSearchQuery(""); setStatusFilter("PENDING"); setOrderTypeFilter("all"); setCustomerTypeFilter("all"); setTodayOnly(true); fetchOrders(); }}>
+            <Button variant="outline" onClick={() => { setSearchQuery(""); setStatusFilter("PENDING"); setOrderTypeFilter("all"); setCustomerTypeFilter("all"); fetchOrders(); }}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
@@ -981,7 +970,14 @@ const Orders = () => {
       </Dialog>
 
       {/* Add Item Dialog */}
-      <Dialog open={isAddItemDialogOpen} onOpenChange={setIsAddItemDialogOpen}>
+      <Dialog open={isAddItemDialogOpen} onOpenChange={(open) => {
+        setIsAddItemDialogOpen(open);
+        if (!open) {
+          setSelectedProductId("");
+          setSelectedProductItem(null);
+          setQuantity(1);
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Item to Order</DialogTitle>
@@ -993,22 +989,14 @@ const Orders = () => {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Select Product</Label>
-              <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a product" />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map((product) => {
-                    const customerType = selectedOrder?.customer_type as "local" | "foreigner";
-                    const priceToShow = customerType === "local" ? (product.localPrice ?? 0) : (product.foreignerPrice ?? 0);
-                    return (
-                      <SelectItem key={product.productId} value={product.productId}>
-                        {product.productName} - Rs.{priceToShow.toFixed(0)}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+              <AsyncProductCombobox
+                value={selectedProductId}
+                onValueChange={(val, label, product) => {
+                  setSelectedProductId(val);
+                  if (product) setSelectedProductItem(product);
+                }}
+                customerType={selectedOrder?.customer_type as "local" | "foreigner"}
+              />
             </div>
 
             <div className="space-y-2">
