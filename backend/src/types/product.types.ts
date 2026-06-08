@@ -4,7 +4,7 @@ export interface ProductDTO {
   description?: string | null;
   barcode?: string | null;
   unit_type?: string | null;
-  product_type: 'HANDMADE' | 'PURCHASE';
+  product_type: 'HANDMADE' | 'PURCHASE' | 'NA_PURCHASE';
   cost_price: string; // Decimal
   foreigner_price: string; // Decimal
   local_price: string; // Decimal
@@ -20,12 +20,13 @@ export type ProductCreateInput = {
   description?: string | null;
   barcode?: string | null;
   unit_type?: string | null;
-  product_type?: 'HANDMADE' | 'PURCHASE';
+  product_type?: 'HANDMADE' | 'PURCHASE' | 'NA_PURCHASE';
   cost_price: number | string;
   foreigner_price: number | string;
   local_price: number | string;
   low_stock?: number | null;
   categoryId: string;
+  initial_quantity?: number | null;
 };
 
 export type ProductUpdateInput = Partial<{
@@ -33,7 +34,7 @@ export type ProductUpdateInput = Partial<{
   description: string | null;
   barcode: string | null;
   unit_type: string | null;
-  product_type: 'HANDMADE' | 'PURCHASE';
+  product_type: 'HANDMADE' | 'PURCHASE' | 'NA_PURCHASE';
   cost_price: number | string;
   foreigner_price: number | string;
   local_price: number | string;
