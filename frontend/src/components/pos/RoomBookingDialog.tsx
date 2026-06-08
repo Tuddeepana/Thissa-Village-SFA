@@ -35,7 +35,8 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
   const [submitting, setSubmitting] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'CREDIT'>('CASH');
   const [cashGiven, setCashGiven] = useState(0);
-  const [generateBill, setGenerateBill] = useState(true);
+  const [paymentType, setPaymentType] = useState<'FULL_PAYMENT' | 'ADVANCE_PAYMENT' | 'ON_CALL'>('FULL_PAYMENT');
+  const [advanceAmount, setAdvanceAmount] = useState(0);
 
   // Helper function to get average price for selected rooms
   const getAveragePrice = (priceType: 'full_day' | 'short_time') => {
@@ -229,9 +230,10 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
         totalAmount: calculateTotal(),
         cashierName,
         rooms,
-        paymentMethod,
-        cashGiven: cashGiven || calculateTotal(),
-        generateBill,
+        paymentType,
+        advanceAmount: paymentType === 'ADVANCE_PAYMENT' ? advanceAmount : undefined,
+        paymentMethod: paymentType !== 'ON_CALL' ? paymentMethod : undefined,
+        cashGiven: paymentType !== 'ON_CALL' ? (cashGiven || (paymentType === 'ADVANCE_PAYMENT' ? advanceAmount : calculateTotal())) : undefined,
       };
 
       console.log('🏨 Creating room booking with payload:', bookingPayload);
@@ -262,7 +264,8 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
       setSelectedRooms(new Set());
       setCashGiven(0);
       setPaymentMethod('CASH');
-      setGenerateBill(true);
+      setPaymentType('FULL_PAYMENT');
+      setAdvanceAmount(0);
       onBookingSuccess();
       onOpenChange(false);
     } catch (error) {
@@ -567,21 +570,45 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
 
               {/* Payment Section */}
               <div className="space-y-4 p-4 border rounded-lg">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="generateBill"
-                    checked={generateBill}
-                    onChange={(e) => setGenerateBill(e.target.checked)}
-                    className="h-4 w-4"
-                  />
-                  <Label htmlFor="generateBill" className="font-semibold cursor-pointer">
-                    Generate Bill (POS Receipt)
-                  </Label>
+                <div className="space-y-2">
+                  <Label>Payment Type</Label>
+                  <Select value={paymentType} onValueChange={(value: 'FULL_PAYMENT' | 'ADVANCE_PAYMENT' | 'ON_CALL') => setPaymentType(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="FULL_PAYMENT">Full Payment (Generate Bill)</SelectItem>
+                      <SelectItem value="ADVANCE_PAYMENT">Advance Payment (Partial Bill)</SelectItem>
+                      <SelectItem value="ON_CALL">On-Call Booking (No Bill)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                {generateBill && (
-                  <div className="space-y-4 pl-6">
+                {paymentType !== 'ON_CALL' && (
+                  <div className="space-y-4">
+                    {paymentType === 'ADVANCE_PAYMENT' && (
+                      <div className="space-y-2">
+                        <Label htmlFor="advanceAmount">Advance Amount *</Label>
+                        <Input
+                          id="advanceAmount"
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          max={calculateTotal()}
+                          value={advanceAmount || ''}
+                          onChange={(e) => setAdvanceAmount(parseFloat(e.target.value) || 0)}
+                          placeholder="Enter advance amount"
+                          required
+                        />
+                        {advanceAmount > 0 && (
+                          <p className="text-sm mt-1">
+                            <span className="text-muted-foreground">Due Amount: </span>
+                            <strong className="text-red-600">Rs. {Math.max(0, calculateTotal() - advanceAmount).toFixed(2)}</strong>
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     <div className="space-y-2">
                       <Label>Payment Method</Label>
                       <Select value={paymentMethod} onValueChange={(value: 'CASH' | 'CARD' | 'CREDIT') => setPaymentMethod(value)}>
@@ -596,7 +623,7 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
                       </Select>
                     </div>
 
-                    {paymentMethod === 'CASH' && (
+                    {paymentMethod === 'CASH' && paymentType !== 'ADVANCE_PAYMENT' && (
                       <div className="space-y-2">
                         <Label htmlFor="cashGiven">Cash Given</Label>
                         <Input
@@ -610,7 +637,7 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
                         />
                         {cashGiven > 0 && (
                           <p className="text-sm text-muted-foreground">
-                            Change: <strong>Rs. {(cashGiven - calculateTotal()).toFixed(2)}</strong>
+                            Change: <strong>Rs. {(cashGiven - (paymentType === 'ADVANCE_PAYMENT' ? advanceAmount : calculateTotal())).toFixed(2)}</strong>
                           </p>
                         )}
                       </div>

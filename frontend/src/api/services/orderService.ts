@@ -88,8 +88,6 @@ export const orderService = {
    */
   async getTableStatus(params?: {
     status?: 'available' | 'occupied' | 'all';
-    date_from?: string;
-    date_to?: string;
   }) {
     const response = await api.get(ENDPOINTS.orders.tableStatus, { params });
     return response.data;

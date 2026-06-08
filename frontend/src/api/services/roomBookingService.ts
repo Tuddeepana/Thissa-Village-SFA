@@ -5,6 +5,7 @@ import type {
   CreateRoomBookingPayload,
   UpdateRoomBookingPayload,
   RoomBookingListResponse,
+  SettleBalancePayload,
   AvailableRoomsResponse,
   Bill
 } from '@/types/room-booking.types';
@@ -52,6 +53,18 @@ export const roomBookingService = {
 
   async cancel(id: string) {
     const res = await api.patch<{ success: boolean; data: RoomBooking }>(`${ENDPOINTS.roomBookings}/${id}/cancel`);
+    return res.data.data;
+  },
+
+  async settleBalance(id: string, payload: SettleBalancePayload) {
+    const res = await api.patch<{
+      success: boolean;
+      message: string;
+      data: {
+        booking: RoomBooking;
+        bill: Bill;
+      }
+    }>(`${ENDPOINTS.roomBookings}/${id}/settle-balance`, payload);
     return res.data.data;
   },
 };

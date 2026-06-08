@@ -148,3 +148,26 @@ export const getAvailableRooms = async (req: Request, res: Response, next: NextF
     next(error);
   }
 };
+
+export const settleBalance = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const payload = req.body;
+
+    const result = await roomBookingService.settleBookingBalance(id, payload);
+
+    res.json({
+      success: true,
+      message: 'Balance settled successfully',
+      data: result,
+    });
+  } catch (error: any) {
+    if (error.message === 'Booking not found' || error.code === 'P2025') {
+      return next(new AppError('Room booking not found', 404));
+    }
+    if (error.message === 'No remaining balance to settle') {
+      return next(new AppError('No remaining balance to settle', 400));
+    }
+    next(error);
+  }
+};

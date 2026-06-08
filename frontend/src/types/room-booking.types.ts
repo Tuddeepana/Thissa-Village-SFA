@@ -1,4 +1,4 @@
-﻿export interface BookedRoom {
+export interface BookedRoom {
   id: string;
   bookingId: string;
   roomId: string;
@@ -33,6 +33,8 @@ export interface RoomBooking {
   checkInDate: string;
   checkOutDate: string;
   totalAmount: number;
+  paymentType: 'FULL_PAYMENT' | 'ADVANCE_PAYMENT' | 'ON_CALL';
+  paidAmount: number;
   status: 'ACTIVE' | 'CHECKED_OUT' | 'CANCELLED';
   cashierName: string;
   createdAt: string;
@@ -53,9 +55,16 @@ export interface CreateRoomBookingPayload {
     roomName: string;
     pricePerNight: number;
   }[];
+  paymentType?: 'FULL_PAYMENT' | 'ADVANCE_PAYMENT' | 'ON_CALL';
+  advanceAmount?: number;
   paymentMethod?: string;
   cashGiven?: number;
   generateBill?: boolean;
+}
+export interface SettleBalancePayload {
+  paymentMethod: string;
+  cashGiven?: number;
+  cashierName: string;
 }
 export interface UpdateRoomBookingPayload {
   customerName?: string;
