@@ -8,19 +8,33 @@ import {
 } from '../types/product.types';
 
 export const createProduct = async (payload: ProductCreateInput): Promise<ProductDTO> => {
-  const created = await (prisma as any).product.create({
-    data: {
-      name: payload.name,
-      description: payload.description ?? null,
-      barcode: payload.barcode ?? null,
-      unit_type: payload.unit_type ?? null,
-      product_type: payload.product_type ?? 'PURCHASE',
-      cost_price: payload.cost_price,
-      foreigner_price: payload.foreigner_price,
-      local_price: payload.local_price,
-      low_stock: payload.low_stock ?? null,
-      categoryId: payload.categoryId,
-    },
+  const created = await (prisma as any).$transaction(async (tx: any) => {
+    const product = await tx.product.create({
+      data: {
+        name: payload.name,
+        description: payload.description ?? null,
+        barcode: payload.barcode ?? null,
+        unit_type: payload.unit_type ?? null,
+        product_type: payload.product_type ?? 'PURCHASE',
+        cost_price: payload.cost_price,
+        foreigner_price: payload.foreigner_price,
+        local_price: payload.local_price,
+        low_stock: payload.low_stock ?? null,
+        categoryId: payload.categoryId,
+      },
+    });
+
+    if (payload.initial_quantity && payload.initial_quantity > 0) {
+      await tx.inventory.create({
+        data: {
+          product: { connect: { id: product.id } },
+          quantity_moved: payload.initial_quantity,
+          available_quantity: payload.initial_quantity,
+        }
+      });
+    }
+
+    return product;
   });
   return created;
 };

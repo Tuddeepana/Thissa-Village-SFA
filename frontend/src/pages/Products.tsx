@@ -61,7 +61,7 @@ const Products = () => {
     const [editingCostPrice, setEditingCostPrice] = useState<number | "">("");
     const [editingForeignerPrice, setEditingForeignerPrice] = useState<number | "">("");
     const [editingLocalPrice, setEditingLocalPrice] = useState<number | "">("");
-    const [editingProductType, setEditingProductType] = useState<'HANDMADE' | 'PURCHASE'>('PURCHASE');
+    const [editingProductType, setEditingProductType] = useState<'HANDMADE' | 'PURCHASE' | 'NA_PURCHASE'>('PURCHASE');
     const [editingCategoryId, setEditingCategoryId] = useState<string>("");
     const [editingCategoryLabel, setEditingCategoryLabel] = useState<string>("");
 
@@ -69,7 +69,8 @@ const Products = () => {
     const [newName, setNewName] = useState("");
     const [newCategory, setNewCategory] = useState("");
     const [newCategoryLabel, setNewCategoryLabel] = useState("");
-    const [newProductType, setNewProductType] = useState<'HANDMADE' | 'PURCHASE'>('PURCHASE');
+    const [newProductType, setNewProductType] = useState<'HANDMADE' | 'PURCHASE' | 'NA_PURCHASE'>('PURCHASE');
+    const [newInitialQuantity, setNewInitialQuantity] = useState<number | "">("");
     const [newBarcode, setNewBarcode] = useState("");
     const [newUnitType, setNewUnitType] = useState("");
     const [newLowStockAlert, setNewLowStockAlert] = useState<number | "">("");
@@ -144,6 +145,7 @@ const Products = () => {
         setNewCostPrice("");
         setNewForeignerPrice("");
         setNewLocalPrice("");
+        setNewInitialQuantity("");
     };
 
     const clearFilters = () => {
@@ -211,6 +213,7 @@ const Products = () => {
         const costPrice = typeof newCostPrice === "number" ? newCostPrice : Number.parseFloat(String(newCostPrice || "0"));
         const foreignerPrice = typeof newForeignerPrice === "number" ? newForeignerPrice : Number.parseFloat(String(newForeignerPrice || "0"));
         const localPrice = typeof newLocalPrice === "number" ? newLocalPrice : Number.parseFloat(String(newLocalPrice || "0"));
+        const initialQuantity = typeof newInitialQuantity === "number" ? newInitialQuantity : Number.parseInt(String(newInitialQuantity || "0"), 10);
 
         setIsAddSubmitting(true);
         try {
@@ -224,6 +227,7 @@ const Products = () => {
                 local_price: Number.isNaN(localPrice) ? "0.00" : localPrice.toFixed(2),
                 low_stock: alertLevel,
                 categoryId: newCategory,
+                initial_quantity: initialQuantity > 0 ? initialQuantity : undefined,
             });
             toast({ title: "Added", description: "Product added successfully" });
             resetForm();
@@ -268,16 +272,33 @@ const Products = () => {
 
                             <div className="space-y-2">
                                 <Label htmlFor="productType">Product Type</Label>
-                                <Select value={newProductType} onValueChange={(val) => setNewProductType(val as 'HANDMADE' | 'PURCHASE')}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select product type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="PURCHASE">Purchase</SelectItem>
-                                        <SelectItem value="HANDMADE">HandMade</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                    <Select value={newProductType} onValueChange={(val) => setNewProductType(val as 'HANDMADE' | 'PURCHASE' | 'NA_PURCHASE')}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select product type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="PURCHASE">Purchase</SelectItem>
+                                            <SelectItem value="HANDMADE">HandMade</SelectItem>
+                                            <SelectItem value="NA_PURCHASE">N/A-Purchase</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                             </div>
+
+                            {newProductType === 'NA_PURCHASE' && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="initialQuantity">Initial Quantity</Label>
+                                    <Input
+                                        id="initialQuantity"
+                                        type="number"
+                                        placeholder="Enter initial quantity"
+                                        value={newInitialQuantity === "" ? "" : String(newInitialQuantity)}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setNewInitialQuantity(val === "" ? "" : Number(val));
+                                        }}
+                                    />
+                                </div>
+                            )}
 
                             <div className="space-y-2">
                                 <Label htmlFor="productName">Product Name</Label>
@@ -484,17 +505,18 @@ const Products = () => {
                                         </TableCell>
                                         <TableCell>
                                             {editingId === product.id ? (
-                                                <Select value={editingProductType} onValueChange={(val) => setEditingProductType(val as 'HANDMADE' | 'PURCHASE')}>
+                                                <Select value={editingProductType} onValueChange={(val) => setEditingProductType(val as 'HANDMADE' | 'PURCHASE' | 'NA_PURCHASE')}>
                                                     <SelectTrigger className="w-32">
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         <SelectItem value="PURCHASE">Purchase</SelectItem>
                                                         <SelectItem value="HANDMADE">HandMade</SelectItem>
+                                                        <SelectItem value="NA_PURCHASE">N/A-Purchase</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             ) : (
-                                                product.product_type === 'HANDMADE' ? 'HandMade' : 'Purchase'
+                                                product.product_type === 'HANDMADE' ? 'HandMade' : product.product_type === 'NA_PURCHASE' ? 'N/A-Purchase' : 'Purchase'
                                             )}
                                         </TableCell>
                                         <TableCell>{product.barcode ?? "-"}</TableCell>
