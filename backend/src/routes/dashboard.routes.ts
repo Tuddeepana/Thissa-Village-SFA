@@ -8,5 +8,7 @@ const router = Router();
 router.get('/summary', authenticate, controller.getSummary);
 // GET /api/dashboard/product-category
 router.get('/product-category', authenticate, controller.getProductCategory);
+// GET /api/dashboard/product-sales
+router.get('/product-sales', authenticate, controller.getProductSales);
 
 export default router;
