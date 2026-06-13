@@ -139,7 +139,7 @@ const Dashboard = () => {
             <div>
               <h3 className="text-sm font-semibold text-muted-foreground mb-3">Hotel Performance</h3>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {Array.from({ length: 2 }).map((_, i) => (
+                {Array.from({ length: 1 }).map((_, i) => (
                   <Card key={i} className="border-violet-100 dark:border-violet-900/50 bg-violet-50/10 dark:bg-violet-950/5">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <Skeleton className="h-4 w-24" />
@@ -163,7 +163,7 @@ const Dashboard = () => {
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Daily Revenue (R)</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Daily Revenue</CardTitle>
                 <DollarSign className="h-4 w-4 text-accent" />
               </CardHeader>
               <CardContent>
@@ -176,7 +176,7 @@ const Dashboard = () => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Today Bills (R)</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Today Bills</CardTitle>
                 <Receipt className="h-4 w-4 text-accent" />
               </CardHeader>
               <CardContent>
@@ -189,7 +189,7 @@ const Dashboard = () => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Revenue (R)</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Revenue</CardTitle>
                 <TrendingUp className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>
@@ -202,7 +202,7 @@ const Dashboard = () => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Products (R)</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Products</CardTitle>
                 <Package className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>
@@ -213,7 +213,7 @@ const Dashboard = () => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Low Stock Items (R)</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Low Stock Items</CardTitle>
                 <AlertCircle className="h-4 w-4 text-warning" />
               </CardHeader>
               <CardContent>
@@ -237,19 +237,6 @@ const Dashboard = () => {
                 <div className="text-2xl font-bold text-foreground">{todayBookedRooms}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Colombo', month: 'short', day: '2-digit', year: 'numeric' }).format(new Date())}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-violet-200/60 dark:border-violet-800/40 bg-violet-50/15 dark:bg-violet-950/10">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-violet-700 dark:text-violet-300">Monthly Revenue (H)</CardTitle>
-                <TrendingUp className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">Rs.{Number(monthlyHotelRevenue || '0').toFixed(2)}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Colombo', month: 'long', year: 'numeric' }).format(new Date())}
                 </p>
               </CardContent>
             </Card>

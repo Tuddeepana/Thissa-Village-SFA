@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Crown, Hotel, Calendar, User, Phone, Clock, Eye, MapPin, LogOut, Filter, X } from "lucide-react";
+import { Crown, Hotel, Calendar, User, Phone, Clock, Eye, MapPin, LogOut, Filter, X, Printer } from "lucide-react";
 import { roomService } from "@/api/services/roomService";
 import { roomBookingService } from "@/api/services/roomBookingService";
 import type { ExpandedRoomItem } from "@/types/room.types";
@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import LocalLoader from "@/components/common/LocalLoader";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import { format, differenceInHours, differenceInDays, isToday, startOfDay, endOfDay } from "date-fns";
+import { printRoomBill } from "@/lib/roomBillPrinter";
 import {
   Table,
   TableBody,
@@ -222,6 +223,33 @@ const RoomStatus = () => {
       toast.success("Balance settled successfully", {
         description: `Bill #${result.bill.bill_number} created`,
       });
+
+      // Auto-print the bill after successful settlement
+      const booking = bookingToSettle;
+      const change = paymentMethod === 'credit' ? 0 : Math.max(0, amountPaid - (booking.totalAmount - booking.paidAmount));
+      await printRoomBill({
+        billNumber: result.bill.bill_number,
+        bookingId: booking.id,
+        customerName: booking.customerName,
+        customerPhone: booking.customerPhone,
+        customerNic: booking.customerNic,
+        customerAddress: booking.customerAddress,
+        cashierName: currentUser.name,
+        checkInDate: booking.checkInDate,
+        checkOutDate: booking.checkOutDate,
+        bookedRooms: booking.bookedRooms.map(r => ({
+          roomName: r.roomName,
+          pricePerNight: Number(r.pricePerNight),
+        })),
+        totalAmount: booking.totalAmount,
+        paidAmount: booking.totalAmount, // fully paid after settlement
+        paymentType: booking.paymentType,
+        paymentMethod: paymentMethod.toUpperCase(),
+        cashGiven: amountPaid,
+        balanceGiven: change,
+        createdAt: booking.createdAt,
+      });
+
       setPaymentDialogOpen(false);
       setBookingToSettle(null);
       // Refetch data
@@ -230,6 +258,27 @@ const RoomStatus = () => {
       console.error("Failed to settle balance:", error);
       toast.error("Failed to settle balance");
     }
+  };
+
+  const handlePrintBill = async (booking: RoomBooking) => {
+    await printRoomBill({
+      bookingId: booking.id,
+      customerName: booking.customerName,
+      customerPhone: booking.customerPhone,
+      customerNic: booking.customerNic,
+      customerAddress: booking.customerAddress,
+      cashierName: booking.cashierName,
+      checkInDate: booking.checkInDate,
+      checkOutDate: booking.checkOutDate,
+      bookedRooms: booking.bookedRooms.map(r => ({
+        roomName: r.roomName,
+        pricePerNight: Number(r.pricePerNight),
+      })),
+      totalAmount: booking.totalAmount,
+      paidAmount: booking.paidAmount,
+      paymentType: booking.paymentType,
+      createdAt: booking.createdAt,
+    });
   };
 
   return (
@@ -463,7 +512,7 @@ const RoomStatus = () => {
                             <div className="flex flex-col gap-1">
                               <Badge variant="outline" className="w-fit text-xs">
                                 {room.booking.paymentType === 'FULL_PAYMENT' ? 'Full' :
-                                 room.booking.paymentType === 'ADVANCE_PAYMENT' ? 'Advance' : 'On-Call'}
+                                  room.booking.paymentType === 'ADVANCE_PAYMENT' ? 'Advance' : 'On-Call'}
                               </Badge>
                               {room.booking.paymentType !== 'FULL_PAYMENT' && room.booking.paidAmount < room.booking.totalAmount && (
                                 <span className="text-xs text-red-600 font-medium whitespace-nowrap">
@@ -504,6 +553,15 @@ const RoomStatus = () => {
                                   title="View Details"
                                 >
                                   <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handlePrintBill(room.booking!)}
+                                  title="Print Bill"
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                >
+                                  <Printer className="h-4 w-4" />
                                 </Button>
                                 {room.booking.paidAmount < room.booking.totalAmount && (
                                   <Button
@@ -781,7 +839,7 @@ const RoomStatus = () => {
                       <div className="flex flex-col">
                         <span className="font-medium">
                           {selectedBooking.paymentType === 'FULL_PAYMENT' ? 'Full Payment' :
-                           selectedBooking.paymentType === 'ADVANCE_PAYMENT' ? 'Advance Payment' : 'On-Call Booking'}
+                            selectedBooking.paymentType === 'ADVANCE_PAYMENT' ? 'Advance Payment' : 'On-Call Booking'}
                         </span>
                         {selectedBooking.paidAmount >= selectedBooking.totalAmount && (
                           <span className="text-sm text-green-600">Fully Paid</span>
