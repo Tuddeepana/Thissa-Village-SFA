@@ -22,11 +22,3 @@ export const getProductCategory = async (req: Request, res: Response) => {
   const data = await dashboardService.getProductCategoryDistribution();
   res.json({ success: true, data });
 };
-
-export const getProductSales = async (req: Request, res: Response) => {
-  const year = Number(req.query.year) || new Date().getFullYear();
-  const month = Number(req.query.month) || (new Date().getMonth() + 1);
-
-  const data = await dashboardService.getProductSalesPerMonth(year, month);
-  res.json({ success: true, data });
-};

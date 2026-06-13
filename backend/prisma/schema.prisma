@@ -18,11 +18,6 @@ enum Role {
   STEWARD
 }
 
-enum ProfileType {
-  Restaurant
-  Bar
-}
-
 enum KotStatus {
   PENDING
   COMPLETED
@@ -54,12 +49,11 @@ model User {
   email     String   @unique
   password  String
   name      String
-  nic         String       @unique
-  role        Role         @default(CASHIER) // admin, manager, cashier
-  status      String       @default("Active")
-  profileType ProfileType?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  nic       String   @unique
+  role      Role     @default(CASHIER) // admin, manager, cashier
+  status    String   @default("Active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("users")
 }
@@ -226,8 +220,6 @@ model Bill {
   payment_method String
   customer_name  String?
   customer_type  String?  @default("local")
-  order_type     String?
-  table_number   String?
   service_charge_percentage Decimal? @db.Decimal(5, 2)
   service_charge_amount     Decimal? @db.Decimal(10, 2)
   total          Decimal  @db.Decimal(10, 2)

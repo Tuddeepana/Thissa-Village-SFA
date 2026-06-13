@@ -49,7 +49,7 @@ import { format } from "date-fns";
 import { DeleteButton } from "@/components/common";
 import { useQuery } from "@tanstack/react-query";
 import { userService } from "@/api/services/userService";
-import type { User, Role, ProfileType } from "@/types/user.types";
+import type { User, Role } from "@/types/user.types";
 
 // Helper mappers for role/status casing
 const toBackendRole = (role: "admin" | "cashier" | "steward"): Role =>
@@ -80,7 +80,6 @@ const Users = () => {
   const [formNic, setFormNic] = useState("");
   const [formName, setFormName] = useState("");
   const [formRole, setFormRole] = useState<"admin" | "cashier" | "steward">("cashier");
-  const [formProfileType, setFormProfileType] = useState<ProfileType | "">("");
   const [showPassword, setShowPassword] = useState(false);
 
   // Filter users (server applies most filters; local guard remains for UI-side checks)
@@ -117,7 +116,6 @@ const Users = () => {
     setFormNic("");
     setFormName("");
     setFormRole("cashier");
-    setFormProfileType("");
     setShowPassword(false);
   };
 
@@ -134,7 +132,6 @@ const Users = () => {
         name: formName,
         nic: formNic,
         role: toBackendRole(formRole),
-        profileType: formProfileType || undefined,
       });
       toast.success("User created successfully!");
       setIsAddDialogOpen(false);
@@ -160,7 +157,6 @@ const Users = () => {
         name: formName,
         nic: formNic,
         role: toBackendRole(formRole),
-        profileType: formProfileType || undefined,
       });
       toast.success("User updated successfully!");
       setIsEditDialogOpen(false);
@@ -202,7 +198,6 @@ const Users = () => {
     setFormNic(user.nic);
     setFormName(user.name ?? "");
     setFormRole(toUIRole(user.role));
-    setFormProfileType(user.profileType || "");
     setIsEditDialogOpen(true);
   };
 
@@ -450,7 +445,6 @@ const Users = () => {
                   <TableHead>Email</TableHead>
                   <TableHead>NIC</TableHead>
                   <TableHead className="text-center">Role</TableHead>
-                  <TableHead className="text-center">Profile Type</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-center">Active</TableHead>
@@ -485,13 +479,6 @@ const Users = () => {
                       </TableCell>
                       <TableCell className="text-center">
                         {getRoleBadge(user.role)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {user.profileType ? (
-                          <Badge variant="outline">{user.profileType}</Badge>
-                        ) : (
-                          "-"
-                        )}
                       </TableCell>
                       <TableCell className="text-center">
                         {getStatusBadge(user.status)}
@@ -553,9 +540,6 @@ const Users = () => {
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       {getRoleBadge(user.role)}
-                      {user.profileType ? (
-                        <Badge variant="outline" className="text-[10px] h-4 px-1">{user.profileType}</Badge>
-                      ) : null}
                       {getStatusBadge(user.status)}
                     </div>
                   </div>
@@ -757,20 +741,6 @@ const Users = () => {
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="profileType">Profile Type</Label>
-              <Select value={formProfileType || "none"} onValueChange={(val: ProfileType | "none") => setFormProfileType(val === "none" ? "" : val)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select profile type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="Restaurant">Restaurant</SelectItem>
-                  <SelectItem value="Bar">Bar</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           <DialogFooter>
@@ -875,20 +845,6 @@ const Users = () => {
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="cashier">Cashier</SelectItem>
                   <SelectItem value="steward">Steward</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-profileType">Profile Type</Label>
-              <Select value={formProfileType || "none"} onValueChange={(val: ProfileType | "none") => setFormProfileType(val === "none" ? "" : val)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select profile type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="Restaurant">Restaurant</SelectItem>
-                  <SelectItem value="Bar">Bar</SelectItem>
                 </SelectContent>
               </Select>
             </div>

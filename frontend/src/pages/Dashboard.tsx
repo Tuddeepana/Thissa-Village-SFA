@@ -16,7 +16,6 @@ import {
 import api from '@/api/client';
 import LocalLoader from '@/components/common/LocalLoader';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatSL } from '@/utils/dateUtils';
 
 // color palette for pie slices
@@ -37,10 +36,8 @@ const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct
 const Dashboard = () => {
   const [weeklyData, setWeeklyData] = useState<Array<{ day: string; income: number }>>([]);
   const [monthlyData, setMonthlyData] = useState<Array<{ month: string; revenue: number }>>([]);
-  const [productSalesData, setProductSalesData] = useState<Array<{ productName: string; quantitySold: number }>>([]);
-  const [selectedMonth, setSelectedMonth] = useState<string>((new Date().getMonth() + 1).toString());
-  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
-  const [isSalesLoading, setIsSalesLoading] = useState<boolean>(false);
+  const [categoryData, setCategoryData] = useState<Array<{ name: string; value: number; color: string }>>([]);
+
   const [weeklyIncome, setWeeklyIncome] = useState<string>('0');
   const [dailyIncome, setDailyIncome] = useState<string>('0');
   const [todayBillCount, setTodayBillCount] = useState<number>(0);
@@ -86,7 +83,10 @@ const Dashboard = () => {
         const mData = MONTH_KEYS.map((k, idx) => ({ month: MONTH_LABELS[idx], revenue: Number(mResp[k] ?? '0') }));
         setMonthlyData(mData);
 
-        // Category distribution removed
+        // Category distribution
+        const cat = payload.categoryDistribution ?? [];
+        const mappedCats = (cat as any[]).map((c, i) => ({ name: c.categoryName ?? c.name, value: Number(c.percentage ?? c.value ?? 0), color: COLOR_VARS[i % COLOR_VARS.length] }));
+        setCategoryData(mappedCats);
       } catch (err: any) {
         console.error('Failed to load dashboard summary', err);
         setError(err?.response?.data?.message ?? err.message ?? 'Failed to load data');
@@ -98,25 +98,6 @@ const Dashboard = () => {
     fetchData();
     return () => { cancelled = true; };
   }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    const fetchSales = async () => {
-      setIsSalesLoading(true);
-      try {
-        const resp = await api.get('/dashboard/product-sales', {
-          params: { month: selectedMonth, year: selectedYear }
-        });
-        if (!cancelled) setProductSalesData(resp.data?.data || []);
-      } catch (err) {
-        console.error('Failed to load product sales', err);
-      } finally {
-        if (!cancelled) setIsSalesLoading(false);
-      }
-    };
-    fetchSales();
-    return () => { cancelled = true; };
-  }, [selectedMonth, selectedYear]);
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -269,60 +250,35 @@ const Dashboard = () => {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-base md:text-lg">Product Sales as per Month</CardTitle>
-          <div className="flex gap-2">
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-28 md:w-32">
-                <SelectValue placeholder="Month" />
-              </SelectTrigger>
-              <SelectContent>
-                {MONTH_LABELS.map((label, idx) => (
-                  <SelectItem key={idx + 1} value={(idx + 1).toString()}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-24 md:w-28">
-                <SelectValue placeholder="Year" />
-              </SelectTrigger>
-              <SelectContent>
-                {[...Array(5)].map((_, i) => {
-                  const yr = new Date().getFullYear() - i;
-                  return <SelectItem key={yr} value={yr.toString()}>{yr}</SelectItem>;
-                })}
-              </SelectContent>
-            </Select>
-          </div>
+        <CardHeader>
+          <CardTitle className="text-base md:text-lg">Product Category Distribution</CardTitle>
         </CardHeader>
         <CardContent className="px-2 md:px-6">
-          {isSalesLoading ? (
-            <div className="flex h-[250px] items-center justify-center">
-              <span className="text-muted-foreground text-sm">Loading product sales...</span>
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={productSalesData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="productName" stroke="hsl(var(--muted-foreground))" tick={{fontSize: 12}} interval={0} angle={-45} textAnchor="end" height={60} />
-                <YAxis stroke="hsl(var(--muted-foreground))" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "var(--radius)",
-                  }}
-                  formatter={(value: number) => [value, 'Quantity Sold']}
-                />
-                <Bar
-                  dataKey="quantitySold"
-                  fill="hsl(var(--primary))"
-                  radius={[4, 4, 0, 0]}
-                  name="Quantity Sold"
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={categoryData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" />
+              <YAxis stroke="hsl(var(--muted-foreground))" />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "hsl(var(--card))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "var(--radius)",
+                }}
+                formatter={(value: number) => [`${value.toFixed(1)}%`, 'Distribution']}
+              />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="value"
+                name="Distribution %"
+                stroke="hsl(var(--chart-1))"
+                strokeWidth={2}
+                dot={{ fill: "hsl(var(--chart-1))", r: 5 }}
+                activeDot={{ r: 7 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </CardContent>
       </Card>
     </div>
