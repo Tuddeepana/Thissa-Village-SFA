@@ -25,8 +25,6 @@ export type BillCreateInput = {
   date: string | Date;
   payment_method: string;
   customer_name?: string | null;
-  order_type?: string | null;
-  table_number?: string | null;
   total: number | string;
   cashier_name: string;
   item_count: number;
