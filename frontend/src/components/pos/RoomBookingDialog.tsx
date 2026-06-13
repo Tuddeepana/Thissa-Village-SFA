@@ -10,6 +10,7 @@ import { Calendar, Crown, Hotel, Loader2, X } from "lucide-react";
 import { roomBookingService } from "@/api/services/roomBookingService";
 import type { AvailableRoom } from "@/types/room-booking.types";
 import { toast } from "sonner";
+import { printRoomBill } from "@/lib/roomBillPrinter";
 
 interface RoomBookingDialogProps {
   open: boolean;
@@ -254,6 +255,36 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
         toast.success("Room booking created successfully!", {
           description: `${selectedRooms.size} room(s) booked for ${customerName}`,
         });
+      }
+
+      // Auto-print the bill / booking slip
+      try {
+        const booking = result.booking;
+        const bill = result.bill;
+        await printRoomBill({
+          billNumber: bill?.bill_number,
+          bookingId: booking.id,
+          customerName: booking.customerName,
+          customerPhone: booking.customerPhone,
+          customerNic: booking.customerNic,
+          customerAddress: booking.customerAddress,
+          cashierName: booking.cashierName || cashierName,
+          checkInDate: booking.checkInDate,
+          checkOutDate: booking.checkOutDate,
+          bookedRooms: booking.bookedRooms.map(r => ({
+            roomName: r.roomName,
+            pricePerNight: Number(r.pricePerNight),
+          })),
+          totalAmount: booking.totalAmount,
+          paidAmount: booking.paidAmount,
+          paymentType: booking.paymentType,
+          paymentMethod: bill?.payment_method || (bookingPayload.paymentType !== 'ON_CALL' ? bookingPayload.paymentMethod : undefined),
+          cashGiven: bill?.cash_given ? Number(bill.cash_given) : bookingPayload.cashGiven,
+          balanceGiven: bill?.balance_given ? Number(bill.balance_given) : undefined,
+          createdAt: booking.createdAt,
+        });
+      } catch (printErr) {
+        console.error("Auto-print failed:", printErr);
       }
 
       // Reset form

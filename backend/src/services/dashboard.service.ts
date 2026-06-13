@@ -25,6 +25,15 @@ class DashboardService {
     const yearStart = new Date(year, 0, 1, 0, 0, 0, 0);
     const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999);
 
+    // Hotel dates
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
     // ── fire ALL independent queries in parallel ───────────────────
     const [
       totalProducts,
@@ -32,6 +41,8 @@ class DashboardService {
       monthlyGrouped,
       lowStockRaw,
       categories,
+      todayHotelBookings,
+      monthlyHotelBookings,
     ] = await Promise.all([
       // 1. Total product count
       (prisma as any).product.count({ where: { deletedAt: null } }),
@@ -84,6 +95,32 @@ class DashboardService {
           id: true,
           name: true,
           _count: { select: { products: { where: { deletedAt: null } } } },
+        },
+      }),
+
+      // 6. Active bookings today
+      (prisma as any).roomBooking.findMany({
+        where: {
+          status: 'ACTIVE',
+          checkInDate: { lte: todayEnd },
+          checkOutDate: { gte: todayStart },
+        },
+        include: {
+          bookedRooms: true,
+        },
+      }),
+
+      // 7. Monthly hotel bookings
+      (prisma as any).roomBooking.findMany({
+        where: {
+          status: { not: 'CANCELLED' },
+          checkInDate: {
+            gte: currentMonthStart,
+            lte: currentMonthEnd,
+          },
+        },
+        select: {
+          paidAmount: true,
         },
       }),
     ]);
@@ -153,6 +190,22 @@ class DashboardService {
       return { categoryId: c.id, categoryName: c.name, productCount: count, percentage };
     });
 
+    // Calculate today's booked rooms count
+    let todayBookedRoomsCount = 0;
+    if (todayHotelBookings && Array.isArray(todayHotelBookings)) {
+      todayHotelBookings.forEach((b: any) => {
+        todayBookedRoomsCount += b.bookedRooms?.length ?? 0;
+      });
+    }
+
+    // Calculate monthly hotel revenue sum
+    let monthlyHotelRevenueSum = 0;
+    if (monthlyHotelBookings && Array.isArray(monthlyHotelBookings)) {
+      monthlyHotelBookings.forEach((b: any) => {
+        monthlyHotelRevenueSum += Number(b.paidAmount || 0);
+      });
+    }
+
     return {
       weeklyIncome: weeklyTotal.toFixed(2),
       monthlyIncome: monthlyTotal.toFixed(2),
@@ -163,6 +216,8 @@ class DashboardService {
       lowStockItemsCount: lowStockItems.length,
       lowStockItems,
       categoryDistribution,
+      todayBookedRooms: todayBookedRoomsCount,
+      monthlyHotelRevenue: monthlyHotelRevenueSum.toFixed(2),
     };
   }
 
