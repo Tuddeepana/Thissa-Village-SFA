@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, Package, AlertCircle, Receipt, Bed } from "lucide-react";
+import { DollarSign, TrendingUp, Package, AlertCircle, Receipt } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -44,8 +44,6 @@ const Dashboard = () => {
   const [monthlyIncome, setMonthlyIncome] = useState<string>('0');
   const [totalProducts, setTotalProducts] = useState<number>(0);
   const [lowStockCount, setLowStockCount] = useState<number>(0);
-  const [todayBookedRooms, setTodayBookedRooms] = useState<number>(0);
-  const [monthlyHotelRevenue, setMonthlyHotelRevenue] = useState<string>('0');
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,8 +64,6 @@ const Dashboard = () => {
         setMonthlyIncome(payload.monthlyIncome ?? '0');
         setTotalProducts(Number(payload.TotalProduct ?? 0));
         setLowStockCount((payload.lowStockItems ?? []).length ?? 0);
-        setTodayBookedRooms(Number(payload.todayBookedRooms ?? 0));
-        setMonthlyHotelRevenue(payload.monthlyHotelRevenue ?? '0');
 
         const DAY_ORDER_BACKEND = ['sunday', 'monday', 'tuesday', 'wensday', 'thursday', 'friday', 'saturday'];
         const todayKey = DAY_ORDER_BACKEND[new Date().getDay()];
@@ -124,23 +120,6 @@ const Dashboard = () => {
               <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <Card key={i}>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <Skeleton className="h-4 w-24" />
-                      <Skeleton className="h-4 w-4" />
-                    </CardHeader>
-                    <CardContent>
-                      <Skeleton className="h-6 w-28" />
-                      <Skeleton className="h-3 w-24 mt-2" />
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-muted-foreground mb-3">Hotel Performance</h3>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {Array.from({ length: 1 }).map((_, i) => (
-                  <Card key={i} className="border-violet-100 dark:border-violet-900/50 bg-violet-50/10 dark:bg-violet-950/5">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <Skeleton className="h-4 w-24" />
                       <Skeleton className="h-4 w-4" />
@@ -219,25 +198,6 @@ const Dashboard = () => {
               <CardContent>
                 <div className="text-2xl font-bold text-warning">{lowStockCount}</div>
                 <p className="text-xs text-muted-foreground mt-1">Require attention</p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Hotel Side */}
-        <div>
-          <h3 className="text-sm font-semibold text-muted-foreground mb-3">Hotel Performance</h3>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card className="border-violet-200/60 dark:border-violet-800/40 bg-violet-50/15 dark:bg-violet-950/10">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-violet-700 dark:text-violet-300">Today Booked Rooms (H)</CardTitle>
-                <Bed className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">{todayBookedRooms}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Colombo', month: 'short', day: '2-digit', year: 'numeric' }).format(new Date())}
-                </p>
               </CardContent>
             </Card>
           </div>
