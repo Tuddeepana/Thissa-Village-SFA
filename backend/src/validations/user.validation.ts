@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Role, ProfileType } from '@prisma/client';
+import { Role } from '@prisma/client';
 
 /**
  * User Registration Validation Schema
@@ -36,10 +36,6 @@ export const registerUserSchema = z.object({
     .nativeEnum(Role)
     .optional()
     .default(Role.CASHIER),
-  
-  profileType: z
-    .nativeEnum(ProfileType)
-    .optional(),
 });
 
 /**
@@ -95,10 +91,6 @@ export const updateUserSchema = z.object({
   
   status: z
     .string()
-    .optional(),
-  
-  profileType: z
-    .nativeEnum(ProfileType)
     .optional(),
 });
 
