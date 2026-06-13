@@ -905,6 +905,15 @@ const Bills = () => {
                     <p className="font-medium">{selectedBill.tableNumber}</p>
                   </div>
                 )}
+                {selectedBill.serviceCharge !== undefined && selectedBill.serviceCharge !== null && selectedBill.serviceCharge > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Service Fee</p>
+                    <p className="font-medium text-amber-600">
+                      Rs.{Number(selectedBill.serviceCharge).toFixed(2)}
+                      {selectedBill.serviceChargeRate ? ` (${selectedBill.serviceChargeRate}%)` : ''}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Customer Info */}
