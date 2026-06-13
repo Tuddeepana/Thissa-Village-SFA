@@ -82,6 +82,7 @@ export class UserService {
         name: data.name,
         nic: data.nic,
         role: data.role || Role.CASHIER,
+        profileType: data.profileType,
       },
     });
 
@@ -96,6 +97,7 @@ export class UserService {
         nic: user.nic,
         role: user.role,
         status: user.status,
+        profileType: user.profileType,
       },
       token,
     };
@@ -140,6 +142,7 @@ export class UserService {
         nic: user.nic,
         role: user.role,
         status: user.status,
+        profileType: user.profileType,
       },
       token,
     };
@@ -176,6 +179,7 @@ export class UserService {
         nic: true,
         role: true,
         status: true,
+        profileType: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -198,6 +202,7 @@ export class UserService {
         nic: true,
         role: true,
         status: true,
+        profileType: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -255,6 +260,7 @@ export class UserService {
       nic: data.nic,
       role: data.role,
       status: data.status,
+      profileType: data.profileType,
     };
 
     // Hash password if updating
@@ -273,6 +279,7 @@ export class UserService {
         nic: true,
         role: true,
         status: true,
+        profileType: true,
         createdAt: true,
         updatedAt: true,
       },
