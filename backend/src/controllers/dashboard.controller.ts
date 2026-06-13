@@ -14,6 +14,8 @@ export const getSummary = async (req: Request, res: Response) => {
       TotalProduct: data.TotalProduct,
       lowStockItems: data.lowStockItems,
       categoryDistribution: data.categoryDistribution,
+      todayBookedRooms: data.todayBookedRooms,
+      monthlyHotelRevenue: data.monthlyHotelRevenue,
     },
   });
 };
