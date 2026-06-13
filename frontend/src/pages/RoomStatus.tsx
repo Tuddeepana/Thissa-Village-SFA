@@ -88,24 +88,29 @@ const RoomStatus = () => {
     refetchInterval: 30_000, // Refresh every 30 seconds
   });
 
-  // Combine rooms with their booking status
+  // Combine rooms with their booking status based on date/today filters
   useEffect(() => {
     if (expandedRoomsData && bookingsData) {
       const now = new Date();
+      const filterDate = dateFilter ? new Date(dateFilter) : null;
 
       const roomsWithBookingStatus: RoomWithBooking[] = expandedRoomsData.map(room => {
-        // Find if this room has an active booking
+        // Find if this room has a booking matching the date filter/today
         const booking = bookingsData.find(b => {
           const checkIn = new Date(b.checkInDate);
           const checkOut = new Date(b.checkOutDate);
 
-          // Check if current time is within booking period
-          const isWithinBookingPeriod = now >= checkIn && now <= checkOut;
-
           // Check if any of the booked rooms matches this room
           const hasThisRoom = b.bookedRooms.some(br => br.roomName === room.displayName);
+          if (!hasThisRoom) return false;
 
-          return isWithinBookingPeriod && hasThisRoom;
+          if (todayFilter || !filterDate) {
+            // Check if current time is within booking period
+            return now >= checkIn && now <= checkOut;
+          } else {
+            // Check if selected date overlaps with booking period
+            return checkIn <= endOfDay(filterDate) && checkOut >= startOfDay(filterDate);
+          }
         });
 
         return {
@@ -117,7 +122,7 @@ const RoomStatus = () => {
 
       setRoomsWithStatus(roomsWithBookingStatus);
     }
-  }, [expandedRoomsData, bookingsData]);
+  }, [expandedRoomsData, bookingsData, dateFilter, todayFilter]);
 
   const availableCount = roomsWithStatus.filter(r => r.status === 'available').length;
   const bookedCount = roomsWithStatus.filter(r => r.status === 'booked').length;
@@ -138,7 +143,7 @@ const RoomStatus = () => {
     }
   };
 
-  // Filter rooms based on filters
+  // Filter rooms based on status filter
   const filteredRooms = useMemo(() => {
     let filtered = [...roomsWithStatus];
 
@@ -147,27 +152,8 @@ const RoomStatus = () => {
       filtered = filtered.filter(room => room.status === roomStatusFilter);
     }
 
-    // Date filter
-    if (todayFilter) {
-      filtered = filtered.filter(room => {
-        if (!room.booking) return true; // Show available rooms
-        const checkIn = new Date(room.booking.checkInDate);
-        const checkOut = new Date(room.booking.checkOutDate);
-        const now = new Date();
-        return isToday(checkIn) || isToday(checkOut) || (checkIn < now && checkOut > now);
-      });
-    } else if (dateFilter) {
-      const filterDate = new Date(dateFilter);
-      filtered = filtered.filter(room => {
-        if (!room.booking) return false; // Hide available rooms when specific date is selected
-        const checkIn = new Date(room.booking.checkInDate);
-        const checkOut = new Date(room.booking.checkOutDate);
-        return checkIn <= endOfDay(filterDate) && checkOut >= startOfDay(filterDate);
-      });
-    }
-
     return filtered;
-  }, [roomsWithStatus, roomStatusFilter, dateFilter, todayFilter]);
+  }, [roomsWithStatus, roomStatusFilter]);
 
   const handleViewDetails = (booking: RoomBooking) => {
     setSelectedBooking(booking);
