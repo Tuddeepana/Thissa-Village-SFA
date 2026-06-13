@@ -1,5 +1,4 @@
 export type Role = 'ADMIN' | 'CASHIER' | 'STEWARD';
-export type ProfileType = 'Restaurant' | 'Bar';
 
 export interface User {
 	id: string;
@@ -8,7 +7,6 @@ export interface User {
 	nic: string;
 	role: Role;
 	status: string;
-	profileType?: ProfileType | null;
 	createdAt?: string;
 	updatedAt?: string;
 }
@@ -45,7 +43,6 @@ export type RegisterUserPayload = {
 	name: string;
 	nic: string;
 	role?: Role; // defaults to CASHIER on backend
-	profileType?: ProfileType | null;
 };
 
 export type UpdateUserPayload = Partial<{
@@ -55,6 +52,5 @@ export type UpdateUserPayload = Partial<{
 	nic: string;
 	role: Role;
 	status: string; // 'Active' | 'Inactive'
-	profileType?: ProfileType | null;
 }>;
 

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Role, ProfileType } from '@prisma/client';
+import { Role } from '@prisma/client';
 
 // Response types
 export interface AuthResponse {
@@ -10,7 +10,6 @@ export interface AuthResponse {
     nic: string;
     role: Role;
     status: string;
-    profileType?: ProfileType | null;
   };
   token: string;
 }
@@ -22,7 +21,6 @@ export interface UserResponse {
   nic: string;
   role: Role;
   status: string;
-  profileType?: ProfileType | null;
   createdAt: Date;
   updatedAt: Date;
 }
