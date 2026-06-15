@@ -245,6 +245,30 @@ class DashboardService {
       percentage: totalProducts > 0 ? Number(((c._count?.products ?? 0) / totalProducts * 100).toFixed(2)) : 0,
     }));
   }
+
+  async getProductSalesPerMonth(year: number, month: number) {
+    const start = new Date(year, month - 1, 1, 0, 0, 0, 0);
+    const end = new Date(year, month, 0, 23, 59, 59, 999);
+
+    const sales = await (prisma as any).$queryRaw`
+      SELECT
+        p."name" as "productName",
+        SUM(ABS(i."quantity_moved"))::int as "quantitySold"
+      FROM "inventory" i
+      JOIN "products" p ON i."productId" = p."id"
+      WHERE i."billId" IS NOT NULL
+        AND i."createdAt" >= ${start}
+        AND i."createdAt" <= ${end}
+      GROUP BY p."name"
+      ORDER BY "quantitySold" DESC
+      LIMIT 20
+    `;
+
+    return (sales as any[]).map((row: any) => ({
+      productName: row.productName,
+      quantitySold: Number(row.quantitySold),
+    }));
+  }
 }
 
 export const dashboardService = new DashboardService();
