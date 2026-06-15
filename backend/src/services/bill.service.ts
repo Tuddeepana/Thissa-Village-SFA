@@ -26,6 +26,8 @@ class BillService {
           customer_name: input.customer_name ?? null,
           customer_phone: (input as any).customer_phone ?? null,
           customer_type: (input as any).customer_type ?? 'local',
+          order_type: input.order_type ?? null,
+          table_number: input.table_number ?? null,
           service_charge_percentage: (input as any).service_charge_percentage !== undefined && (input as any).service_charge_percentage !== null
             ? (typeof (input as any).service_charge_percentage === 'number' ? (input as any).service_charge_percentage : Number((input as any).service_charge_percentage))
             : null,
@@ -67,6 +69,8 @@ class BillService {
           customer_name: input.customer_name ?? null,
           customer_phone: (input as any).customer_phone ?? null,
           customer_type: (input as any).customer_type ?? 'local',
+          order_type: input.order_type ?? null,
+          table_number: input.table_number ?? null,
           service_charge_percentage: (input as any).service_charge_percentage !== undefined && (input as any).service_charge_percentage !== null
             ? (typeof (input as any).service_charge_percentage === 'number' ? (input as any).service_charge_percentage : Number((input as any).service_charge_percentage))
             : null,
@@ -160,6 +164,8 @@ class BillService {
       balance_given: bill.balance_given !== undefined && bill.balance_given !== null ? String(bill.balance_given) : '0',
       service_charge_percentage: bill.service_charge_percentage !== undefined && bill.service_charge_percentage !== null ? String(bill.service_charge_percentage) : null,
       service_charge_amount: bill.service_charge_amount !== undefined && bill.service_charge_amount !== null ? String(bill.service_charge_amount) : null,
+      order_type: bill.order_type,
+      table_number: bill.table_number,
       Items: items,
       Subtotal: subtotalVal,
       Tax: taxVal,
