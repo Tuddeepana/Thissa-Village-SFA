@@ -579,8 +579,9 @@ const Orders = () => {
       {/* Stats Cards */}
       <div className="grid grid-cols-3 gap-4">
         <Card className={`cursor-pointer transition-all ${statusFilter === "PENDING" ? "ring-2 ring-yellow-400" : ""}`} onClick={() => setStatusFilter(statusFilter === "PENDING" ? "all" : "PENDING")}>
-          <CardHeader className="p-4 pb-1">
+          <CardHeader className="p-4 pb-1 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium text-yellow-600">Pending</CardTitle>
+            <span className="text-xs text-muted-foreground font-normal">{formatSL(new Date(), "MMM dd, yyyy")}</span>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <div className="text-2xl font-bold">{pendingStats.count}</div>
@@ -588,8 +589,9 @@ const Orders = () => {
           </CardContent>
         </Card>
         <Card className={`cursor-pointer transition-all ${statusFilter === "COMPLETED" ? "ring-2 ring-green-400" : ""}`} onClick={() => setStatusFilter(statusFilter === "COMPLETED" ? "all" : "COMPLETED")}>
-          <CardHeader className="p-4 pb-1">
+          <CardHeader className="p-4 pb-1 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium text-green-600">Completed</CardTitle>
+            <span className="text-xs text-muted-foreground font-normal">{formatSL(new Date(), "MMM dd, yyyy")}</span>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <div className="text-2xl font-bold">{completedStats.count}</div>
@@ -597,8 +599,9 @@ const Orders = () => {
           </CardContent>
         </Card>
         <Card className={`cursor-pointer transition-all ${statusFilter === "CANCELLED" ? "ring-2 ring-red-400" : ""}`} onClick={() => setStatusFilter(statusFilter === "CANCELLED" ? "all" : "CANCELLED")}>
-          <CardHeader className="p-4 pb-1">
+          <CardHeader className="p-4 pb-1 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium text-red-600">Cancelled</CardTitle>
+            <span className="text-xs text-muted-foreground font-normal">{formatSL(new Date(), "MMM dd, yyyy")}</span>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <div className="text-2xl font-bold">{cancelledStats.count}</div>
