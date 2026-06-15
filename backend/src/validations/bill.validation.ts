@@ -13,6 +13,8 @@ export const createBillSchema = z.object({
   customer_name: z.string().optional().nullable(),
   customer_phone: z.string().optional().nullable(),
   customer_type: z.enum(['local', 'foreigner']).optional(),
+  order_type: z.string().optional().nullable(),
+  table_number: z.string().optional().nullable(),
   service_charge_percentage: z.union([z.number(), z.string()]).optional().nullable(),
   service_charge_amount: z.union([z.number(), z.string()]).optional().nullable(),
   total: z.union([z.number(), z.string()]),
