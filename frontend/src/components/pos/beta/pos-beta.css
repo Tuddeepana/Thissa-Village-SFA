@@ -1,0 +1,925 @@
+/* ═══════════════════════════════════════════════════════════════════
+   POS Beta UI — System Colors Version
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── Layout ─────────────────────────────────────────────────────── */
+.pos-beta {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  font-family: inherit;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+.pos-beta-header {
+  flex-shrink: 0;
+  padding: 12px 16px;
+  background-color: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.pos-beta-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  gap: 0;
+  overflow: hidden;
+  min-height: 0;
+}
+
+@media (max-width: 1024px) {
+  .pos-beta-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Product Grid ───────────────────────────────────────────────── */
+.pos-products-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid hsl(var(--border));
+  background-color: hsl(var(--background));
+}
+
+.pos-products-toolbar {
+  flex-shrink: 0;
+  padding: 16px 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pos-search-wrapper {
+  position: relative;
+}
+
+.pos-search-wrapper input {
+  width: 100%;
+  height: 40px;
+  padding: 0 16px 0 40px;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid hsl(var(--input));
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.pos-search-wrapper input:focus {
+  outline: none;
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 1px hsl(var(--ring));
+}
+
+.pos-search-wrapper .pos-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+}
+
+.pos-product-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 20px 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
+.pos-product-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.pos-product-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pos-product-grid::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 3px;
+}
+
+/* ─── Product Card ───────────────────────────────────────────────── */
+.pos-product-card {
+  position: relative;
+  padding: 14px;
+  border-radius: var(--radius);
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  cursor: pointer;
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.pos-product-card:hover {
+  border-color: hsl(var(--ring) / 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.pos-product-card:active {
+  transform: translateY(0);
+}
+
+.pos-product-card.out-of-stock {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.pos-product-card .product-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: hsl(var(--card-foreground));
+  margin-bottom: 4px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pos-product-card .product-category {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 8px;
+}
+
+.pos-product-card .product-price {
+  font-size: 16px;
+  font-weight: 700;
+  color: hsl(var(--primary));
+}
+
+.pos-product-card .product-price-secondary {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+
+.pos-product-card .product-stock {
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.pos-product-card .product-add-btn {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.2s ease;
+}
+
+.pos-product-card:hover .product-add-btn {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.pos-product-card .product-add-btn:hover {
+  background-color: hsl(var(--primary) / 0.9);
+}
+
+/* ─── Order Panel ────────────────────────────────────────────────── */
+.pos-order-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: hsl(var(--card));
+  border-left: 1px solid hsl(var(--border));
+}
+
+.pos-order-header {
+  flex-shrink: 0;
+  padding: 16px 20px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.pos-order-items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+}
+
+.pos-order-items::-webkit-scrollbar {
+  width: 4px;
+}
+
+.pos-order-items::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 2px;
+}
+
+.pos-order-footer {
+  flex-shrink: 0;
+  padding: 16px 20px;
+  border-top: 1px solid hsl(var(--border));
+  background-color: hsl(var(--background));
+}
+
+/* ─── Cart Item ──────────────────────────────────────────────────── */
+.pos-cart-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: calc(var(--radius) - 2px);
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.pos-cart-item:hover {
+  border-color: hsl(var(--ring) / 0.3);
+}
+
+.pos-cart-item .cart-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pos-cart-item .cart-item-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pos-cart-item .cart-item-price {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+
+.pos-cart-item .cart-item-total {
+  font-size: 14px;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  white-space: nowrap;
+}
+
+/* ─── Quantity Stepper ───────────────────────────────────────────── */
+.pos-qty-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-radius: calc(var(--radius) - 4px);
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+}
+
+.pos-qty-stepper button {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  border: none;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.pos-qty-stepper button:hover:not(:disabled) {
+  background-color: hsl(var(--secondary));
+}
+
+.pos-qty-stepper button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pos-qty-stepper .qty-value {
+  width: 32px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--secondary) / 0.5);
+  padding: 4px 0;
+}
+
+/* ─── Segmented Control ──────────────────────────────────────────── */
+.pos-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius);
+  background-color: hsl(var(--secondary));
+  border: 1px solid hsl(var(--border));
+}
+
+.pos-segmented button {
+  padding: 8px 16px;
+  border-radius: calc(var(--radius) - 2px);
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  background-color: transparent;
+  color: hsl(var(--secondary-foreground));
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.pos-segmented button.active {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.pos-segmented button:not(.active):hover {
+  background-color: hsl(var(--background) / 0.5);
+}
+
+/* ─── Table Grid ─────────────────────────────────────────────────── */
+.pos-table-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 8px;
+}
+
+.pos-table-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 4px;
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+  background-color: hsl(var(--card));
+  cursor: pointer;
+  transition: all 0.2s ease;
+  gap: 4px;
+}
+
+.pos-table-btn:hover:not(:disabled) {
+  border-color: hsl(var(--ring));
+}
+
+.pos-table-btn.selected {
+  border-color: hsl(var(--primary));
+  background-color: hsl(var(--primary) / 0.1);
+  box-shadow: 0 0 0 1px hsl(var(--primary));
+}
+
+.pos-table-btn.occupied {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pos-table-btn .table-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.pos-table-btn .table-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.pos-table-btn .table-status-dot.free {
+  background-color: hsl(142.1 76.2% 36.3%);
+  /* green-600 approx */
+}
+
+.pos-table-btn .table-status-dot.occupied {
+  background-color: hsl(var(--destructive));
+}
+
+/* ─── Action Buttons ─────────────────────────────────────────────── */
+.pos-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.pos-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pos-action-btn.primary {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.pos-action-btn.primary:hover:not(:disabled) {
+  background-color: hsl(var(--primary) / 0.9);
+}
+
+.pos-action-btn.success {
+  background-color: hsl(142.1 76.2% 36.3%);
+  color: white;
+}
+
+.pos-action-btn.success:hover:not(:disabled) {
+  background-color: hsl(142.1 76.2% 36.3% / 0.9);
+}
+
+.pos-action-btn.outline {
+  background-color: transparent;
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+}
+
+.pos-action-btn.outline:hover:not(:disabled) {
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+.pos-action-btn.kot-sent {
+  background-color: hsl(142.1 76.2% 36.3% / 0.1);
+  color: hsl(142.1 76.2% 36.3%);
+  border: 1px solid hsl(142.1 76.2% 36.3% / 0.3);
+}
+
+/* ─── Summary Section ────────────────────────────────────────────── */
+.pos-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.pos-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.pos-summary-row .label {
+  color: hsl(var(--muted-foreground));
+}
+
+.pos-summary-row .value {
+  color: hsl(var(--foreground));
+  font-weight: 500;
+}
+
+.pos-summary-row.discount .value {
+  color: hsl(142.1 76.2% 36.3%);
+}
+
+.pos-summary-row.total {
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px solid hsl(var(--border));
+  font-size: 18px;
+}
+
+.pos-summary-row.total .label {
+  color: hsl(var(--foreground));
+  font-weight: 700;
+}
+
+.pos-summary-row.total .value {
+  font-weight: 800;
+  color: hsl(var(--primary));
+}
+
+/* ─── Empty State ────────────────────────────────────────────────── */
+.pos-empty-cart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  gap: 12px;
+}
+
+.pos-empty-cart .empty-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-color: hsl(var(--secondary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: hsl(var(--muted-foreground));
+}
+
+.pos-empty-cart .empty-text {
+  font-size: 14px;
+  color: hsl(var(--muted-foreground));
+}
+
+.pos-empty-cart .empty-hint {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+
+/* ─── KOT Status Badge ──────────────────────────────────────────── */
+.pos-kot-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.pos-kot-badge.sent {
+  background-color: hsl(142.1 76.2% 36.3% / 0.1);
+  color: hsl(142.1 76.2% 36.3%);
+}
+
+.pos-kot-badge.pending {
+  background-color: hsl(38 92% 50% / 0.1);
+  color: hsl(38 92% 50%);
+}
+
+/* ─── Collapsible Section ────────────────────────────────────────── */
+.pos-collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  text-transform: uppercase;
+}
+
+.pos-collapsible-header:hover {
+  color: hsl(var(--foreground));
+}
+
+/* ─── Scrollable forms in Order Panel ────────────────────────────── */
+.pos-order-form {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+
+
+.pos-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pos-form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pos-form-label .required {
+  color: hsl(var(--destructive));
+}
+
+/* ─── Item Count Badge ───────────────────────────────────────────── */
+.pos-item-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 100px;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ─── Pagination ─────────────────────────────────────────────────── */
+.pos-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  flex-shrink: 0;
+  border-top: 1px solid hsl(var(--border));
+}
+
+.pos-pagination button {
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid hsl(var(--border));
+  background-color: transparent;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pos-pagination button:hover:not(:disabled) {
+  background-color: hsl(var(--accent));
+}
+
+.pos-pagination button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pos-pagination .page-info {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+
+/* ─── VIP Badge ──────────────────────────────────────────────────── */
+.pos-vip-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  background-color: #f59e0b;
+  color: white;
+  text-transform: uppercase;
+}
+
+/* ─── Stock Indicators ───────────────────────────────────────────── */
+.pos-stock-ok {
+  color: hsl(142.1 76.2% 36.3%);
+}
+
+.pos-stock-low {
+  color: hsl(38 92% 50%);
+}
+
+.pos-stock-out {
+  color: hsl(var(--destructive));
+}
+
+/* ─── Responsive: Mobile Tab Layout ──────────────────────────────── */
+@media (max-width: 1024px) {
+  .pos-beta-body {
+    grid-template-columns: 1fr;
+  }
+
+  .pos-products-panel {
+    border-right: none;
+  }
+
+  .pos-order-panel {
+    border-left: none;
+    border-top: 1px solid hsl(var(--border));
+  }
+
+  .pos-mobile-tabs {
+    display: flex;
+    border-bottom: 1px solid hsl(var(--border));
+    flex-shrink: 0;
+  }
+
+  .pos-mobile-tab {
+    flex: 1;
+    padding: 12px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    background-color: transparent;
+    color: hsl(var(--muted-foreground));
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-bottom: 2px solid transparent;
+  }
+
+  .pos-mobile-tab.active {
+    color: hsl(var(--primary));
+    border-bottom-color: hsl(var(--primary));
+  }
+}
+
+@media (min-width: 1025px) {
+  .pos-mobile-tabs {
+    display: none;
+  }
+}
+
+/* ─── Stock Warning Banner ───────────────────────────────────────── */
+.pos-stock-warning {
+  padding: 8px 12px;
+  border-radius: calc(var(--radius) - 2px);
+  background-color: hsl(var(--destructive) / 0.1);
+  border: 1px solid hsl(var(--destructive) / 0.2);
+  margin-bottom: 8px;
+}
+
+.pos-stock-warning .warning-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: hsl(var(--destructive));
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pos-stock-warning .warning-item {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+  padding-left: 18px;
+}
+
+/* ─── Printer Status ─────────────────────────────────────────────── */
+.pos-printer-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.pos-printer-status.online {
+  background-color: hsl(142.1 76.2% 36.3% / 0.1);
+  color: hsl(142.1 76.2% 36.3%);
+  border: 1px solid hsl(142.1 76.2% 36.3% / 0.2);
+}
+
+.pos-printer-status.offline {
+  background-color: hsl(var(--destructive) / 0.1);
+  color: hsl(var(--destructive));
+  border: 1px solid hsl(var(--destructive) / 0.2);
+}
+
+.pos-printer-status.checking {
+  background-color: hsl(38 92% 50% / 0.1);
+  color: hsl(38 92% 50%);
+  border: 1px solid hsl(38 92% 50% / 0.2);
+}
+
+.pos-printer-status.unknown {
+  background-color: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  border: 1px solid hsl(var(--border));
+}
+
+.pos-printer-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.pos-printer-dot.online {
+  background-color: hsl(142.1 76.2% 36.3%);
+}
+
+.pos-printer-dot.offline {
+  background-color: hsl(var(--destructive));
+}
+
+.pos-printer-dot.checking {
+  background-color: hsl(38 92% 50%);
+}
+
+.pos-printer-dot.unknown {
+  background-color: hsl(var(--muted-foreground));
+}
+
+/* ─── Tax/Discount Input ─────────────────────────────────────────── */
+.pos-rate-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pos-rate-input label {
+  font-size: 12px;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  min-width: 70px;
+}
+
+.pos-rate-input input {
+  width: 64px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid hsl(var(--input));
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  transition: border-color 0.2s ease;
+}
+
+.pos-rate-input input:focus {
+  outline: none;
+  border-color: hsl(var(--ring));
+}
+
+.pos-rate-input .rate-amount {
+  flex: 1;
+  text-align: right;
+  font-size: 13px;
+  color: hsl(var(--muted-foreground));
+}
+
+/* ─── Delete button ──────────────────────────────────────────────── */
+.pos-delete-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: none;
+  background-color: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.pos-delete-btn:hover:not(:disabled) {
+  background-color: hsl(var(--destructive) / 0.1);
+  color: hsl(var(--destructive));
+}
+
+.pos-delete-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Category pills fallback if they appear */
+.pos-category-pills {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.pos-category-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.pos-category-pill {
+  flex-shrink: 0;
+  padding: 6px 16px;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid hsl(var(--border));
+  background-color: hsl(var(--card));
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.pos-category-pill:hover {
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary));
+}
+
+.pos-category-pill.active {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
+}
