@@ -11,6 +11,7 @@ export const createBillSchema = z.object({
   date: z.union([z.string(), z.date()]),
   payment_method: z.string().min(1),
   customer_name: z.string().optional().nullable(),
+  customer_phone: z.string().optional().nullable(),
   customer_type: z.enum(['local', 'foreigner']).optional(),
   order_type: z.string().optional().nullable(),
   table_number: z.string().optional().nullable(),
