@@ -4,6 +4,7 @@ export type BillDTO = {
   date: string; // ISO
   payment_method: string;
   customer_name?: string | null;
+  customer_phone?: string | null;
   total: string; // Decimal as string
   cashier_name: string;
   item_count: number;
@@ -25,6 +26,7 @@ export type BillCreateInput = {
   date: string | Date;
   payment_method: string;
   customer_name?: string | null;
+  customer_phone?: string | null;
   order_type?: string | null;
   table_number?: string | null;
   total: number | string;
