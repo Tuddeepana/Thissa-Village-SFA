@@ -225,6 +225,7 @@ model Bill {
   date           DateTime
   payment_method String
   customer_name  String?
+  customer_phone String?
   customer_type  String?  @default("local")
   order_type     String?
   table_number   String?
