@@ -248,7 +248,7 @@ const Bills = () => {
           serviceChargeRate: serviceChargeRateNum,
           total: totalNum,
           customerName: detailed.customer_name || detailed.customer || bill.customerName || undefined,
-          customerPhone: undefined,
+          customerPhone: detailed.customer_phone ?? undefined,
           cashierName: detailed.cashier_name || bill.cashierName || undefined,
           paymentMethod: paymentMethodLower,
           amountPaid: paymentMethodLower === 'credit'
@@ -378,7 +378,7 @@ const Bills = () => {
       } catch (e) {
         console.error('Failed updating bill payment, proceeding to print locally', e);
       }
-      const printable: Bill = {
+      let printable: Bill = {
         id: billForPayment.id,
         items: billForPayment.items,
         subtotal: billForPayment.subtotal,
@@ -397,6 +397,76 @@ const Bills = () => {
         orderType: billForPayment.orderType,
         createdAt: now,
       };
+
+      try {
+        const resp = await api.get(`/bills/${encodeURIComponent(billForPayment.id)}`);
+        const detailed = resp.data?.data ?? resp.data;
+        if (detailed && detailed.Items) {
+          const billCustomerType: 'local' | 'foreigner' = detailed.customer_type === 'foreigner' ? 'foreigner' : 'local';
+          const mappedItems = (detailed.Items || []).map((it: any) => {
+            const qty = Math.abs(Number(it.quantity_moved || 0));
+            const price = it.unit_price !== undefined && it.unit_price !== null
+              ? Number(it.unit_price)
+              : (billCustomerType === 'local'
+                ? (it.local_price !== undefined ? Number(it.local_price) : 0)
+                : (it.foreigner_price !== undefined ? Number(it.foreigner_price) : 0));
+            return {
+              product: {
+                id: it.productId || it.productId || 'unknown',
+                name: it.name || it.productName || 'Unknown Product',
+                category: it.categoryName || it.category || 'General',
+                unit: it.unit_type ?? null,
+                foreignerPrice: it.foreigner_price !== undefined ? Number(it.foreigner_price) : price,
+                localPrice: it.local_price !== undefined ? Number(it.local_price) : price,
+                cost: it.cost_price !== undefined && it.cost_price !== null ? Number(it.cost_price) : price * 0.7,
+                stock: 0,
+                minStock: 0,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+              quantity: qty,
+              subtotal: +(price * qty),
+            };
+          });
+
+          const subtotalNum = Number(detailed.Subtotal ?? mappedItems.reduce((s: number, it: any) => s + it.subtotal, 0));
+          const taxNum = Number(detailed.Tax ?? 0);
+          const totalNum = Number(detailed.Total ?? (subtotalNum + taxNum));
+          const serviceChargeAmountNum = detailed.service_charge_amount !== undefined && detailed.service_charge_amount !== null
+            ? Number(detailed.service_charge_amount)
+            : 0;
+          const serviceChargeRateNum = detailed.service_charge_percentage !== undefined && detailed.service_charge_percentage !== null
+            ? Number(detailed.service_charge_percentage)
+            : 0;
+
+          printable = {
+            id: detailed.id || billForPayment.id,
+            billNumber: detailed.bill_number || detailed.billNo || billForPayment.billNumber,
+            items: mappedItems,
+            subtotal: subtotalNum,
+            tax: taxNum,
+            taxRate: mappedItems.length ? Math.round((taxNum / (subtotalNum || 1)) * 100) : 0,
+            discount: 0,
+            discountRate: 0,
+            serviceCharge: serviceChargeAmountNum,
+            serviceChargeRate: serviceChargeRateNum,
+            total: totalNum,
+            customerName: detailed.customer_name || detailed.customer || billForPayment.customerName || undefined,
+            customerPhone: detailed.customer_phone ?? undefined,
+            cashierName: detailed.cashier_name || billForPayment.cashierName || undefined,
+            paymentMethod: paymentMethod, // updated method
+            amountPaid: amountPaid,
+            change: change,
+            creditDescription: creditDescription ?? undefined,
+            tableNumber: detailed.table_number || detailed.tableNumber || undefined,
+            orderType: detailed.order_type || detailed.orderType || undefined,
+            createdAt: detailed.dateTime ? new Date(detailed.dateTime) : now,
+          };
+        }
+      } catch (err) {
+        console.error('Failed fetching detailed bill for print, falling back to shallow data', err);
+      }
+
       printBillNewWindow(printable);
       setIsPaymentDialogOpen(false);
       setBillForPayment(null);
