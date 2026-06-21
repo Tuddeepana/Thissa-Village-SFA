@@ -47,6 +47,10 @@ export const addItemsToOrderSchema = z.object({
   items: z.array(orderItemSchema).min(1, 'At least one item is required'),
 });
 
+export const updateOrderItemSchema = z.object({
+  quantity: z.number().int().positive('Quantity must be at least 1'),
+});
+
 export const deleteOrderItemSchema = z.object({
   itemId: z.string().uuid('Invalid item ID'),
 });

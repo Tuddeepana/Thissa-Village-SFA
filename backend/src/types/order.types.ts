@@ -78,6 +78,10 @@ export interface AddItemsToOrderInput {
   items: CreateOrderItemInput[];
 }
 
+export interface UpdateOrderItemInput {
+  quantity: number;
+}
+
 export interface OrderStatsDTO {
   pending: number;
   completed: number;
