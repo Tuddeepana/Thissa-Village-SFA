@@ -68,6 +68,17 @@ export const orderService = {
   },
 
   /**
+   * Update order item quantity
+   */
+  async updateOrderItemQuantity(orderId: string, itemId: string, quantity: number): Promise<Order> {
+    const response = await api.patch<{ order: Order }>(
+      `${ENDPOINTS.orders.byId(orderId)}/items/${itemId}`,
+      { quantity }
+    );
+    return response.data.order;
+  },
+
+  /**
    * Cancel order
    */
   async cancelOrder(id: string): Promise<Order> {

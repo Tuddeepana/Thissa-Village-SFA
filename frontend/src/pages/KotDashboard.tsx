@@ -139,16 +139,16 @@ const KotDashboard = () => {
       {/* ── Top Bar (Matching standard SFA layout, but no sidebar) ── */}
       <header className="h-16 border-b bg-card flex items-center justify-between px-4 md:px-6 sticky top-0 z-10">
         <div className="flex items-center gap-2 md:gap-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleBack}
             className="flex"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Modules
           </Button>
-          
+
           {/* Desktop breadcrumb */}
           <div className="hidden md:block">
             <Breadcrumb>
