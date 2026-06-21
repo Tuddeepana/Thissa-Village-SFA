@@ -5,6 +5,7 @@ import {
   createOrderSchema,
   updateOrderStatusSchema,
   addItemsToOrderSchema,
+  updateOrderItemSchema,
   orderQuerySchema,
 } from '../validations/order.validation';
 
@@ -74,6 +75,17 @@ export const addItemsToOrder = async (req: Request, res: Response) => {
 
   const order = await orderService.addItemsToOrder(id, validatedData);
   res.json({ message: 'Items added to order successfully', order });
+};
+
+/**
+ * Update order item quantity
+ */
+export const updateOrderItem = async (req: Request, res: Response) => {
+  const { id, itemId } = req.params;
+  const validatedData = updateOrderItemSchema.parse(req.body);
+
+  const order = await orderService.updateItemQuantity(id, itemId, validatedData);
+  res.json({ message: 'Order item updated successfully', order });
 };
 
 /**

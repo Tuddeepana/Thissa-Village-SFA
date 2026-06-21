@@ -31,6 +31,7 @@ import {
 import {
   ClipboardList,
   Plus,
+  Minus,
   Printer,
   Eye,
   User,
@@ -46,6 +47,7 @@ import {
   Trash2,
   Globe,
   Users,
+  AlertTriangle,
 } from "lucide-react";
 import { formatSL } from "@/utils/dateUtils";
 import { toast } from "sonner";
@@ -83,6 +85,8 @@ const Orders = () => {
   const [isSendingKot, setIsSendingKot] = useState(false);
   const [kotSentOrderItemIds, setKotSentOrderItemIds] = useState<Set<string>>(new Set());
   const [serviceCharge, setServiceCharge] = useState<ServiceCharge | null>(null);
+  const [updatingItemId, setUpdatingItemId] = useState<string | null>(null);
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<{ id: string; name: string } | null>(null);
 
 
   // Products for adding items
@@ -275,11 +279,39 @@ const Orders = () => {
       const updatedOrder = await orderService.deleteItemFromOrder(selectedOrder.id, itemId);
       setOrders(orders.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)));
       setSelectedOrder(updatedOrder);
+      setDeleteConfirmItem(null);
       toast.success("Item removed from order");
     } catch (error: any) {
       console.error("Failed to delete item", error);
       const msg = error?.response?.data?.message ?? "Failed to delete item";
       toast.error(msg);
+    }
+  };
+
+  const handleRequestDeleteItem = (item: { id: string; product_name: string; kot_sent: boolean }) => {
+    if (item.kot_sent || kotSentOrderItemIds.has(item.id)) {
+      // Show confirmation dialog for KOT-sent items
+      setDeleteConfirmItem({ id: item.id, name: item.product_name });
+    } else {
+      // Direct delete for non-KOT items
+      handleDeleteItemFromOrder(item.id);
+    }
+  };
+
+  const handleUpdateItemQuantity = async (itemId: string, newQuantity: number) => {
+    if (!selectedOrder || newQuantity < 1) return;
+
+    setUpdatingItemId(itemId);
+    try {
+      const updatedOrder = await orderService.updateOrderItemQuantity(selectedOrder.id, itemId, newQuantity);
+      setOrders(orders.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)));
+      setSelectedOrder(updatedOrder);
+    } catch (error: any) {
+      console.error("Failed to update item quantity", error);
+      const msg = error?.response?.data?.message ?? "Failed to update quantity";
+      toast.error(msg);
+    } finally {
+      setUpdatingItemId(null);
     }
   };
 
@@ -875,7 +907,39 @@ const Orders = () => {
                             )}
                           </TableCell>
                           <TableCell>{item.product_name}</TableCell>
-                          <TableCell className="text-center">{item.quantity}</TableCell>
+                          <TableCell className="text-center">
+                            {selectedOrder.status === "PENDING" ? (
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  className="h-6 w-6"
+                                  onClick={() => handleUpdateItemQuantity(item.id, item.quantity - 1)}
+                                  disabled={item.quantity <= 1 || updatingItemId === item.id}
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </Button>
+                                <span className="w-8 text-center font-medium">
+                                  {updatingItemId === item.id ? (
+                                    <RefreshCw className="h-3 w-3 animate-spin mx-auto" />
+                                  ) : (
+                                    item.quantity
+                                  )}
+                                </span>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  className="h-6 w-6"
+                                  onClick={() => handleUpdateItemQuantity(item.id, item.quantity + 1)}
+                                  disabled={updatingItemId === item.id}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              item.quantity
+                            )}
+                          </TableCell>
                           <TableCell className="text-right">Rs.{item.unit_price.toFixed(0)}</TableCell>
                           <TableCell className="text-right">Rs.{item.total.toFixed(0)}</TableCell>
                           {selectedOrder.status === "PENDING" && (
@@ -883,11 +947,9 @@ const Orders = () => {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => handleDeleteItemFromOrder(item.id)}
-                                disabled={item.kot_sent || kotSentOrderItemIds.has(item.id)}
-                                title={item.kot_sent || kotSentOrderItemIds.has(item.id) ? "Cannot remove item after KOT is sent" : undefined}
+                                onClick={() => handleRequestDeleteItem(item)}
                               >
-                                <Trash2 className={`h-4 w-4 ${item.kot_sent || kotSentOrderItemIds.has(item.id) ? 'text-muted-foreground' : 'text-red-500'}`} />
+                                <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>
                             </TableCell>
                           )}
@@ -1024,6 +1086,31 @@ const Orders = () => {
               ) : (
                 'Add Item'
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Delete KOT-Sent Item Dialog */}
+      <Dialog open={!!deleteConfirmItem} onOpenChange={(open) => { if (!open) setDeleteConfirmItem(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+              Confirm Item Removal
+            </DialogTitle>
+            <DialogDescription>
+              <strong>{deleteConfirmItem?.name}</strong> has already been sent to the kitchen (KOT).
+              Are you sure you want to remove it from this order?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteConfirmItem(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteConfirmItem && handleDeleteItemFromOrder(deleteConfirmItem.id)}
+            >
+              <Trash2 className="h-4 w-4 mr-1" /> Remove Item
             </Button>
           </DialogFooter>
         </DialogContent>

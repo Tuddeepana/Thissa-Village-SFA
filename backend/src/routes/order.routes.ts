@@ -5,6 +5,7 @@ import {
   listOrders,
   updateOrderStatus,
   addItemsToOrder,
+  updateOrderItem,
   deleteItemFromOrder,
   cancelOrder,
   getOrderStats,
@@ -16,6 +17,7 @@ import {
   createOrderSchema,
   updateOrderStatusSchema,
   addItemsToOrderSchema,
+  updateOrderItemSchema,
   orderQuerySchema,
 } from '../validations/order.validation';
 
@@ -65,6 +67,12 @@ router.patch('/:id/status', validate(updateOrderStatusSchema), updateOrderStatus
  * Add items to existing order
  */
 router.post('/:id/items', validate(addItemsToOrderSchema), addItemsToOrder);
+
+/**
+ * PATCH /api/orders/:id/items/:itemId
+ * Update order item quantity
+ */
+router.patch('/:id/items/:itemId', validate(updateOrderItemSchema), updateOrderItem);
 
 /**
  * DELETE /api/orders/:id/items/:itemId
