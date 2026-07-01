@@ -250,6 +250,7 @@ const Orders = () => {
           {
             productId: product.productId,
             product_name: product.productName,
+            unit_type: product.unitType || null,
             quantity,
             unit_price: priceToUse,
           },
@@ -333,12 +334,11 @@ const Orders = () => {
       const stewardName = selectedOrder.steward_name || currentUser.name;
       const tableName = selectedOrder.table_name || "Take Away";
       const kotItems = unsentItems.map(item => {
-        const matchingProduct = products.find(p => p.productId === item.productId);
         return {
           orderItemId: item.id,
           product_name: item.product_name,
           quantity: item.quantity,
-          unit: matchingProduct?.unitType || undefined
+          unit: item.unit_type || undefined
         };
       });
 
@@ -407,14 +407,13 @@ const Orders = () => {
         id: order.order_number,
         billNumber: order.order_number,
         items: order.items.map(item => {
-          const matchingProduct = products.find(p => p.productId === item.productId);
           return {
             product: {
               id: item.id,
               name: item.product_name,
               category: '',
               product_type: undefined,
-              unit: matchingProduct?.unitType ?? null,
+              unit: item.unit_type ?? null,
               foreignerPrice: item.unit_price,
               localPrice: item.unit_price,
               cost: 0,
@@ -529,14 +528,13 @@ const Orders = () => {
       const bill: Bill = {
         id: createdBillNumber,
         items: selectedOrder.items.map((item) => {
-          const matchingProduct = products.find(p => p.productId === item.productId);
           return {
             product: {
               id: item.productId,
               name: item.product_name,
               category: '',
               product_type: undefined,
-              unit: matchingProduct?.unitType ?? null,
+              unit: item.unit_type ?? null,
               foreignerPrice: item.unit_price,
               localPrice: item.unit_price,
               cost: 0,

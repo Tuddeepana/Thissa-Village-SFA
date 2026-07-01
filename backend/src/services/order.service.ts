@@ -48,6 +48,7 @@ export class OrderService {
             create: input.items.map((item) => ({
               productId: item.productId,
               product_name: item.product_name,
+              unit_type: item.unit_type || null,
               quantity: item.quantity,
               unit_price: new Prisma.Decimal(item.unit_price),
               total: new Prisma.Decimal(item.unit_price * item.quantity),
@@ -233,6 +234,7 @@ export class OrderService {
           create: input.items.map((item) => ({
             productId: item.productId,
             product_name: item.product_name,
+            unit_type: item.unit_type || null,
             quantity: item.quantity,
             unit_price: new Prisma.Decimal(item.unit_price),
             total: new Prisma.Decimal(item.unit_price * item.quantity),
@@ -595,6 +597,7 @@ export class OrderService {
         id: item.id,
         productId: item.productId,
         product_name: item.product_name,
+        unit_type: item.unit_type || null,
         quantity: item.quantity,
         unit_price: Number(item.unit_price),
         total: Number(item.total),
