@@ -13,6 +13,7 @@ export interface OrderItemDTO {
   id: string;
   productId: string;
   product_name: string;
+  unit_type?: string | null;
   quantity: number;
   unit_price: number;
   total: number;
@@ -47,6 +48,7 @@ export interface OrderDTO {
 export interface CreateOrderItemInput {
   productId: string;
   product_name: string;
+  unit_type?: string | null;
   quantity: number;
   unit_price: number;
   kot_sent?: boolean;

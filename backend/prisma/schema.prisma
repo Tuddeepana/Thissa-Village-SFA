@@ -340,6 +340,7 @@ model OrderItem {
   orderId      String
   productId    String
   product_name String
+  unit_type    String?
   quantity     Int
   unit_price   Decimal  @db.Decimal(10, 2)
   total        Decimal  @db.Decimal(10, 2)
