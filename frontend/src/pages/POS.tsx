@@ -658,6 +658,7 @@ const POS = () => {
           return {
             productId: item.product.id,
             product_name: item.product.name,
+            unit_type: item.product.unit || null,
             quantity: item.quantity,
             unit_price: customerType === "local" ? localPrice : foreignerPrice,
             kot_sent: kotSentItemIds.has(item.product.id),
