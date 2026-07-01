@@ -165,12 +165,18 @@ class DashboardService {
       monthlySums[MONTH_NAMES[m]] = '0';
     }
 
+    // Current month number (1-based) to isolate current month's revenue
+    const currentMonthNum = now.getMonth() + 1;
+
     for (const row of monthlyGrouped) {
       const monthIndex = Number(row.month_num) - 1; // 1-based → 0-based
       const sum = Number(row.total);
       const key = MONTH_NAMES[monthIndex] || `m${monthIndex + 1}`;
       monthlySums[key] = sum.toFixed(2);
-      monthlyTotal += sum;
+      // Only accumulate revenue for the current month
+      if (Number(row.month_num) === currentMonthNum) {
+        monthlyTotal += sum;
+      }
     }
 
     // ── post-process low stock ─────────────────────────────────────
