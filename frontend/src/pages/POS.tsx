@@ -199,59 +199,6 @@ const POS = () => {
     checkAgentHealth();
   }, [checkAgentHealth]);
 
-  // Refresh product unit data for cart items loaded from localStorage.
-  // When bill items are rehydrated from a previous session, the product's `unit`
-  // field may be stale (null/missing) even though the product now has a unitType
-  // set in the database. This effect fetches fresh data and patches any gaps.
-  useEffect(() => {
-    if (billItems.length === 0) return;
-
-    // Check if any items might be missing the unit field
-    const productIds = billItems.map(item => item.product.id);
-    if (productIds.length === 0) return;
-
-    let cancelled = false;
-    const refreshUnits = async () => {
-      try {
-        const res = await api.get<MyStockResponse>('/mystock', {
-          params: { page: 1, pageSize: 1000, noPagination: true },
-        });
-        const rows: MyStockTableRow[] = res.data.tableResponse?.data ?? [];
-        const unitMap = new Map<string, string | null>();
-        for (const r of rows) {
-          unitMap.set(r.productId, r.unitType ?? null);
-        }
-
-        if (cancelled) return;
-
-        // Update bill items where the stored unit differs from the current DB value
-        setBillItems(prev => {
-          let changed = false;
-          const updated = prev.map(item => {
-            const freshUnit = unitMap.get(item.product.id);
-            // Only update if the DB has a non-empty unit and the item is missing it
-            if (freshUnit && freshUnit.trim() && (!item.product.unit || !item.product.unit.trim())) {
-              changed = true;
-              return {
-                ...item,
-                product: { ...item.product, unit: freshUnit.trim() },
-              };
-            }
-            return item;
-          });
-          return changed ? updated : prev;
-        });
-      } catch (err) {
-        // Non-critical — if refresh fails, KOT will just use whatever is in state
-        console.warn('Failed to refresh product unit data for cart items', err);
-      }
-    };
-    refreshUnits();
-    return () => { cancelled = true; };
-    // Only run on mount (billItems.length used as a guard, not a re-trigger)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Fetch stewards
   useEffect(() => {
     let cancelled = false;
@@ -438,7 +385,7 @@ const POS = () => {
         items: unsentItems.map(item => ({
           product_name: item.product.name,
           quantity: item.quantity,
-          unit: (item.product.unit && item.product.unit.trim()) ? item.product.unit.trim() : undefined
+          unit: item.product.unit || undefined
         }))
       });
 
@@ -454,7 +401,7 @@ const POS = () => {
         items: unsentItems.map(item => ({
           product_name: item.product.name,
           quantity: item.quantity,
-          unit: (item.product.unit && item.product.unit.trim()) ? item.product.unit.trim() : undefined
+          unit: item.product.unit || undefined
         }))
       });
 
@@ -711,7 +658,7 @@ const POS = () => {
           return {
             productId: item.product.id,
             product_name: item.product.name,
-            unit_type: (item.product.unit && item.product.unit.trim()) ? item.product.unit.trim() : null,
+            unit_type: item.product.unit || null,
             quantity: item.quantity,
             unit_price: customerType === "local" ? localPrice : foreignerPrice,
             kot_sent: kotSentItemIds.has(item.product.id),
