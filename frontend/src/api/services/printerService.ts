@@ -132,19 +132,53 @@ export const printerService = {
     const config = await getAgentConfig();
     if (!config) throw new Error('Agent not configured');
 
-    const res = await fetch(`${config.url}/print`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Print-Agent-Key': config.key,
-        'ngrok-skip-browser-warning': 'true',
-      },
-      body: JSON.stringify(data),
-    });
+    const AGENT_TIMEOUT_MS = 8000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), AGENT_TIMEOUT_MS);
 
-    const result = await res.json();
-    if (!result.success) throw new Error(result.message || 'Agent print failed');
-    return result;
+    try {
+      const res = await fetch(`${config.url}/print`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Print-Agent-Key': config.key,
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: JSON.stringify(data),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        // Try to extract error message, but guard against non-JSON responses (e.g. ngrok HTML error pages)
+        let errorMsg = `Agent returned HTTP ${res.status}`;
+        try {
+          const errBody = await res.json();
+          if (errBody?.message) errorMsg = errBody.message;
+        } catch { /* ignore parse errors */ }
+        throw new Error(errorMsg);
+      }
+
+      const result = await res.json();
+      if (!result.success) throw new Error(result.message || 'Agent print failed');
+      return result;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      // If fetch itself failed (network error, timeout, DNS), the cached agent URL is likely stale
+      if (err?.name === 'AbortError') {
+        // Timeout — clear cache so next attempt re-fetches the URL
+        cachedAgentUrl = null;
+        cachedAgentKey = null;
+        throw new Error(`Agent print timed out after ${AGENT_TIMEOUT_MS / 1000}s — agent may be offline or URL stale`);
+      }
+      if (err?.message?.includes('fetch') || err?.message?.includes('NetworkError') || err?.name === 'TypeError') {
+        // Network-level failure (e.g., wrong ngrok URL) — invalidate cache
+        cachedAgentUrl = null;
+        cachedAgentKey = null;
+      }
+      throw err;
+    }
   },
 };
 

@@ -262,13 +262,17 @@ const buildKotSlipBody = (data: KotSlipData, logoDataUrl: string): string => `
 `;
 
 export const printKotSlip = async (data: KotSlipData): Promise<void> => {
+  const errors: string[] = [];
+
   // 1. Try the local print agent (via ngrok when deployed to Railway)
   try {
     await printerService.printKotViaAgent(data);
     console.log('✅ KOT printed via print agent');
     return;
   } catch (err: any) {
-    console.warn('Print agent unavailable, trying backend direct print...', err?.message);
+    const msg = err?.message || 'Unknown agent error';
+    errors.push(`Agent: ${msg}`);
+    console.warn('Print agent unavailable, trying backend direct print...', msg);
   }
 
   // 2. Try backend direct print (works only when backend is on the same LAN as the printer)
@@ -277,44 +281,55 @@ export const printKotSlip = async (data: KotSlipData): Promise<void> => {
     console.log('✅ KOT printed via backend direct');
     return;
   } catch (err: any) {
-    console.warn('Backend direct print failed, falling back to browser print...', err?.message);
+    const msg = err?.message || 'Unknown backend error';
+    errors.push(`Backend: ${msg}`);
+    console.warn('Backend direct print failed, falling back to browser print...', msg);
   }
 
   // 3. Final fallback: browser print dialog
-  const logoDataUrl = await toDataURL(logoUrl);
-  const printWindow = window.open('', '_blank', 'width=320,height=520');
-  if (!printWindow) {
-    alert("Please allow popups for KOT printing");
-    return;
-  }
+  try {
+    const logoDataUrl = await toDataURL(logoUrl);
+    const printWindow = window.open('', '_blank', 'width=320,height=520');
+    if (!printWindow) {
+      throw new Error('Popup blocked — please allow popups for KOT printing');
+    }
 
-  const kotHTML = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>KOT - ${data.tableName}</title>
-      <style>${KOT_CSS}</style>
-    </head>
-    <body>
-      ${buildKotSlipBody(data, logoDataUrl)}
-      <script>
-        window.onload = function() {
-          // Short delay to ensure styles and images are fully rendered
-          setTimeout(function() {
-            window.print();
+    const kotHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>KOT - ${data.tableName}</title>
+        <style>${KOT_CSS}</style>
+      </head>
+      <body>
+        ${buildKotSlipBody(data, logoDataUrl)}
+        <script>
+          window.onload = function() {
+            // Short delay to ensure styles and images are fully rendered
             setTimeout(function() {
-              window.close();
-            }, 500);
-          }, 100);
-        };
-      </script>
-    </body>
-    </html>
-  `;
+              window.print();
+              setTimeout(function() {
+                window.close();
+              }, 500);
+            }, 100);
+          };
+        </script>
+      </body>
+      </html>
+    `;
 
     printWindow.document.write(kotHTML);
     printWindow.document.close();
-  
+    console.log('✅ KOT printed via browser print dialog');
+    return;
+  } catch (err: any) {
+    const msg = err?.message || 'Browser print failed';
+    errors.push(`Browser: ${msg}`);
+    console.error('Browser print fallback also failed:', msg);
+  }
+
+  // All 3 methods failed — throw so the caller can show an error toast
+  throw new Error(`KOT print failed (all methods exhausted). ${errors.join(' | ')}`);
 };
 

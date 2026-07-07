@@ -34,28 +34,43 @@ function sendToPrinter(payload) {
   return new Promise((resolve, reject) => {
     const timeoutMs = 5000;
     const client = new net.Socket();
+    let settled = false;
+
+    const finish = (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      client.removeAllListeners();
+      client.destroy();
+      if (err) {
+        reject(err);
+      } else {
+        resolve();
+      }
+    };
 
     const timer = setTimeout(() => {
-      client.destroy();
-      reject(new Error(`Connection timed out after ${timeoutMs / 1000}s — verify printer IP and port`));
+      finish(new Error(`Connection timed out after ${timeoutMs / 1000}s — verify printer IP and port`));
     }, timeoutMs);
 
     client.connect(PRINTER_PORT, PRINTER_IP, () => {
-      clearTimeout(timer);
-      client.write(payload, (writeErr) => {
-        client.end();
+      const flushed = client.write(payload, (writeErr) => {
         if (writeErr) {
-          reject(new Error(`Failed to send data: ${writeErr.message}`));
-        } else {
-          resolve();
+          finish(new Error(`Failed to send data: ${writeErr.message}`));
+        } else if (flushed) {
+          // Data was fully flushed to the OS buffer
+          finish(null);
         }
+        // else: wait for 'drain' event below
       });
+
+      if (!flushed) {
+        client.once('drain', () => finish(null));
+      }
     });
 
     client.on('error', (err) => {
-      clearTimeout(timer);
-      client.destroy();
-      reject(new Error(`TCP connection error: ${err.message}`));
+      finish(new Error(`TCP connection error: ${err.message}`));
     });
   });
 }

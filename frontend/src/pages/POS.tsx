@@ -390,20 +390,25 @@ const POS = () => {
       });
 
       // Then print KOT slip with the generated ID
-      await printKotSlip({
-        kotId: kotLogResponse.kotLog?.kot_number || undefined,
-        tableName,
-        orderType: kotOrderType,
-        stewardName,
-        cashierName: currentUser.name,
-        customerName: customerName || undefined,
-        remark: kotRemark || undefined,
-        items: unsentItems.map(item => ({
-          product_name: item.product.name,
-          quantity: item.quantity,
-          unit: item.product.unit || undefined
-        }))
-      });
+      try {
+        await printKotSlip({
+          kotId: kotLogResponse.kotLog?.kot_number || undefined,
+          tableName,
+          orderType: kotOrderType,
+          stewardName,
+          cashierName: currentUser.name,
+          customerName: customerName || undefined,
+          remark: kotRemark || undefined,
+          items: unsentItems.map(item => ({
+            product_name: item.product.name,
+            quantity: item.quantity,
+            unit: item.product.unit || undefined
+          }))
+        });
+      } catch (printErr: any) {
+        console.error("KOT print failed (KOT was saved):", printErr);
+        toast.error("KOT saved but print failed: " + (printErr?.message || "Unknown print error"));
+      }
 
       setKotSentItemIds(prev => {
         const newSet = new Set(prev);

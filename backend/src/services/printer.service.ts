@@ -133,15 +133,26 @@ class PrinterService {
     return new Promise((resolve, reject) => {
       const timeoutMs = 5000;
       const client = new net.Socket();
+      let settled = false;
+
+      const finish = (err: Error | null) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        client.removeAllListeners();
+        client.destroy();
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      };
 
       const timer = setTimeout(() => {
-        client.destroy();
-        reject(new Error(`Connection timed out after ${timeoutMs / 1000}s — verify IP and port`));
+        finish(new Error(`Connection timed out after ${timeoutMs / 1000}s — verify IP and port`));
       }, timeoutMs);
 
       client.connect(port, ip, () => {
-        clearTimeout(timer);
-
         try {
           const now = new Date();
           const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -194,24 +205,24 @@ class PrinterService {
 
           const fullPayload = Buffer.concat(commands);
 
-          client.write(fullPayload, (writeErr) => {
-            client.end();
+          const flushed = client.write(fullPayload, (writeErr) => {
             if (writeErr) {
-              reject(new Error(`Failed to send data: ${writeErr.message}`));
-            } else {
-              resolve();
+              finish(new Error(`Failed to send data: ${writeErr.message}`));
+            } else if (flushed) {
+              finish(null);
             }
           });
+
+          if (!flushed) {
+            client.once('drain', () => finish(null));
+          }
         } catch (err: any) {
-          client.destroy();
-          reject(new Error(`Error building print data: ${err.message}`));
+          finish(new Error(`Error building print data: ${err.message}`));
         }
       });
 
       client.on('error', (err) => {
-        clearTimeout(timer);
-        client.destroy();
-        reject(new Error(`TCP connection error: ${err.message}`));
+        finish(new Error(`TCP connection error: ${err.message}`));
       });
     });
   }
@@ -278,15 +289,26 @@ class PrinterService {
     return new Promise((resolve, reject) => {
       const timeoutMs = 5000;
       const client = new net.Socket();
+      let settled = false;
+
+      const finish = (err: Error | null) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        client.removeAllListeners();
+        client.destroy();
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      };
 
       const timer = setTimeout(() => {
-        client.destroy();
-        reject(new Error(`Connection timed out`));
+        finish(new Error(`Connection timed out`));
       }, timeoutMs);
 
       client.connect(port, ip, () => {
-        clearTimeout(timer);
-
         try {
           const now = new Date();
           const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -375,8 +397,6 @@ class PrinterService {
 
             let line = firstLineName + ' '.repeat(48 - firstLineName.length - qtyStr.length) + qtyStr + '\n';
 
-            // Render item text slightly larger (Double width)
-            // Wait, double width breaks the layout. Let's keep normal width but bold.
             commands.push(Buffer.from(line));
 
             // If itemName is longer than maxItemLen, print the rest wrapped
@@ -401,24 +421,24 @@ class PrinterService {
 
           const fullPayload = Buffer.concat(commands);
 
-          client.write(fullPayload, (writeErr) => {
-            client.end();
+          const flushed = client.write(fullPayload, (writeErr) => {
             if (writeErr) {
-              reject(new Error(`Failed to send data: ${writeErr.message}`));
-            } else {
-              resolve();
+              finish(new Error(`Failed to send data: ${writeErr.message}`));
+            } else if (flushed) {
+              finish(null);
             }
           });
+
+          if (!flushed) {
+            client.once('drain', () => finish(null));
+          }
         } catch (err: any) {
-          client.destroy();
-          reject(new Error(`Error building print data: ${err.message}`));
+          finish(new Error(`Error building print data: ${err.message}`));
         }
       });
 
       client.on('error', (err) => {
-        clearTimeout(timer);
-        client.destroy();
-        reject(new Error(`TCP connection error: ${err.message}`));
+        finish(new Error(`TCP connection error: ${err.message}`));
       });
     });
   }
