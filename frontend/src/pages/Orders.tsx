@@ -138,7 +138,7 @@ const Orders = () => {
   // Fetch products for adding items
   const fetchProducts = async () => {
     try {
-      const res = await api.get<MyStockResponse>('/mystock', { params: { page: 1, pageSize: 1000, noPagination: true } });
+      const res = await api.get<MyStockResponse>('/mystock', { params: { page: 1, pageSize: 100 } });
       setProducts(res.data.tableResponse?.data ?? []);
     } catch (error) {
       console.error("Failed to fetch products", error);
@@ -334,21 +334,11 @@ const Orders = () => {
       const stewardName = selectedOrder.steward_name || currentUser.name;
       const tableName = selectedOrder.table_name || "Take Away";
       const kotItems = unsentItems.map(item => {
-        // Use the order item's unit_type first; if missing, look up the current
-        // product's unitType from the loaded products list as a fallback.
-        // This handles orders created before unitType was set on the product.
-        let unit: string | undefined = (item.unit_type && item.unit_type.trim()) ? item.unit_type.trim() : undefined;
-        if (!unit && item.productId) {
-          const prod = products.find(p => p.productId === item.productId);
-          if (prod?.unitType && prod.unitType.trim()) {
-            unit = prod.unitType.trim();
-          }
-        }
         return {
           orderItemId: item.id,
           product_name: item.product_name,
           quantity: item.quantity,
-          unit,
+          unit: item.unit_type || undefined
         };
       });
 
@@ -364,16 +354,21 @@ const Orders = () => {
       });
 
       // Then print KOT slip with the generated ID
-      await printKotSlip({
-        kotId: kotLogResponse.kotLog?.kot_number || undefined,
-        tableName,
-        orderType: selectedOrder.order_type,
-        stewardName,
-        cashierName: currentUser.name,
-        customerName: selectedOrder.customer_name || undefined,
-        remark: kotRemark || undefined,
-        items: kotItems,
-      });
+      try {
+        await printKotSlip({
+          kotId: kotLogResponse.kotLog?.kot_number || undefined,
+          tableName,
+          orderType: selectedOrder.order_type,
+          stewardName,
+          cashierName: currentUser.name,
+          customerName: selectedOrder.customer_name || undefined,
+          remark: kotRemark || undefined,
+          items: kotItems,
+        });
+      } catch (printErr: any) {
+        console.error("KOT print failed (KOT was saved):", printErr);
+        toast.error("KOT saved but print failed: " + (printErr?.message || "Unknown print error"));
+      }
 
       setKotSentOrderItemIds(prev => {
         const newSet = new Set(prev);
