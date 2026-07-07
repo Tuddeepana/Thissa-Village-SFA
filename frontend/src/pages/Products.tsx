@@ -57,6 +57,7 @@ const Products = () => {
 
     // Inline edit state for per-row editing
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [editingName, setEditingName] = useState<string>("");
     const [editingLow, setEditingLow] = useState<number | "">("");
     const [editingCostPrice, setEditingCostPrice] = useState<number | "">("");
     const [editingForeignerPrice, setEditingForeignerPrice] = useState<number | "">("");
@@ -91,6 +92,7 @@ const Products = () => {
     // Handlers for inline edit
     const startEditing = (product: Product) => {
         setEditingId(product.id);
+        setEditingName(product.name);
         setEditingLow(product.low_stock ?? "");
         setEditingCostPrice(Number.parseFloat(product.cost_price));
         setEditingForeignerPrice(Number.parseFloat(product.foreigner_price));
@@ -102,6 +104,7 @@ const Products = () => {
 
     const cancelEditing = () => {
         setEditingId(null);
+        setEditingName("");
         setEditingLow("");
         setEditingCostPrice("");
         setEditingForeignerPrice("");
@@ -113,12 +116,17 @@ const Products = () => {
 
     const saveEditing = async () => {
         if (editingId == null) return;
+        if (!editingName.trim()) {
+            toast({ title: "Validation", description: "Product name is required" });
+            return;
+        }
         const alertLevel = editingLow === "" ? null : (typeof editingLow === "number" ? editingLow : Number.parseInt(String(editingLow || "0"), 10));
         const costPriceNum = typeof editingCostPrice === "number" ? editingCostPrice : Number.parseFloat(String(editingCostPrice || "0"));
         const foreignerPriceNum = typeof editingForeignerPrice === "number" ? editingForeignerPrice : Number.parseFloat(String(editingForeignerPrice || "0"));
         const localPriceNum = typeof editingLocalPrice === "number" ? editingLocalPrice : Number.parseFloat(String(editingLocalPrice || "0"));
         try {
             await productService.update(editingId, {
+                name: editingName.trim(),
                 product_type: editingProductType,
                 low_stock: alertLevel,
                 cost_price: Number.isNaN(costPriceNum) ? undefined : costPriceNum.toFixed(2),
@@ -485,7 +493,17 @@ const Products = () => {
                             <TableBody>
                                 {products.map((product) => (
                                     <TableRow key={product.id}>
-                                        <TableCell className="font-medium">{product.name}</TableCell>
+                                        <TableCell className="font-medium">
+                                            {editingId === product.id ? (
+                                                <Input
+                                                    className="w-40"
+                                                    value={editingName}
+                                                    onChange={(e) => setEditingName(e.target.value)}
+                                                />
+                                            ) : (
+                                                product.name
+                                            )}
+                                        </TableCell>
                                         <TableCell>
                                             {editingId === product.id ? (
                                                 <AsyncCategoryCombobox
