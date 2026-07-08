@@ -10,40 +10,45 @@ const formatBillNumber = (seq: number | bigint) => {
 };
 
 class BillService {
-  async createBill(input: BillCreateInput): Promise<BillDTO> {
+  async createBill(input: BillCreateInput, existingTx?: any): Promise<BillDTO> {
     // bill_number is required by Prisma/DB (NOT NULL), but frontend no longer sends it.
     // Generate a unique placeholder; if you have bill_seq formatting logic elsewhere,
     // it can update this value after creation.
     const billNumber = input.bill_number && String(input.bill_number).trim().length > 0
       ? String(input.bill_number)
       : `TMP-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const bill = await (prisma as any).$transaction(async (tx: any) => {
-      const createdBill = await tx.bill.create({
-        data: {
-          bill_number: billNumber,
-          date: new Date(input.date as any),
-          payment_method: input.payment_method,
-          customer_name: input.customer_name ?? null,
-          customer_phone: (input as any).customer_phone ?? null,
-          customer_type: (input as any).customer_type ?? 'local',
-          order_type: input.order_type ?? null,
-          table_number: input.table_number ?? null,
-          service_charge_percentage: (input as any).service_charge_percentage !== undefined && (input as any).service_charge_percentage !== null
-            ? (typeof (input as any).service_charge_percentage === 'number' ? (input as any).service_charge_percentage : Number((input as any).service_charge_percentage))
-            : null,
-          service_charge_amount: (input as any).service_charge_amount !== undefined && (input as any).service_charge_amount !== null
-            ? (typeof (input as any).service_charge_amount === 'number' ? (input as any).service_charge_amount : Number((input as any).service_charge_amount))
-            : null,
-          total: (typeof input.total === 'number' ? input.total : Number(input.total)).toFixed(2),
-          cashier_name: input.cashier_name,
-          item_count: input.item_count,
-          credit_note: input.credit_note ?? null,
-          cash_given: (typeof input.cash_given === 'number' ? input.cash_given : Number(input.cash_given)).toFixed(2),
-          balance_given: (typeof input.balance_given === 'number' ? input.balance_given : Number(input.balance_given)).toFixed(2),
-          tax: input.tax !== undefined && input.tax !== null ? (typeof input.tax === 'number' ? input.tax : Number(input.tax)).toFixed(2) : null,
-          roomBookingId: input.roomBookingId ?? null,
-        },
-      });
+
+    const baseData: any = {
+      bill_number: billNumber,
+      date: new Date(input.date as any),
+      payment_method: input.payment_method,
+      customer_name: input.customer_name ?? null,
+      customer_phone: (input as any).customer_phone ?? null,
+      customer_type: (input as any).customer_type ?? 'local',
+      order_type: input.order_type ?? null,
+      table_number: input.table_number ?? null,
+      service_charge_percentage: (input as any).service_charge_percentage !== undefined && (input as any).service_charge_percentage !== null
+        ? (typeof (input as any).service_charge_percentage === 'number' ? (input as any).service_charge_percentage : Number((input as any).service_charge_percentage))
+        : null,
+      service_charge_amount: (input as any).service_charge_amount !== undefined && (input as any).service_charge_amount !== null
+        ? (typeof (input as any).service_charge_amount === 'number' ? (input as any).service_charge_amount : Number((input as any).service_charge_amount))
+        : null,
+      total: (typeof input.total === 'number' ? input.total : Number(input.total)).toFixed(2),
+      cashier_name: input.cashier_name,
+      item_count: input.item_count,
+      credit_note: input.credit_note ?? null,
+      cash_given: (typeof input.cash_given === 'number' ? input.cash_given : Number(input.cash_given)).toFixed(2),
+      balance_given: (typeof input.balance_given === 'number' ? input.balance_given : Number(input.balance_given)).toFixed(2),
+      tax: input.tax !== undefined && input.tax !== null ? (typeof input.tax === 'number' ? input.tax : Number(input.tax)).toFixed(2) : null,
+    };
+
+    // Only include roomBookingId when provided (avoids issues if DB column doesn't exist yet)
+    if (input.roomBookingId) {
+      baseData.roomBookingId = input.roomBookingId;
+    }
+
+    const createBillLogic = async (tx: any, data: any) => {
+      const createdBill = await tx.bill.create({ data });
 
       const finalBillNumber = formatBillNumber(createdBill.bill_seq);
       const updatedBill = await tx.bill.update({
@@ -52,7 +57,31 @@ class BillService {
       });
 
       return updatedBill;
-    });
+    };
+
+    const createBillInTx = async (data: any) => {
+      if (existingTx) {
+        return await createBillLogic(existingTx, data);
+      } else {
+        return await (prisma as any).$transaction(async (tx: any) => {
+          return await createBillLogic(tx, data);
+        });
+      }
+    };
+
+    let bill;
+    try {
+      bill = await createBillInTx(baseData);
+    } catch (err: any) {
+      // If roomBookingId column doesn't exist in DB yet, retry without it
+      if (input.roomBookingId && (err?.message?.includes('roomBookingId') || err?.message?.includes('room_booking') || err?.code === 'P2022')) {
+        console.warn('⚠️ roomBookingId column not found in DB, retrying bill creation without it. Run migration to fix.');
+        const { roomBookingId, ...dataWithoutBookingId } = baseData;
+        bill = await createBillInTx(dataWithoutBookingId);
+      } else {
+        throw err;
+      }
+    }
 
     return bill as BillDTO;
   }
@@ -111,17 +140,31 @@ class BillService {
   }
 
   async getById(id: string): Promise<BillDTO | null> {
-    const bill = await (prisma as any).bill.findUnique({
-      where: { id },
-      include: {
-        inventoryRecords: { include: { product: { include: { category: true } } } },
-        roomBooking: {
-          include: {
-            bookedRooms: true,
+    let bill: any;
+    try {
+      bill = await (prisma as any).bill.findUnique({
+        where: { id },
+        include: {
+          inventoryRecords: { include: { product: { include: { category: true } } } },
+          roomBooking: {
+            include: {
+              bookedRooms: true,
+            },
           },
         },
-      },
-    });
+      });
+    } catch (err: any) {
+      // Fallback if roomBooking relation doesn't exist in DB yet (migration not applied)
+      if (err?.message?.includes('roomBooking') || err?.message?.includes('room_booking') || err?.code === 'P2022') {
+        console.warn('⚠️ roomBooking relation not available, fetching bill without it.');
+        bill = await (prisma as any).bill.findUnique({
+          where: { id },
+          include: { inventoryRecords: { include: { product: { include: { category: true } } } } },
+        });
+      } else {
+        throw err;
+      }
+    }
     if (!bill) return null;
 
     const customerType: 'local' | 'foreigner' = (bill.customer_type === 'foreigner' ? 'foreigner' : 'local');
