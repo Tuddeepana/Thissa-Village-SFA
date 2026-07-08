@@ -74,7 +74,8 @@ class BillService {
       bill = await createBillInTx(baseData);
     } catch (err: any) {
       // If roomBookingId column doesn't exist in DB yet, retry without it
-      if (input.roomBookingId && (err?.message?.includes('roomBookingId') || err?.message?.includes('room_booking') || err?.code === 'P2022')) {
+      // NOTE: We cannot retry if we are using an existing transaction, because Postgres aborts the entire transaction on error.
+      if (!existingTx && input.roomBookingId && (err?.message?.includes('roomBookingId') || err?.message?.includes('room_booking') || err?.code === 'P2022')) {
         console.warn('⚠️ roomBookingId column not found in DB, retrying bill creation without it. Run migration to fix.');
         const { roomBookingId, ...dataWithoutBookingId } = baseData;
         bill = await createBillInTx(dataWithoutBookingId);
