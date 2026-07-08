@@ -126,6 +126,7 @@ export const createRoomBooking = async (payload: CreateBookingPayload) => {
         cash_given: cash,
         balance_given: balance,
         tax: 0,
+        roomBookingId: booking.id,
       });
 
       console.log('✅ Bill created successfully:', bill.bill_number);
@@ -260,6 +261,7 @@ export const settleBookingBalance = async (id: string, payload: SettleBalancePay
       cash_given: cash,
       balance_given: balance,
       tax: 0,
+      roomBookingId: id,
     });
 
     // Update the booking's paidAmount to totalAmount

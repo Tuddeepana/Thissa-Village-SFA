@@ -41,6 +41,7 @@ class BillService {
           cash_given: (typeof input.cash_given === 'number' ? input.cash_given : Number(input.cash_given)).toFixed(2),
           balance_given: (typeof input.balance_given === 'number' ? input.balance_given : Number(input.balance_given)).toFixed(2),
           tax: input.tax !== undefined && input.tax !== null ? (typeof input.tax === 'number' ? input.tax : Number(input.tax)).toFixed(2) : null,
+          roomBookingId: input.roomBookingId ?? null,
         },
       });
 
@@ -112,7 +113,14 @@ class BillService {
   async getById(id: string): Promise<BillDTO | null> {
     const bill = await (prisma as any).bill.findUnique({
       where: { id },
-      include: { inventoryRecords: { include: { product: { include: { category: true } } } } },
+      include: {
+        inventoryRecords: { include: { product: { include: { category: true } } } },
+        roomBooking: {
+          include: {
+            bookedRooms: true,
+          },
+        },
+      },
     });
     if (!bill) return null;
 
@@ -170,9 +178,37 @@ class BillService {
       Subtotal: subtotalVal,
       Tax: taxVal,
       Total: totalVal,
+      roomBooking: null as any,
     };
 
     // Return normalized BillDTO for backward compatibility, but attach _detailed if needed — here we return the normal DTO
+    // Also attach room booking details when available
+    const roomBookingData = bill.roomBooking ? {
+      id: bill.roomBooking.id,
+      customerName: bill.roomBooking.customerName,
+      customerNic: bill.roomBooking.customerNic ?? null,
+      customerPhone: bill.roomBooking.customerPhone,
+      customerAddress: bill.roomBooking.customerAddress ?? null,
+      checkInDate: bill.roomBooking.checkInDate instanceof Date ? bill.roomBooking.checkInDate.toISOString() : String(bill.roomBooking.checkInDate),
+      checkOutDate: bill.roomBooking.checkOutDate instanceof Date ? bill.roomBooking.checkOutDate.toISOString() : String(bill.roomBooking.checkOutDate),
+      totalAmount: bill.roomBooking.totalAmount !== undefined ? String(bill.roomBooking.totalAmount) : '0',
+      paidAmount: bill.roomBooking.paidAmount !== undefined ? String(bill.roomBooking.paidAmount) : '0',
+      paymentType: bill.roomBooking.paymentType ?? 'FULL_PAYMENT',
+      status: bill.roomBooking.status ?? 'ACTIVE',
+      cashierName: bill.roomBooking.cashierName,
+      bookedRooms: (bill.roomBooking.bookedRooms || []).map((br: any) => ({
+        id: br.id,
+        roomName: br.roomName,
+        pricePerNight: br.pricePerNight !== undefined ? String(br.pricePerNight) : '0',
+      })),
+      createdAt: bill.roomBooking.createdAt instanceof Date ? bill.roomBooking.createdAt.toISOString() : String(bill.roomBooking.createdAt),
+    } : null;
+
+    // Attach room booking to the detailed response as well
+    if (roomBookingData) {
+      response.roomBooking = roomBookingData;
+    }
+
     return {
       id: bill.id,
       bill_number: bill.bill_number,

@@ -36,6 +36,7 @@ export type BillCreateInput = {
   cash_given: number | string;
   balance_given: number | string;
   tax?: number | string | null;
+  roomBookingId?: string | null;
 };
 
 export type BillCreateWithItemsInput = BillCreateInput & {

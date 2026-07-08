@@ -43,6 +43,7 @@ import {
   Phone,
   Clock,
   Monitor,
+  BedDouble,
 } from "lucide-react";
 import { formatSL } from "@/utils/dateUtils";
 import { Bill } from "@/types/pos";
@@ -261,6 +262,8 @@ const Bills = () => {
           tableNumber: detailed.table_number || detailed.tableNumber || undefined,
           orderType: detailed.order_type || detailed.orderType || undefined,
           createdAt: detailed.dateTime ? new Date(detailed.dateTime) : bill.createdAt,
+          // Attach room booking data if present
+          roomBooking: detailed.roomBooking ?? null,
         };
 
         setSelectedBill(mappedBill);
@@ -1027,7 +1030,8 @@ const Bills = () => {
 
               <Separator />
 
-              {/* Items Table */}
+              {/* Items Table - show only for POS bills with actual items */}
+              {selectedBill.items && selectedBill.items.length > 0 && selectedBill.items.some((it: any) => it.product?.name) && (
               <div>
                 <h4 className="font-medium mb-2">Items</h4>
                 <div className="border rounded-lg overflow-hidden">
@@ -1066,6 +1070,137 @@ const Bills = () => {
                   </Table>
                 </div>
               </div>
+              )}
+
+              {/* Room Booking Details Section */}
+              {selectedBill.roomBooking && (
+                <>
+                  <div>
+                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                      <BedDouble className="h-4 w-4" />
+                      Room Booking Details
+                    </h4>
+                    <div className="bg-blue-50 dark:bg-blue-950 rounded-lg p-4 space-y-3">
+                      {/* Rooms */}
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Rooms</p>
+                        <div className="flex flex-wrap gap-2">
+                          {(selectedBill.roomBooking.bookedRooms || []).map((room: any, idx: number) => (
+                            <Badge key={idx} variant="secondary" className="text-sm">
+                              {room.roomName} - Rs.{Number(room.pricePerNight).toFixed(2)}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Check-in / Check-out */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            Check-In
+                          </p>
+                          <p className="font-medium text-sm">
+                            {selectedBill.roomBooking.checkInDate
+                              ? formatSL(new Date(selectedBill.roomBooking.checkInDate), 'dd/MM/yyyy HH:mm')
+                              : '-'}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            Check-Out
+                          </p>
+                          <p className="font-medium text-sm">
+                            {selectedBill.roomBooking.checkOutDate
+                              ? formatSL(new Date(selectedBill.roomBooking.checkOutDate), 'dd/MM/yyyy HH:mm')
+                              : '-'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Duration */}
+                      {selectedBill.roomBooking.checkInDate && selectedBill.roomBooking.checkOutDate && (() => {
+                        const checkIn = new Date(selectedBill.roomBooking.checkInDate);
+                        const checkOut = new Date(selectedBill.roomBooking.checkOutDate);
+                        const diffMs = checkOut.getTime() - checkIn.getTime();
+                        const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+                        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                        const isShortTime = diffHours <= 6 && diffDays === 0;
+                        const label = isShortTime
+                          ? `Short Time (${diffHours} hour${diffHours !== 1 ? 's' : ''})`
+                          : `Full Time (${diffDays || 1} night${(diffDays || 1) !== 1 ? 's' : ''})`;
+                        return (
+                          <div className="space-y-1">
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              Duration
+                            </p>
+                            <p className="font-medium text-sm">{label}</p>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Customer NIC & Address */}
+                      <div className="grid grid-cols-2 gap-4">
+                        {selectedBill.roomBooking.customerNic && (
+                          <div className="space-y-1">
+                            <p className="text-sm text-muted-foreground">NIC</p>
+                            <p className="font-medium text-sm">{selectedBill.roomBooking.customerNic}</p>
+                          </div>
+                        )}
+                        {selectedBill.roomBooking.customerAddress && (
+                          <div className="space-y-1">
+                            <p className="text-sm text-muted-foreground">Address</p>
+                            <p className="font-medium text-sm">{selectedBill.roomBooking.customerAddress}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Payment Type & Booking Status */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">Booking Type</p>
+                          <Badge variant="outline" className="text-sm">
+                            {selectedBill.roomBooking.paymentType === 'FULL_PAYMENT' ? 'Full Payment'
+                              : selectedBill.roomBooking.paymentType === 'ADVANCE_PAYMENT' ? 'Advance Payment'
+                              : 'On-Call'}
+                          </Badge>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">Booking Status</p>
+                          <Badge
+                            variant="outline"
+                            className={`text-sm ${
+                              selectedBill.roomBooking.status === 'ACTIVE' ? 'border-green-500 text-green-700' :
+                              selectedBill.roomBooking.status === 'CHECKED_OUT' ? 'border-blue-500 text-blue-700' :
+                              'border-red-500 text-red-700'
+                            }`}
+                          >
+                            {selectedBill.roomBooking.status === 'ACTIVE' ? 'Active'
+                              : selectedBill.roomBooking.status === 'CHECKED_OUT' ? 'Checked Out'
+                              : 'Cancelled'}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {/* Booking Total & Paid */}
+                      {selectedBill.roomBooking.totalAmount && (
+                        <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                          <div className="space-y-1">
+                            <p className="text-sm text-muted-foreground">Booking Total</p>
+                            <p className="font-semibold text-sm">Rs.{Number(selectedBill.roomBooking.totalAmount).toFixed(2)}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm text-muted-foreground">Total Paid</p>
+                            <p className="font-semibold text-sm text-green-600">Rs.{Number(selectedBill.roomBooking.paidAmount || 0).toFixed(2)}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
 
               <Separator />
 
