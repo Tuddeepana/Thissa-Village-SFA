@@ -137,6 +137,7 @@ model RoomBooking {
 
   // Relations
   bookedRooms BookedRoom[]
+  bills       Bill[]
 
   @@map("room_bookings")
 }
@@ -238,9 +239,11 @@ model Bill {
   cash_given     Decimal  @db.Decimal(10, 2)
   balance_given  Decimal  @db.Decimal(10, 2)
   tax            Decimal? @db.Decimal(10, 2)
+  roomBookingId  String?
 
   // Relations
   inventoryRecords Inventory[]
+  roomBooking      RoomBooking? @relation(fields: [roomBookingId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
