@@ -1,10 +1,8 @@
 import prisma from '../lib/prisma';
-// @ts-ignore
-import { RoomTypeEnum } from '@prisma/client';
 
 interface CreateRoomPayload {
   name: string;
-  room_type: RoomTypeEnum;
+  roomTypeId: string;
   quantity: number;
   price_full_day: number;
   price_short_time: number;
@@ -12,7 +10,7 @@ interface CreateRoomPayload {
 
 interface UpdateRoomPayload {
   name?: string;
-  room_type?: RoomTypeEnum;
+  roomTypeId?: string;
   quantity?: number;
   price_full_day?: number;
   price_short_time?: number;
@@ -21,19 +19,21 @@ interface UpdateRoomPayload {
 interface ExpandedRoomItem {
   id: string;
   displayName: string;
-  room_type: RoomTypeEnum;
+  room_type: string; // Resolves to RoomType.type
   baseRoomId: string;
 }
 
 export const createRoom = async (payload: CreateRoomPayload) => {
   return await prisma.room.create({
     data: payload,
+    include: { roomType: true },
   });
 };
 
 export const getRoomById = async (id: string) => {
   return await prisma.room.findUnique({
     where: { id, deletedAt: null },
+    include: { roomType: true },
   });
 };
 
@@ -41,10 +41,14 @@ export const listRooms = async () => {
   const rooms = await prisma.room.findMany({
     where: { deletedAt: null },
     orderBy: { createdAt: 'desc' },
+    include: { roomType: true },
   });
 
   return {
-    rooms,
+    rooms: rooms.map(room => ({
+      ...room,
+      room_type: room.roomType.type,
+    })),
     total: rooms.length,
   };
 };
@@ -53,6 +57,7 @@ export const getExpandedRoomList = async (): Promise<ExpandedRoomItem[]> => {
   const rooms = await prisma.room.findMany({
     where: { deletedAt: null },
     orderBy: { createdAt: 'desc' },
+    include: { roomType: true },
   });
 
   const expanded: ExpandedRoomItem[] = [];
@@ -62,7 +67,7 @@ export const getExpandedRoomList = async (): Promise<ExpandedRoomItem[]> => {
       expanded.push({
         id: `${room.id}-${i}`,
         displayName: `${room.name} ${i}`,
-        room_type: room.room_type,
+        room_type: room.roomType.type,
         baseRoomId: room.id,
       });
     }
@@ -75,6 +80,7 @@ export const updateRoom = async (id: string, payload: UpdateRoomPayload) => {
   return await prisma.room.update({
     where: { id },
     data: payload,
+    include: { roomType: true },
   });
 };
 
@@ -84,4 +90,3 @@ export const deleteRoom = async (id: string) => {
     data: { deletedAt: new Date() },
   });
 };
-
