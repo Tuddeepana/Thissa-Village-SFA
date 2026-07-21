@@ -287,6 +287,7 @@ export const getAvailableRooms = async (checkInDate: Date, checkOutDate: Date) =
   const allRooms = await prisma.room.findMany({
     where: { deletedAt: null },
     orderBy: { createdAt: 'desc' },
+    include: { roomType: true },
   });
 
   // Get all active bookings that overlap with the requested dates
@@ -332,7 +333,7 @@ export const getAvailableRooms = async (checkInDate: Date, checkOutDate: Date) =
         availableRooms.push({
           id: `${room.id}-${i}`,
           displayName,
-          room_type: room.room_type,
+          room_type: room.roomType.type,
           baseRoomId: room.id,
           priceFullDay: Number(room.price_full_day),
           priceShortTime: Number(room.price_short_time),

@@ -34,4 +34,5 @@ BEGIN
 END $$;
 
 -- 5) Set sequence to max(bill_seq)
-SELECT setval(pg_get_serial_sequence('"bills"', 'bill_seq'), (SELECT COALESCE(MAX("bill_seq"), 0) FROM "bills"));
+SELECT setval(pg_get_serial_sequence('"bills"', 'bill_seq'), (SELECT COALESCE(MAX("bill_seq"), 1) FROM "bills"));
+

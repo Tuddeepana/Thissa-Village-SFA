@@ -11,6 +11,7 @@ import Categories from "./pages/Categories";
 import Units from "./pages/Units";
 import Tables from "./pages/Tables";
 import Rooms from "./pages/Rooms";
+import RoomTypes from "./pages/RoomTypes";
 import Products from "./pages/Products";
 import Invoices from "./pages/Invoices";
 import LowStock from "./pages/LowStock";
@@ -80,6 +81,7 @@ const App = () => (
             <Route path="categories" element={<Categories />} />
             <Route path="units" element={<Units />} />
             <Route path="tables" element={<Tables />} />
+            <Route path="room-types" element={<RoomTypes />} />
             <Route path="rooms" element={<Rooms />} />
             <Route path="products" element={<Products />} />
             <Route path="invoices" element={<Invoices />} />

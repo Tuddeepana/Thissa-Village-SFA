@@ -25,7 +25,9 @@ import { DeleteButton } from "@/components/common";
 import LocalLoader from "@/components/common/LocalLoader";
 import { useQuery } from "@tanstack/react-query";
 import { roomService } from "@/api/services/roomService";
+import { roomTypeService } from "@/api/services/roomTypeService";
 import type { Room, ExpandedRoomItem } from "@/types/room.types";
+import type { RoomType } from "@/types/room-type.types";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 
@@ -38,7 +40,7 @@ const Rooms = () => {
 
   const [formData, setFormData] = useState({
     name: "",
-    room_type: "NORMAL" as 'VIP' | 'NORMAL',
+    roomTypeId: "",
     quantity: 1,
     price_full_day: 0,
     price_short_time: 0
@@ -48,7 +50,7 @@ const Rooms = () => {
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [editForm, setEditForm] = useState({
     name: "",
-    room_type: "NORMAL" as 'VIP' | 'NORMAL',
+    roomTypeId: "",
     quantity: 1,
     price_full_day: 0,
     price_short_time: 0
@@ -72,6 +74,22 @@ const Rooms = () => {
     staleTime: 10_000,
   });
 
+  const { data: roomTypesData } = useQuery({
+    queryKey: ["room-types"],
+    queryFn: async () => {
+      const response = await roomTypeService.list();
+      return response.roomTypes;
+    },
+    staleTime: 10_000,
+  });
+
+  // Set default room type when loaded
+  useEffect(() => {
+    if (roomTypesData && roomTypesData.length > 0 && !formData.roomTypeId) {
+      setFormData(prev => ({ ...prev, roomTypeId: roomTypesData[0].id }));
+    }
+  }, [roomTypesData]);
+
   useEffect(() => {
     if (data) setRooms(data);
   }, [data]);
@@ -86,13 +104,13 @@ const Rooms = () => {
     try {
       await roomService.create({
         name: formData.name,
-        room_type: formData.room_type,
+        roomTypeId: formData.roomTypeId,
         quantity: formData.quantity,
         price_full_day: formData.price_full_day,
         price_short_time: formData.price_short_time
       });
       toast({ title: "Success", description: "Room added successfully" });
-      setFormData({ name: "", room_type: "NORMAL", quantity: 1, price_full_day: 0, price_short_time: 0 });
+      setFormData({ name: "", roomTypeId: roomTypesData?.[0]?.id || "", quantity: 1, price_full_day: 0, price_short_time: 0 });
       setOpen(false);
       refetch();
       refetchExpanded();
@@ -120,7 +138,7 @@ const Rooms = () => {
     setSelectedRoom(room);
     setEditForm({
       name: room.name,
-      room_type: room.room_type,
+      roomTypeId: room.roomTypeId,
       quantity: room.quantity,
       price_full_day: typeof room.price_full_day === 'string' ? parseFloat(room.price_full_day) : room.price_full_day,
       price_short_time: typeof room.price_short_time === 'string' ? parseFloat(room.price_short_time) : room.price_short_time
@@ -135,7 +153,7 @@ const Rooms = () => {
     try {
       await roomService.update(selectedRoom.id, {
         name: editForm.name,
-        room_type: editForm.room_type,
+        roomTypeId: editForm.roomTypeId,
         quantity: editForm.quantity,
         price_full_day: editForm.price_full_day,
         price_short_time: editForm.price_short_time,
@@ -183,17 +201,26 @@ const Rooms = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="room_type">Room Type</Label>
+                <Label htmlFor="roomTypeId">Room Type</Label>
                 <Select
-                  value={formData.room_type}
-                  onValueChange={(val: 'VIP' | 'NORMAL') => setFormData({ ...formData, room_type: val })}
+                  value={formData.roomTypeId}
+                  onValueChange={(val) => {
+                    const selectedType = roomTypesData?.find(rt => rt.id === val);
+                    setFormData({ 
+                      ...formData, 
+                      roomTypeId: val,
+                      price_full_day: selectedType?.price_full_day || formData.price_full_day,
+                      price_short_time: selectedType?.price_short_time || formData.price_short_time
+                    });
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="NORMAL">Normal</SelectItem>
-                    <SelectItem value="VIP">VIP</SelectItem>
+                    {roomTypesData?.map((rt) => (
+                      <SelectItem key={rt.id} value={rt.id}>{rt.type}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -274,13 +301,13 @@ const Rooms = () => {
                   <TableRow key={room.id}>
                     <TableCell className="font-medium">{room.name}</TableCell>
                     <TableCell>
-                      {room.room_type === 'VIP' ? (
+                      {room.room_type.toLowerCase() === 'vip' ? (
                         <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200">
                           <Crown className="h-3 w-3 mr-1" />
-                          VIP
+                          {room.room_type}
                         </Badge>
                       ) : (
-                        <Badge variant="secondary">Normal</Badge>
+                        <Badge variant="secondary">{room.room_type}</Badge>
                       )}
                     </TableCell>
                     <TableCell>{room.quantity}</TableCell>
@@ -339,13 +366,11 @@ const Rooms = () => {
                 }`}
               >
                 <CardContent className="p-4 text-center">
-                  {room.room_type === 'VIP' && (
+                  {room.room_type.toLowerCase() === 'vip' && (
                     <Crown className="h-4 w-4 text-amber-600 mx-auto mb-1" />
                   )}
                   <p className="font-semibold text-sm">{room.displayName}</p>
-                  {room.room_type === 'VIP' && (
-                    <p className="text-xs text-amber-600 mt-1">VIP</p>
-                  )}
+                  <p className={`text-xs mt-1 ${room.room_type.toLowerCase() === 'vip' ? 'text-amber-600' : 'text-muted-foreground'}`}>{room.room_type}</p>
                 </CardContent>
               </Card>
             ))}
@@ -375,17 +400,26 @@ const Rooms = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-room_type">Room Type</Label>
+              <Label htmlFor="edit-roomTypeId">Room Type</Label>
               <Select
-                value={editForm.room_type}
-                onValueChange={(val: 'VIP' | 'NORMAL') => setEditForm({ ...editForm, room_type: val })}
+                value={editForm.roomTypeId}
+                onValueChange={(val) => {
+                  const selectedType = roomTypesData?.find(rt => rt.id === val);
+                  setEditForm({ 
+                    ...editForm, 
+                    roomTypeId: val,
+                    price_full_day: selectedType ? selectedType.price_full_day : editForm.price_full_day,
+                    price_short_time: selectedType ? selectedType.price_short_time : editForm.price_short_time
+                  });
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="NORMAL">Normal</SelectItem>
-                  <SelectItem value="VIP">VIP</SelectItem>
+                  {roomTypesData?.map((rt) => (
+                    <SelectItem key={rt.id} value={rt.id}>{rt.type}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

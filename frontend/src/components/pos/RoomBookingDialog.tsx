@@ -509,23 +509,30 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
                     key={room.id}
                     className={`cursor-pointer transition-all ${
                       selectedRooms.has(room.id)
-                        ? room.room_type === 'VIP'
+                        ? room.room_type.toLowerCase() === 'vip'
                           ? 'border-amber-500 bg-amber-50'
                           : 'border-primary bg-primary/10'
-                        : room.room_type === 'VIP'
+                        : room.room_type.toLowerCase() === 'vip'
                         ? 'border-amber-200 hover:border-amber-400'
                         : 'hover:border-primary/50'
                     }`}
                     onClick={() => toggleRoomSelection(room.id)}
                   >
                     <div className="p-3 text-center">
-                      {room.room_type === 'VIP' && (
+                      {room.room_type.toLowerCase() === 'vip' && (
                         <Crown className="h-4 w-4 text-amber-600 mx-auto mb-1" />
                       )}
                       <p className="font-semibold text-sm">{room.displayName}</p>
-                      {room.room_type === 'VIP' && (
-                        <Badge className="text-xs bg-amber-100 text-amber-800 mt-1">VIP</Badge>
-                      )}
+                      <Badge 
+                        className={`text-xs mt-1 ${
+                          room.room_type.toLowerCase() === 'vip' 
+                            ? 'bg-amber-100 text-amber-800' 
+                            : 'bg-primary/10 text-primary'
+                        }`}
+                        variant={room.room_type.toLowerCase() === 'vip' ? 'default' : 'secondary'}
+                      >
+                        {room.room_type}
+                      </Badge>
                       <p className="text-xs text-muted-foreground mt-1">
                         Rs. {bookingType === 'short_time' ? room.priceShortTime : room.priceFullDay}/{bookingType === 'short_time' ? 'hour' : 'night'}
                       </p>
