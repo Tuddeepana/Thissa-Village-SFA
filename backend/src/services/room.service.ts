@@ -1,10 +1,10 @@
 import prisma from '../lib/prisma';
 // @ts-ignore
-import { RoomType } from '@prisma/client';
+import { RoomTypeEnum } from '@prisma/client';
 
 interface CreateRoomPayload {
   name: string;
-  room_type: RoomType;
+  room_type: RoomTypeEnum;
   quantity: number;
   price_full_day: number;
   price_short_time: number;
@@ -12,7 +12,7 @@ interface CreateRoomPayload {
 
 interface UpdateRoomPayload {
   name?: string;
-  room_type?: RoomType;
+  room_type?: RoomTypeEnum;
   quantity?: number;
   price_full_day?: number;
   price_short_time?: number;
@@ -21,7 +21,7 @@ interface UpdateRoomPayload {
 interface ExpandedRoomItem {
   id: string;
   displayName: string;
-  room_type: RoomType;
+  room_type: RoomTypeEnum;
   baseRoomId: string;
 }
 

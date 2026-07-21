@@ -65,6 +65,7 @@ const hotelMenuGroups: MenuGroup[] = [
         title: "Hotel Management",
         icon: Hotel,
         items: [
+            { title: "Room Types", url: "/room-types", icon: Hotel },
             { title: "Rooms", url: "/rooms", icon: Hotel },
             { title: "Room Status", url: "/room-status", icon: Building2 },
             { title: "Tables", url: "/tables", icon: TableProperties },

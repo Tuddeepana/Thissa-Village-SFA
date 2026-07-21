@@ -23,6 +23,7 @@ import serviceChargeRoutes from './routes/service-charge.routes';
 import printerRoutes from './routes/printer.routes';
 import kotRoutes from './routes/kot.routes';
 import configRoutes from './routes/system-config.routes';
+import roomTypeRoutes from './routes/room-type.routes';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 
 // Load environment variables
@@ -83,7 +84,7 @@ app.use('/api/service-charge', serviceChargeRoutes);
 app.use('/api/printers', printerRoutes);
 app.use('/api/kot', kotRoutes);
 app.use('/api/config', configRoutes);
-
+app.use('/api/room-types', roomTypeRoutes);
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {

@@ -44,10 +44,11 @@ enum TableType {
   NORMAL
 }
 
-enum RoomType {
+enum RoomTypeEnum {
   VIP
   NORMAL
 }
+
 
 model User {
   id        String   @id @default(uuid())
@@ -105,7 +106,7 @@ model RestaurantTable {
 model Room {
   id              String    @id @default(uuid())
   name            String    @unique
-  room_type       RoomType  @default(NORMAL)
+  room_type       RoomTypeEnum  @default(NORMAL)
   quantity        Int       @default(1)
   price_full_day  Decimal   @default(0) @db.Decimal(10, 2)
   price_short_time Decimal  @default(0) @db.Decimal(10, 2)
@@ -117,6 +118,19 @@ model Room {
   bookedRooms BookedRoom[]
 
   @@map("rooms")
+}
+
+model RoomType {
+  id               String    @id @default(uuid())
+  type             String    @unique
+  price_full_day   Decimal   @default(0) @db.Decimal(10, 2)
+  price_short_time Decimal   @default(0) @db.Decimal(10, 2)
+  description      String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  @@map("room_types")
 }
 
 model RoomBooking {
