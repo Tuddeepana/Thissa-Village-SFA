@@ -4,6 +4,7 @@ import { z } from 'zod';
 const bookedRoomSchema = z.object({
   roomId: z.string().uuid('Invalid room ID'),
   roomName: z.string().min(1, 'Room name is required'),
+  roomType: z.string().optional(),
   pricePerNight: z.number().positive('Price must be positive'),
 });
 

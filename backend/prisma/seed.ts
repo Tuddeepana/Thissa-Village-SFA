@@ -39,6 +39,19 @@ async function main() {
   });
   console.log('✅ Cashier user created:', cashierUser.email);
 
+  // Seed default room type config
+  const normalRoomType = await prisma.roomTypeConfig.upsert({
+    where: { type: 'NORMAL' },
+    update: {},
+    create: {
+      type: 'NORMAL',
+      price_full_day: 5000,
+      price_short_time: 5000,
+      description: 'Default normal room type',
+    },
+  });
+  console.log('✅ Default room type config created:', normalRoomType.type);
+
   console.log('\n🎉 Database seeded successfully!');
   console.log('\n📝 Default credentials:');
   console.log('   Email: admin@vinopos.com');

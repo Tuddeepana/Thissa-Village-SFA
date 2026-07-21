@@ -25,7 +25,9 @@ import { DeleteButton } from "@/components/common";
 import LocalLoader from "@/components/common/LocalLoader";
 import { useQuery } from "@tanstack/react-query";
 import { roomService } from "@/api/services/roomService";
+import { roomTypeService } from "@/api/services/roomTypeService";
 import type { Room, ExpandedRoomItem } from "@/types/room.types";
+import type { RoomTypeConfig } from "@/types/room-type.types";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 
@@ -36,22 +38,19 @@ const Rooms = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
 
+  // Default form values
   const [formData, setFormData] = useState({
     name: "",
-    room_type: "NORMAL" as 'VIP' | 'NORMAL',
+    room_types: [] as string[],
     quantity: 1,
-    price_full_day: 0,
-    price_short_time: 0
   });
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [editForm, setEditForm] = useState({
     name: "",
-    room_type: "NORMAL" as 'VIP' | 'NORMAL',
+    room_types: [] as string[],
     quantity: 1,
-    price_full_day: 0,
-    price_short_time: 0
   });
 
   const { data, refetch } = useQuery({
@@ -80,19 +79,69 @@ const Rooms = () => {
     if (expandedData) setExpandedRooms(expandedData);
   }, [expandedData]);
 
+  // Room types from API
+  const { data: roomTypeData } = useQuery({
+    queryKey: ["room-types"],
+    queryFn: async () => {
+      const { roomTypes } = await roomTypeService.list();
+      return roomTypes;
+    },
+    staleTime: 10_000,
+  });
+
+  const [roomTypes, setRoomTypes] = useState<RoomTypeConfig[]>([]);
+  const [filterType, setFilterType] = useState<'ALL' | string>('ALL');
+
+  useEffect(() => {
+    if (roomTypeData) {
+      setRoomTypes(roomTypeData);
+      if (formData.room_types.length === 0 && roomTypeData.length > 0) {
+        const defaultType = roomTypeData.find((rt) => rt.type === 'NORMAL') ?? roomTypeData[0];
+        setFormData((prev) => ({ ...prev, room_types: [defaultType.type] }));
+      }
+    }
+  }, [roomTypeData]);
+
+  const getTypePrices = (type: string) => {
+    const rt = (roomTypes || []).find((r) => (r.type || '').toUpperCase() === type.toUpperCase());
+    return { full: rt?.price_full_day ?? null, short: rt?.price_short_time ?? null };
+  };
+
+  const filteredRooms = rooms.filter((r) => filterType === 'ALL' || (r.room_types || []).includes(filterType));
+  const filteredExpandedRooms = expandedRooms.filter((r) => filterType === 'ALL' || (r.room_types || []).includes(filterType));
+
+  const toggleFormRoomType = (type: string) => {
+    setFormData(prev => {
+      const types = prev.room_types;
+      if (types.includes(type)) return { ...prev, room_types: types.filter(t => t !== type) };
+      return { ...prev, room_types: [...types, type] };
+    });
+  };
+
+  const toggleEditFormRoomType = (type: string) => {
+    setEditForm(prev => {
+      const types = prev.room_types;
+      if (types.includes(type)) return { ...prev, room_types: types.filter(t => t !== type) };
+      return { ...prev, room_types: [...types, type] };
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.room_types.length === 0) {
+      toast({ title: "Validation Error", description: "Please select at least one room type." });
+      return;
+    }
     setIsSubmitting(true);
     try {
       await roomService.create({
         name: formData.name,
-        room_type: formData.room_type,
+        room_types: formData.room_types,
         quantity: formData.quantity,
-        price_full_day: formData.price_full_day,
-        price_short_time: formData.price_short_time
       });
       toast({ title: "Success", description: "Room added successfully" });
-      setFormData({ name: "", room_type: "NORMAL", quantity: 1, price_full_day: 0, price_short_time: 0 });
+      const defaultType = roomTypes.find((rt) => rt.type === 'NORMAL') ?? roomTypes[0];
+      setFormData({ name: "", room_types: [defaultType?.type ?? "NORMAL"], quantity: 1 });
       setOpen(false);
       refetch();
       refetchExpanded();
@@ -120,10 +169,8 @@ const Rooms = () => {
     setSelectedRoom(room);
     setEditForm({
       name: room.name,
-      room_type: room.room_type,
+      room_types: room.room_types || [],
       quantity: room.quantity,
-      price_full_day: typeof room.price_full_day === 'string' ? parseFloat(room.price_full_day) : room.price_full_day,
-      price_short_time: typeof room.price_short_time === 'string' ? parseFloat(room.price_short_time) : room.price_short_time
     });
     setEditOpen(true);
   };
@@ -131,14 +178,16 @@ const Rooms = () => {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRoom) return;
+    if (editForm.room_types.length === 0) {
+      toast({ title: "Validation Error", description: "Please select at least one room type." });
+      return;
+    }
     setIsEditSubmitting(true);
     try {
       await roomService.update(selectedRoom.id, {
         name: editForm.name,
-        room_type: editForm.room_type,
+        room_types: editForm.room_types,
         quantity: editForm.quantity,
-        price_full_day: editForm.price_full_day,
-        price_short_time: editForm.price_short_time,
       });
       toast({ title: "Updated", description: "Room updated successfully" });
       setEditOpen(false);
@@ -153,12 +202,38 @@ const Rooms = () => {
     }
   };
 
+  const renderTypeBadge = (type: string) => {
+    if (type === 'VIP') {
+      return (
+        <Badge key={type} className="bg-amber-100 text-amber-800 hover:bg-amber-200 text-xs">
+          <Crown className="h-3 w-3 mr-1" />
+          VIP
+        </Badge>
+      );
+    }
+    return <Badge key={type} variant="secondary" className="text-xs">{type}</Badge>;
+  };
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Room Management</h1>
           <p className="text-sm md:text-base text-muted-foreground">Manage hotel rooms and accommodations</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="hidden md:block text-sm text-muted-foreground mr-2">Filter by Type</div>
+          <Select value={filterType} onValueChange={(v) => setFilterType(v)}>
+            <SelectTrigger className="h-9 md:h-10 w-40">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Types</SelectItem>
+              {roomTypes.map((rt) => (
+                <SelectItem key={rt.id} value={rt.type}>{rt.type}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -183,19 +258,22 @@ const Rooms = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="room_type">Room Type</Label>
-                <Select
-                  value={formData.room_type}
-                  onValueChange={(val: 'VIP' | 'NORMAL') => setFormData({ ...formData, room_type: val })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NORMAL">Normal</SelectItem>
-                    <SelectItem value="VIP">VIP</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Assigned Room Types</Label>
+                <div className="flex flex-wrap gap-2">
+                  {roomTypes.map((rt) => {
+                    const isSelected = formData.room_types.includes(rt.type);
+                    return (
+                      <Badge
+                        key={rt.id}
+                        variant={isSelected ? "default" : "outline"}
+                        className="cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => toggleFormRoomType(rt.type)}
+                      >
+                        {rt.type}
+                      </Badge>
+                    );
+                  })}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="quantity">Quantity</Label>
@@ -207,40 +285,6 @@ const Rooms = () => {
                   onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
                   required
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="price_full_day" className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    Full Day Price (Rs.)
-                  </Label>
-                  <Input
-                    id="price_full_day"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.price_full_day}
-                    onChange={(e) => setFormData({ ...formData, price_full_day: parseFloat(e.target.value) || 0 })}
-                    required
-                    placeholder="Per night"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="price_short_time" className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    Short Time Price (Rs.)
-                  </Label>
-                  <Input
-                    id="price_short_time"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.price_short_time}
-                    onChange={(e) => setFormData({ ...formData, price_short_time: parseFloat(e.target.value) || 0 })}
-                    required
-                    placeholder="Per hour/session"
-                  />
-                </div>
               </div>
               <Button type="submit" className="w-full" disabled={isSubmitting}>
                 {isSubmitting ? "Adding..." : "Add Room"}
@@ -261,41 +305,54 @@ const Rooms = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
+                  <TableHead>Assigned Types</TableHead>
+                  <TableHead>Full Day (Rs)</TableHead>
+                  <TableHead>Short Time (Rs)</TableHead>
                   <TableHead>Quantity</TableHead>
-                  <TableHead>Full Day Price</TableHead>
-                  <TableHead>Short Time Price</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rooms.map((room) => (
+                {filteredRooms.map((room) => (
                   <TableRow key={room.id}>
                     <TableCell className="font-medium">{room.name}</TableCell>
                     <TableCell>
-                      {room.room_type === 'VIP' ? (
-                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200">
-                          <Crown className="h-3 w-3 mr-1" />
-                          VIP
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">Normal</Badge>
-                      )}
+                      <div className="flex flex-col gap-2">
+                        {(room.room_types || []).map(type => (
+                          <div key={type} className="h-6 flex items-center">
+                            {renderTypeBadge(type)}
+                          </div>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-2">
+                        {(room.room_types || []).map(type => {
+                          const prices = getTypePrices(type);
+                          return (
+                            <div key={type} className="h-6 flex items-center gap-1 text-sm text-muted-foreground font-medium">
+                              <Calendar className="h-3.5 w-3.5 text-purple-600"/>
+                              {Number(prices.full ?? 0).toFixed(2)}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-2">
+                        {(room.room_types || []).map(type => {
+                          const prices = getTypePrices(type);
+                          return (
+                            <div key={type} className="h-6 flex items-center gap-1 text-sm text-muted-foreground font-medium">
+                              <Clock className="h-3.5 w-3.5 text-blue-600"/>
+                              {Number(prices.short ?? 0).toFixed(2)}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </TableCell>
                     <TableCell>{room.quantity}</TableCell>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-1 text-purple-700">
-                        <Calendar className="h-3 w-3" />
-                        Rs. {Number(room.price_full_day).toFixed(2)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-1 text-blue-700">
-                        <Clock className="h-3 w-3" />
-                        Rs. {Number(room.price_short_time).toFixed(2)}
-                      </div>
-                    </TableCell>
                     <TableCell>
                       {room.createdAt ? format(new Date(room.createdAt), "PP") : "-"}
                     </TableCell>
@@ -329,26 +386,23 @@ const Rooms = () => {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {expandedRooms.map((room) => (
-              <Card
-                key={room.id}
-                className={`${
-                  room.room_type === 'VIP' 
-                    ? 'border-amber-200 bg-amber-50/50' 
-                    : 'border-gray-200'
-                }`}
-              >
-                <CardContent className="p-4 text-center">
-                  {room.room_type === 'VIP' && (
-                    <Crown className="h-4 w-4 text-amber-600 mx-auto mb-1" />
-                  )}
-                  <p className="font-semibold text-sm">{room.displayName}</p>
-                  {room.room_type === 'VIP' && (
-                    <p className="text-xs text-amber-600 mt-1">VIP</p>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+            {filteredExpandedRooms.map((room) => {
+              const typesString = (room.room_types || []).join(', ');
+              const hasVIP = (room.room_types || []).includes('VIP');
+              return (
+                <Card key={room.id} className={`${
+                    hasVIP ? 'border-amber-200 bg-amber-50/50' : 'border-gray-200'
+                  }`}>
+                  <CardContent className="p-4 text-center">
+                    {hasVIP && <Crown className="h-4 w-4 text-amber-600 mx-auto mb-1" />}
+                    <p className="font-semibold text-sm">{room.displayName}</p>
+                    <div className="flex flex-wrap justify-center gap-1 mt-2">
+                      {(room.room_types || []).map(t => renderTypeBadge(t))}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
           {expandedRooms.length === 0 && (
             <p className="text-center text-muted-foreground py-8">
@@ -375,19 +429,22 @@ const Rooms = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-room_type">Room Type</Label>
-              <Select
-                value={editForm.room_type}
-                onValueChange={(val: 'VIP' | 'NORMAL') => setEditForm({ ...editForm, room_type: val })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NORMAL">Normal</SelectItem>
-                  <SelectItem value="VIP">VIP</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Assigned Room Types</Label>
+              <div className="flex flex-wrap gap-2">
+                {roomTypes.map((rt) => {
+                  const isSelected = editForm.room_types.includes(rt.type);
+                  return (
+                    <Badge
+                      key={rt.id}
+                      variant={isSelected ? "default" : "outline"}
+                      className="cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => toggleEditFormRoomType(rt.type)}
+                    >
+                      {rt.type}
+                    </Badge>
+                  );
+                })}
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-quantity">Quantity</Label>
@@ -404,40 +461,6 @@ const Rooms = () => {
                 Changing quantity will update the number of rooms displayed
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-price_full_day" className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  Full Day Price (Rs.)
-                </Label>
-                <Input
-                  id="edit-price_full_day"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={editForm.price_full_day === 0 ? "" : editForm.price_full_day}
-                  onChange={(e) => setEditForm({ ...editForm, price_full_day: e.target.value === "" ? 0 : parseFloat(e.target.value) || 0 })}
-                  required
-                  placeholder="Per night"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-price_short_time" className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  Short Time Price (Rs.)
-                </Label>
-                <Input
-                  id="edit-price_short_time"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={editForm.price_short_time === 0 ? "" : editForm.price_short_time}
-                  onChange={(e) => setEditForm({ ...editForm, price_short_time: e.target.value === "" ? 0 : parseFloat(e.target.value) || 0 })}
-                  required
-                  placeholder="Per hour/session"
-                />
-              </div>
-            </div>
             <Button type="submit" className="w-full" disabled={isEditSubmitting}>
               {isEditSubmitting ? "Updating..." : "Update Room"}
             </Button>
@@ -449,4 +472,3 @@ const Rooms = () => {
 };
 
 export default Rooms;
-

@@ -8,6 +8,8 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, Crown, Hotel, Loader2, X } from "lucide-react";
 import { roomBookingService } from "@/api/services/roomBookingService";
+import { roomTypeService } from "@/api/services/roomTypeService";
+import type { RoomTypeConfig } from '@/types/room-type.types';
 import type { AvailableRoom } from "@/types/room-booking.types";
 import { toast } from "sonner";
 import { printRoomBill } from "@/lib/roomBillPrinter";
@@ -39,6 +41,27 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
   const [paymentType, setPaymentType] = useState<'FULL_PAYMENT' | 'ADVANCE_PAYMENT' | 'ON_CALL'>('FULL_PAYMENT');
   const [advanceAmount, setAdvanceAmount] = useState(0);
 
+  // Room type support for per-selection override
+  const [roomTypes, setRoomTypes] = useState<RoomTypeConfig[]>([]);
+  const [roomToConfigure, setRoomToConfigure] = useState<AvailableRoom | null>(null);
+  const [selectedRoomType, setSelectedRoomType] = useState<string>('');
+  const [chosenRoomTypes, setChosenRoomTypes] = useState<Record<string,string>>({});
+  const [priceOverrides, setPriceOverrides] = useState<Record<string, { full: number; short: number }>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchTypes = async () => {
+      try {
+        const { roomTypes } = await roomTypeService.list();
+        if (!cancelled) setRoomTypes(roomTypes.map(r => ({ ...r, type: (r.type || '').toUpperCase() })));
+      } catch (err) {
+        console.error('Failed to load room types', err);
+      }
+    };
+    fetchTypes();
+    return () => { cancelled = true; };
+  }, []);
+
   // Helper function to get average price for selected rooms
   const getAveragePrice = (priceType: 'full_day' | 'short_time') => {
     if (selectedRooms.size === 0) return 0;
@@ -46,7 +69,9 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
     Array.from(selectedRooms).forEach(roomId => {
       const room = availableRooms.find(r => r.id === roomId);
       if (room) {
-        totalPrice += priceType === 'full_day' ? room.priceFullDay : room.priceShortTime;
+        const override = priceOverrides[roomId];
+        const price = priceType === 'full_day' ? (override?.full ?? 0) : (override?.short ?? 0);
+        totalPrice += price;
       }
     });
     return totalPrice / selectedRooms.size;
@@ -104,6 +129,8 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
       );
       setAvailableRooms(response.rooms);
       setSelectedRooms(new Set()); // Clear selections when dates change
+      setChosenRoomTypes({});
+      setPriceOverrides({});
     } catch (error) {
       console.error("Failed to fetch available rooms:", error);
       toast.error("Failed to load available rooms");
@@ -124,41 +151,93 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
     }
   }, [checkInDate, checkOutDate, checkInTime, bookingType, shortTimeHours, open, fetchAvailableRooms]);
 
-  const toggleRoomSelection = (roomId: string) => {
-    const newSelection = new Set(selectedRooms);
-    if (newSelection.has(roomId)) {
+  const removeRoomSelection = (roomId: string) => {
+    setSelectedRooms(prev => {
+      const newSelection = new Set(prev);
       newSelection.delete(roomId);
-    } else {
-      newSelection.add(roomId);
+      return newSelection;
+    });
+    setChosenRoomTypes(prev => {
+      const newTypes = { ...prev };
+      delete newTypes[roomId];
+      return newTypes;
+    });
+    setPriceOverrides(prev => {
+      const newOverrides = { ...prev };
+      delete newOverrides[roomId];
+      return newOverrides;
+    });
+  };
+
+  const handleRoomClick = (room: AvailableRoom) => {
+    if (selectedRooms.has(room.id)) {
+      removeRoomSelection(room.id);
+      return;
     }
-    setSelectedRooms(newSelection);
+
+    // Auto select if only one type
+    const roomTypesList = room.room_types || [];
+    if (roomTypesList.length === 1) {
+      const chosen = roomTypesList[0].toUpperCase();
+      const rt = roomTypes.find(r => r.type.toUpperCase() === chosen);
+      if (rt) {
+        setChosenRoomTypes(prev => ({ ...prev, [room.id]: chosen }));
+        setPriceOverrides(prev => ({ ...prev, [room.id]: { full: Number(rt.price_full_day), short: Number(rt.price_short_time) } }));
+        setSelectedRooms(prev => new Set(Array.from(prev).concat([room.id])));
+        return;
+      }
+    }
+
+    // Otherwise, open configure dialog
+    setSelectedRoomType(roomTypesList.length > 0 ? roomTypesList[0] : '');
+    setRoomToConfigure(room);
+  };
+
+  const confirmConfigureRoom = () => {
+    if (!roomToConfigure) return;
+    const room = roomToConfigure;
+    const chosen = (selectedRoomType || '').toUpperCase();
+
+    const rt = roomTypes.find(r => r.type.toUpperCase() === chosen);
+    if (!rt) {
+      toast.error("Invalid room type selected");
+      return;
+    }
+
+    // store chosen type
+    setChosenRoomTypes(prev => ({ ...prev, [room.id]: chosen }));
+    setPriceOverrides(prev => ({ ...prev, [room.id]: { full: Number(rt.price_full_day), short: Number(rt.price_short_time) } }));
+
+    // mark as selected
+    setSelectedRooms(prev => new Set(Array.from(prev).concat([room.id])));
+
+    // reset
+    setRoomToConfigure(null);
+    setSelectedRoomType('');
   };
 
   const calculateTotal = () => {
+    if (selectedRooms.size === 0) return 0;
+
     if (bookingType === 'short_time') {
-      // Short time: sum of (room hourly price × hours) for each room
       let total = 0;
       Array.from(selectedRooms).forEach(roomId => {
-        const room = availableRooms.find(r => r.id === roomId);
-        if (room) {
-          total += room.priceShortTime * shortTimeHours;
-        }
+        const override = priceOverrides[roomId];
+        const price = override?.short ?? 0;
+        total += price * shortTimeHours;
       });
       return total;
     } else {
-      // Full day: sum of (room nightly price × nights) for each room
       if (!checkInDate || !checkOutDate) return 0;
-
       const checkIn = new Date(checkInDate);
       const checkOut = new Date(checkOutDate);
       const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
 
       let total = 0;
       Array.from(selectedRooms).forEach(roomId => {
-        const room = availableRooms.find(r => r.id === roomId);
-        if (room) {
-          total += room.priceFullDay * nights;
-        }
+        const override = priceOverrides[roomId];
+        const price = override?.full ?? 0;
+        total += price * nights;
       });
       return total;
     }
@@ -166,7 +245,7 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
 
   const calculateNights = () => {
     if (bookingType === 'short_time') {
-      return shortTimeHours; // Return hours for short time
+      return shortTimeHours; 
     }
 
     if (!checkInDate || !checkOutDate) return 0;
@@ -208,12 +287,15 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
     try {
       const rooms = Array.from(selectedRooms).map(roomId => {
         const room = availableRooms.find(r => r.id === roomId);
+        const override = priceOverrides[roomId];
+        const type = chosenRoomTypes[roomId];
         return {
           roomId: room?.baseRoomId || roomId.split('-')[0],
           roomName: room?.displayName || '',
-          pricePerNight: bookingType === 'short_time' 
-            ? (room?.priceShortTime || 0)
-            : (room?.priceFullDay || 0),
+          roomType: type,
+          pricePerNight: Number(bookingType === 'short_time' 
+            ? (override?.short ?? 0)
+            : (override?.full ?? 0)),
         };
       });
 
@@ -297,6 +379,8 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
       setPaymentMethod('CASH');
       setPaymentType('FULL_PAYMENT');
       setAdvanceAmount(0);
+      setChosenRoomTypes({});
+      setPriceOverrides({});
       onBookingSuccess();
       onOpenChange(false);
     } catch (error) {
@@ -504,52 +588,98 @@ export function RoomBookingDialog({ open, onOpenChange, cashierName, onBookingSu
               </p>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-60 overflow-y-auto p-1">
-                {availableRooms.map((room) => (
-                  <Card
-                    key={room.id}
-                    className={`cursor-pointer transition-all ${
-                      selectedRooms.has(room.id)
-                        ? room.room_type === 'VIP'
-                          ? 'border-amber-500 bg-amber-50'
-                          : 'border-primary bg-primary/10'
-                        : room.room_type === 'VIP'
-                        ? 'border-amber-200 hover:border-amber-400'
-                        : 'hover:border-primary/50'
-                    }`}
-                    onClick={() => toggleRoomSelection(room.id)}
-                  >
-                    <div className="p-3 text-center">
-                      {room.room_type === 'VIP' && (
-                        <Crown className="h-4 w-4 text-amber-600 mx-auto mb-1" />
-                      )}
-                      <p className="font-semibold text-sm">{room.displayName}</p>
-                      {room.room_type === 'VIP' && (
-                        <Badge className="text-xs bg-amber-100 text-amber-800 mt-1">VIP</Badge>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Rs. {bookingType === 'short_time' ? room.priceShortTime : room.priceFullDay}/{bookingType === 'short_time' ? 'hour' : 'night'}
-                      </p>
-                      {selectedRooms.has(room.id) && (
-                        <Badge className="mt-2 bg-green-100 text-green-700">Selected</Badge>
-                      )}
-                    </div>
-                  </Card>
-                ))}
+                {availableRooms.map((room) => {
+                  const hasVIP = (room.room_types || []).includes('VIP');
+                  return (
+                    <Card
+                      key={room.id}
+                      className={`cursor-pointer transition-all ${
+                        selectedRooms.has(room.id)
+                          ? hasVIP
+                            ? 'border-amber-500 bg-amber-50'
+                            : 'border-primary bg-primary/10'
+                          : hasVIP
+                          ? 'border-amber-200 hover:border-amber-400'
+                          : 'hover:border-primary/50'
+                      }`}
+                      onClick={() => handleRoomClick(room)}
+                    >
+                      <div className="p-3 text-center">
+                        {hasVIP && (
+                          <Crown className="h-4 w-4 text-amber-600 mx-auto mb-1" />
+                        )}
+                        <p className="font-semibold text-sm">{room.displayName}</p>
+                        
+                        {selectedRooms.has(room.id) ? (
+                          <div className="mt-1">
+                            <Badge className="text-xs">{chosenRoomTypes[room.id]}</Badge>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Rs. {bookingType === 'short_time' ? priceOverrides[room.id]?.short : priceOverrides[room.id]?.full}/{bookingType === 'short_time' ? 'hour' : 'night'}
+                            </p>
+                            <Badge className="mt-2 bg-green-100 text-green-700 hover:bg-green-200">Selected</Badge>
+                          </div>
+                        ) : (
+                          <div className="mt-1 flex flex-col gap-1">
+                            <div className="flex flex-wrap justify-center gap-1">
+                              {(room.room_types || []).map(rt => (
+                                <span key={rt} className="text-[10px] bg-secondary px-1 rounded-sm text-muted-foreground">{rt}</span>
+                              ))}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1 text-center">
+                              Select to view prices
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  );
+                })}
               </div>
+            )}
+
+            {roomToConfigure && (
+            <Dialog open={true} onOpenChange={(v) => { if (!v) setRoomToConfigure(null); }}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Configure Room Type</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <p className="font-medium">{roomToConfigure.displayName}</p>
+                  <div className="space-y-2">
+                    <Label>Select Room Type</Label>
+                    <Select value={selectedRoomType} onValueChange={(v) => setSelectedRoomType(v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(roomToConfigure.room_types || []).map(rt => (
+                          <SelectItem key={rt} value={rt}>{rt}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => setRoomToConfigure(null)}>Cancel</Button>
+                    <Button type="button" onClick={confirmConfigureRoom} disabled={!selectedRoomType}>Select Type</Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
             )}
 
             {selectedRooms.size > 0 && (
               <div className="flex flex-wrap gap-2">
                 {Array.from(selectedRooms).map(roomId => {
                   const room = availableRooms.find(r => r.id === roomId);
+                  const type = chosenRoomTypes[roomId];
                   return room ? (
-                    <Badge key={roomId} variant="secondary" className="gap-1">
-                      {room.displayName}
+                    <Badge key={roomId} variant="secondary" className="gap-1 flex items-center">
+                      {room.displayName} ({type})
                       <X
-                        className="h-3 w-3 cursor-pointer"
+                        className="h-3 w-3 cursor-pointer ml-1"
                         onClick={(e) => {
                           e.stopPropagation();
-                          toggleRoomSelection(roomId);
+                          removeRoomSelection(roomId);
                         }}
                       />
                     </Badge>

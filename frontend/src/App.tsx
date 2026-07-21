@@ -8,6 +8,7 @@ import ModuleSelection from "./pages/ModuleSelection";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Categories from "./pages/Categories";
+import RoomTypes from "./pages/RoomTypes";
 import Units from "./pages/Units";
 import Tables from "./pages/Tables";
 import Rooms from "./pages/Rooms";
@@ -78,6 +79,7 @@ const App = () => (
             <Route index element={<Navigate to="/modules" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="categories" element={<Categories />} />
+            <Route path="room-types" element={<RoomTypes />} />
             <Route path="units" element={<Units />} />
             <Route path="tables" element={<Tables />} />
             <Route path="rooms" element={<Rooms />} />

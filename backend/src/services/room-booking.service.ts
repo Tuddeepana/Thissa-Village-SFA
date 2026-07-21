@@ -4,6 +4,7 @@ import { billService } from './bill.service';
 interface BookedRoomInput {
   roomId: string;
   roomName: string;
+  roomType?: string;
   pricePerNight: number;
 }
 
@@ -78,6 +79,7 @@ export const createRoomBooking = async (payload: CreateBookingPayload) => {
           create: rooms.map(room => ({
             roomId: room.roomId,
             roomName: room.roomName,
+            roomType: room.roomType,
             pricePerNight: room.pricePerNight,
           })),
         },
@@ -319,10 +321,8 @@ export const getAvailableRooms = async (checkInDate: Date, checkOutDate: Date) =
   const availableRooms: Array<{
     id: string;
     displayName: string;
-    room_type: string;
+    room_types: string[];
     baseRoomId: string;
-    priceFullDay: number;
-    priceShortTime: number;
   }> = [];
 
   allRooms.forEach(room => {
@@ -332,10 +332,8 @@ export const getAvailableRooms = async (checkInDate: Date, checkOutDate: Date) =
         availableRooms.push({
           id: `${room.id}-${i}`,
           displayName,
-          room_type: room.room_type,
+          room_types: room.room_types,
           baseRoomId: room.id,
-          priceFullDay: Number(room.price_full_day),
-          priceShortTime: Number(room.price_short_time),
         });
       }
     }
@@ -343,3 +341,5 @@ export const getAvailableRooms = async (checkInDate: Date, checkOutDate: Date) =
 
   return availableRooms;
 };
+
+

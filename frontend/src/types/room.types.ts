@@ -1,12 +1,10 @@
-export type RoomType = 'VIP' | 'NORMAL';
+export type RoomType = string;
 
 export interface Room {
   id: string;
   name: string;
-  room_type: RoomType;
+  room_types: string[];
   quantity: number;
-  price_full_day: number;
-  price_short_time: number;
   createdAt?: string;
   updatedAt?: string;
   deletedAt?: string | null;
@@ -14,18 +12,14 @@ export interface Room {
 
 export interface CreateRoomPayload {
   name: string;
-  room_type: RoomType;
+  room_types: string[];
   quantity: number;
-  price_full_day: number;
-  price_short_time: number;
 }
 
 export interface UpdateRoomPayload {
   name?: string;
-  room_type?: RoomType;
+  room_types?: string[];
   quantity?: number;
-  price_full_day?: number;
-  price_short_time?: number;
 }
 
 export interface RoomListResponse {
@@ -37,7 +31,7 @@ export interface RoomListResponse {
 export interface ExpandedRoomItem {
   id: string;
   displayName: string;
-  room_type: RoomType;
+  room_types: string[];
   baseRoomId: string;
 }
 
@@ -46,4 +40,3 @@ export interface ExpandedRoomListResponse {
   rooms: ExpandedRoomItem[];
   total: number;
 }
-
