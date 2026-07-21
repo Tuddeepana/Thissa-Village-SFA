@@ -436,14 +436,31 @@ const RoomStatus = () => {
 
                         {/* Room Type */}
                         <TableCell>
-                          {room.room_type === 'VIP' ? (
-                            <Badge className="bg-amber-100 text-amber-800 border-amber-300">
-                              <Crown className="h-3 w-3 mr-1" />
-                              VIP
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary">Normal</Badge>
-                          )}
+                          <div className="flex flex-wrap gap-1">
+                            {room.booking ? (
+                              (() => {
+                                const bookedRoom = room.booking.bookedRooms.find(br => br.roomName === room.displayName);
+                                const t = bookedRoom?.roomType || 'NORMAL';
+                                return t === 'VIP' ? (
+                                  <Badge className="bg-amber-100 text-amber-800 border-amber-300">
+                                    <Crown className="h-3 w-3 mr-1" /> VIP
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="secondary">{t}</Badge>
+                                );
+                              })()
+                            ) : (
+                              (room.room_types || []).map(t => 
+                                t === 'VIP' ? (
+                                  <Badge key={t} className="bg-amber-100 text-amber-800 border-amber-300">
+                                    <Crown className="h-3 w-3 mr-1" /> VIP
+                                  </Badge>
+                                ) : (
+                                  <Badge key={t} variant="secondary">{t}</Badge>
+                                )
+                              )
+                            )}
+                          </div>
                         </TableCell>
 
                         {/* From Date */}
@@ -743,6 +760,11 @@ const RoomStatus = () => {
                       <div className="flex items-center gap-2">
                         <Hotel className="h-4 w-4 text-muted-foreground" />
                         <span className="font-medium">{room.roomName}</span>
+                        {room.roomType && (
+                          <Badge variant="outline" className="text-[10px] h-5 px-1.5 ml-1">
+                            {room.roomType}
+                          </Badge>
+                        )}
                       </div>
                       <span className="text-sm text-muted-foreground">
                         Rs. {Number(room.pricePerNight).toFixed(2)}

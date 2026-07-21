@@ -2,20 +2,15 @@ import { z } from 'zod';
 
 export const createRoomSchema = z.object({
   name: z.string().min(1, 'Room name is required').max(100, 'Name too long'),
-  room_type: z.enum(['VIP', 'NORMAL']),
+  room_types: z.array(z.string()).min(1, 'At least one room type is required'),
   quantity: z.number().int().min(1, 'Quantity must be at least 1').max(100, 'Maximum 100 rooms'),
-  price_full_day: z.number().min(0, 'Price must be non-negative'),
-  price_short_time: z.number().min(0, 'Price must be non-negative'),
 });
 
 export const updateRoomSchema = z.object({
   name: z.string().min(1, 'Room name is required').max(100, 'Name too long').optional(),
-  room_type: z.enum(['VIP', 'NORMAL']).optional(),
+  room_types: z.array(z.string()).min(1, 'At least one room type is required').optional(),
   quantity: z.number().int().min(1, 'Quantity must be at least 1').max(100, 'Maximum 100 rooms').optional(),
-  price_full_day: z.number().min(0, 'Price must be non-negative').optional(),
-  price_short_time: z.number().min(0, 'Price must be non-negative').optional(),
 });
 
 export type CreateRoomInput = z.infer<typeof createRoomSchema>;
 export type UpdateRoomInput = z.infer<typeof updateRoomSchema>;
-
