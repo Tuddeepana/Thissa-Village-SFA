@@ -44,5 +44,6 @@ export const ENDPOINTS = {
 		byKey: (key: string) => `/config/${key}`,
 		base: '/config',
 	},
+	roomTypes: '/room-types',
 };
 

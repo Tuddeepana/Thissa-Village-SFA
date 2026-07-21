@@ -3,6 +3,7 @@ export interface BookedRoom {
   bookingId: string;
   roomId: string;
   roomName: string;
+  roomType?: string;
   pricePerNight: number;
   createdAt: string;
 }
@@ -53,6 +54,7 @@ export interface CreateRoomBookingPayload {
   rooms: {
     roomId: string;
     roomName: string;
+    roomType?: string;
     pricePerNight: number;
   }[];
   paymentType?: 'FULL_PAYMENT' | 'ADVANCE_PAYMENT' | 'ON_CALL';
@@ -79,10 +81,8 @@ export interface UpdateRoomBookingPayload {
 export interface AvailableRoom {
   id: string;
   displayName: string;
-  room_type: string;
+  room_types: string[];
   baseRoomId: string;
-  priceFullDay: number;
-  priceShortTime: number;
 }
 export interface RoomBookingListResponse {
   success: boolean;
