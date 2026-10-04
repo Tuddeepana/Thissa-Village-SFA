@@ -43,7 +43,7 @@ class InventoryService {
    * @returns Array of created inventory records
    */
   async createBulkMovements(
-    items: Array<{ productId: string; billId: string; quantity_moved: number }>,
+    items: Array<{ productId: string; billId: string; quantity_moved: number; unit_price?: number | null }>,
     tx: any
   ): Promise<InventoryDTO[]> {
     if (items.length === 0) return [];
@@ -77,6 +77,7 @@ class InventoryService {
         billId: item.billId,
         quantity_moved: item.quantity_moved,
         available_quantity: newAvailable,
+        unit_price: item.unit_price !== undefined ? item.unit_price : null, // snapshot price at time of sale
       };
     });
 

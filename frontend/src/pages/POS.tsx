@@ -750,6 +750,8 @@ const POS = () => {
       items: billItems.map((bi) => ({
         productId: bi.product.id,
         quantityMoved: bi.quantity,
+        // Snapshot the price that was actually charged at time of sale
+        unit_price: customerType === 'foreigner' ? bi.product.foreignerPrice : bi.product.localPrice,
       })),
     };
 

@@ -95,10 +95,14 @@ class BillService {
       });
 
       // Batch all inventory movements in 2 queries (instead of 2N)
+      // unit_price is passed as a snapshot so old bills are immune to future product price changes
       const bulkItems = input.items.map((item) => ({
         productId: item.productId,
         billId: billForInventory.id,
         quantity_moved: item.quantityMoved > 0 ? -Math.abs(item.quantityMoved) : item.quantityMoved,
+        unit_price: item.unit_price !== undefined && item.unit_price !== null
+          ? (typeof item.unit_price === 'number' ? item.unit_price : Number(item.unit_price))
+          : null,
       }));
 
       const inventoryRecords = await inventoryService.createBulkMovements(bulkItems, tx);
@@ -118,17 +122,26 @@ class BillService {
 
     const customerType: 'local' | 'foreigner' = (bill.customer_type === 'foreigner' ? 'foreigner' : 'local');
 
-    // Map inventory records to item DTOs
-    const items = (bill.inventoryRecords || []).map((rec: any) => ({
-      productId: rec.productId,
-      name: rec.product?.name ?? null,
-      categoryName: rec.product?.category?.name ?? null,
-      unit_type: rec.product?.unit_type ?? null,
-      cost_price: rec.product?.cost_price !== undefined ? String(rec.product.cost_price) : null,
-      foreigner_price: rec.product?.foreigner_price !== undefined ? String(rec.product.foreigner_price) : null,
-      local_price: rec.product?.local_price !== undefined ? String(rec.product.local_price) : null,
-      quantity_moved: rec.quantity_moved,
-    }));
+    // Map inventory records to item DTOs.
+    // IMPORTANT: Use the stored unit_price snapshot (recorded at time of sale) to prevent
+    // retroactive price changes from affecting old bills. Fall back to the live product price
+    // only for pre-migration records that don't have a snapshot (unit_price === null).
+    const items = (bill.inventoryRecords || []).map((rec: any) => {
+      const snapshotPrice = rec.unit_price !== null && rec.unit_price !== undefined
+        ? String(rec.unit_price)
+        : null;
+      return {
+        productId: rec.productId,
+        name: rec.product?.name ?? null,
+        categoryName: rec.product?.category?.name ?? null,
+        unit_type: rec.product?.unit_type ?? null,
+        cost_price: rec.product?.cost_price !== undefined ? String(rec.product.cost_price) : null,
+        // Use snapshot price if available; fall back to current product price for legacy records
+        foreigner_price: snapshotPrice ?? (rec.product?.foreigner_price !== undefined ? String(rec.product.foreigner_price) : null),
+        local_price: snapshotPrice ?? (rec.product?.local_price !== undefined ? String(rec.product.local_price) : null),
+        quantity_moved: rec.quantity_moved,
+      };
+    });
 
     // Compute subtotal from the correct price list based on the persisted customer type
     let subtotalFromItems = 0;

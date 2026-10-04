@@ -518,6 +518,8 @@ const Orders = () => {
         items: selectedOrder.items.map((item) => ({
           productId: item.productId,
           quantityMoved: item.quantity,
+          // Snapshot the unit_price from the order (already captured at order creation time)
+          unit_price: item.unit_price,
         })),
       };
 

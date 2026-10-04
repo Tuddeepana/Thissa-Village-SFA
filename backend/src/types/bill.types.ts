@@ -19,6 +19,7 @@ export type BillDTO = {
 export type BillItemInput = {
   productId: string;
   quantityMoved: number; // for bills, typically positive in UI; will be stored negative in inventory
+  unit_price?: number | null; // Price at time of sale — used to snapshot price so old bills are immune to future price changes
 };
 
 export type BillCreateInput = {
