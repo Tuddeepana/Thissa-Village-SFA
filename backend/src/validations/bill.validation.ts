@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const billItemSchema = z.object({
   productId: z.string().uuid(),
   quantityMoved: z.number().int().positive(), // will be negated when writing to inventory
+  unit_price: z.union([z.number(), z.string()]).optional().nullable(), // price snapshot at time of sale
 });
 
 export const createBillSchema = z.object({

@@ -206,12 +206,13 @@ model Invoice {
 }
 
 model Inventory {
-  id                 String  @id @default(uuid())
+  id                 String   @id @default(uuid())
   productId          String
   invoiceId          String?
   billId             String?
   quantity_moved     Int
   available_quantity Int
+  unit_price         Decimal? @db.Decimal(10, 2) // Price snapshot at time of sale — prevents retroactive price changes on old bills
 
   // Relations
   product Product  @relation(fields: [productId], references: [id])
