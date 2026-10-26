@@ -8,9 +8,9 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Eye, Edit, Trash2, CheckCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, Edit, Trash2, CheckCircle, Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import { Invoice } from "@/types/invoice";
+import { Invoice, InvoiceItem } from "@/types/invoice";
 import { useState } from "react";
 import {
   Dialog,
@@ -18,6 +18,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import api from '@/api/client';
+import { toast } from "sonner";
 
 interface InvoiceTableProps {
   invoices: Invoice[];
@@ -39,8 +41,52 @@ export function InvoiceTable({
   onMarkPaid,
 }: InvoiceTableProps) {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
   const [invoiceToPay, setInvoiceToPay] = useState<Invoice | null>(null);
+
+  // Fetch full invoice details with products from the backend
+  const handleViewDetails = async (invoice: Invoice) => {
+    setLoadingDetails(true);
+    try {
+      const res = await api.get(`/invoices/${invoice.id}`);
+      const data = res.data?.data;
+      if (data && data.products) {
+        // Map backend products to frontend InvoiceItem format
+        const items: InvoiceItem[] = (data.products || []).map((p: any) => {
+          const unit = Number(p.cost_price ?? 0);
+          const cost = p.cost_price !== undefined && p.cost_price !== null ? Number(p.cost_price) : undefined;
+          const qty = Number(p.quantity_moved ?? 0);
+          return {
+            productId: p.productId,
+            productName: p.name ?? '',
+            category: p.categoryName ?? 'Uncategorized',
+            quantity: qty,
+            unitPrice: unit,
+            costPrice: cost,
+            total: unit * qty,
+          };
+        });
+        setSelectedInvoice({
+          ...invoice,
+          items,
+          subtotal: Number(data.subtotal ?? invoice.subtotal),
+          discount: Number(data.discount ?? invoice.discount),
+          total: Number(data.subtotal ?? invoice.subtotal) - Number(data.discount ?? invoice.discount),
+        });
+      } else {
+        // Fallback to in-memory data
+        setSelectedInvoice(invoice);
+      }
+    } catch (err) {
+      console.error('Failed to fetch invoice details', err);
+      toast.error('Failed to load invoice details');
+      // Fallback to in-memory data
+      setSelectedInvoice(invoice);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
 
   // Check if invoice is editable (within 5 hours of creation)
   const isEditable = (invoice: Invoice): boolean => {
@@ -99,9 +145,10 @@ export function InvoiceTable({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setSelectedInvoice(invoice)}
+                      onClick={() => handleViewDetails(invoice)}
+                      disabled={loadingDetails}
                     >
-                      <Eye className="h-4 w-4" />
+                      {loadingDetails ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
                     </Button>
                     {isEditable(invoice) && (
                       <>

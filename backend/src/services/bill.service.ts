@@ -10,14 +10,15 @@ const formatBillNumber = (seq: number | bigint) => {
 };
 
 class BillService {
-  async createBill(input: BillCreateInput): Promise<BillDTO> {
+  async createBill(input: BillCreateInput, txClient?: any): Promise<BillDTO> {
     // bill_number is required by Prisma/DB (NOT NULL), but frontend no longer sends it.
     // Generate a unique placeholder; if you have bill_seq formatting logic elsewhere,
     // it can update this value after creation.
     const billNumber = input.bill_number && String(input.bill_number).trim().length > 0
       ? String(input.bill_number)
       : `TMP-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const bill = await (prisma as any).$transaction(async (tx: any) => {
+
+    const execute = async (tx: any) => {
       const createdBill = await tx.bill.create({
         data: {
           bill_number: billNumber,
@@ -51,8 +52,9 @@ class BillService {
       });
 
       return updatedBill;
-    });
+    };
 
+    const bill = txClient ? await execute(txClient) : await (prisma as any).$transaction(execute);
     return bill as BillDTO;
   }
 

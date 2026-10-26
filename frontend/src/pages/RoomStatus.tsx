@@ -60,6 +60,7 @@ const RoomStatus = () => {
   };
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [bookingToSettle, setBookingToSettle] = useState<RoomBooking | null>(null);
+  const [isSettling, setIsSettling] = useState(false);
 
   // Filter states
   const [roomStatusFilter, setRoomStatusFilter] = useState<string>("all");
@@ -197,8 +198,9 @@ const RoomStatus = () => {
     amountPaid: number,
     creditDescription?: string
   ) => {
-    if (!bookingToSettle) return;
+    if (!bookingToSettle || isSettling) return;
 
+    setIsSettling(true);
     try {
       const result = await roomBookingService.settleBalance(bookingToSettle.id, {
         paymentMethod: paymentMethod.toUpperCase(),
@@ -240,9 +242,11 @@ const RoomStatus = () => {
       setBookingToSettle(null);
       // Refetch data
       window.location.reload();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to settle balance:", error);
-      toast.error("Failed to settle balance");
+      toast.error(error?.response?.data?.message || "Failed to settle balance");
+    } finally {
+      setIsSettling(false);
     }
   };
 
@@ -872,9 +876,15 @@ const RoomStatus = () => {
       {bookingToSettle && (
         <PaymentDialog
           open={paymentDialogOpen}
-          onOpenChange={setPaymentDialogOpen}
+          onOpenChange={(open) => {
+            if (!isSettling) {
+              setPaymentDialogOpen(open);
+              if (!open) setBookingToSettle(null);
+            }
+          }}
           total={bookingToSettle.totalAmount - bookingToSettle.paidAmount}
           onConfirmPayment={confirmSettleBalance}
+          isPrinting={isSettling}
         />
       )}
     </div>
