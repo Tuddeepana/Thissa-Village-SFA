@@ -165,8 +165,8 @@ export const settleBalance = async (req: Request, res: Response, next: NextFunct
     if (error.message === 'Booking not found' || error.code === 'P2025') {
       return next(new AppError('Room booking not found', 404));
     }
-    if (error.message === 'No remaining balance to settle') {
-      return next(new AppError('No remaining balance to settle', 400));
+    if (error.message === 'No remaining balance to settle' || (error.message && error.message.startsWith('Cannot settle balance'))) {
+      return next(new AppError(error.message, 400));
     }
     next(error);
   }

@@ -115,7 +115,7 @@ export const createRoomBooking = async (payload: CreateBookingPayload) => {
         paymentType,
       });
 
-      // Create bill using the bill service
+      // Create bill using the bill service within the active transaction
       bill = await billService.createBill({
         bill_number: billNumber,
         date: new Date(),
@@ -128,7 +128,7 @@ export const createRoomBooking = async (payload: CreateBookingPayload) => {
         cash_given: cash,
         balance_given: balance,
         tax: 0,
-      });
+      }, tx);
 
       console.log('✅ Bill created successfully:', bill.bill_number);
     } else {
@@ -216,27 +216,31 @@ export const cancelBooking = async (id: string) => {
 };
 
 export const settleBookingBalance = async (id: string, payload: SettleBalancePayload) => {
-  const booking = await prisma.roomBooking.findUnique({
-    where: { id },
-    include: {
-      bookedRooms: true,
-    },
-  });
-
-  if (!booking) {
-    throw new Error('Booking not found');
-  }
-
-  const totalAmount = Number(booking.totalAmount);
-  const paidAmount = Number(booking.paidAmount);
-  const remainingAmount = totalAmount - paidAmount;
-
-  if (remainingAmount <= 0) {
-    throw new Error('No remaining balance to settle');
-  }
-
   return await prisma.$transaction(async (tx) => {
-    // Create a bill for the remaining amount
+    const booking = await tx.roomBooking.findUnique({
+      where: { id },
+      include: {
+        bookedRooms: true,
+      },
+    });
+
+    if (!booking) {
+      throw new Error('Booking not found');
+    }
+
+    if (booking.status !== 'ACTIVE') {
+      throw new Error(`Cannot settle balance for booking with status ${booking.status}`);
+    }
+
+    const totalAmount = Number(booking.totalAmount);
+    const paidAmount = Number(booking.paidAmount);
+    const remainingAmount = totalAmount - paidAmount;
+
+    if (remainingAmount <= 0) {
+      throw new Error('No remaining balance to settle');
+    }
+
+    // Create a bill for the remaining amount within this transaction
     const billNumber = `ROOM-BAL-${Date.now()}`;
     const cash = payload.cashGiven || remainingAmount;
     const balance = cash - remainingAmount;
@@ -262,7 +266,7 @@ export const settleBookingBalance = async (id: string, payload: SettleBalancePay
       cash_given: cash,
       balance_given: balance,
       tax: 0,
-    });
+    }, tx);
 
     // Update the booking's paidAmount to totalAmount
     const updatedBooking = await tx.roomBooking.update({
