@@ -95,15 +95,13 @@ const MyStock = () => {
     setCurrentPage(1);
   }, [searchProduct, itemsPerPage, categoryId, stockFilter]);
 
-  // Pagination (use server pagination values where possible)
+  // Pagination: server already returns the correct page slice, so just map directly
   const paginatedItems = useMemo<(MyStockTableRow & { lastUpdated: Date })[]>(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const pageSlice = filteredItems.slice(startIndex, startIndex + itemsPerPage);
-    return pageSlice.map((r) => ({
+    return filteredItems.map((r) => ({
       ...r,
       lastUpdated: r.lastUpdatedAt ? new Date(r.lastUpdatedAt) : new Date(),
     } as MyStockTableRow & { lastUpdated: Date }));
-  }, [filteredItems, currentPage, itemsPerPage]);
+  }, [filteredItems]);
 
   // Use server-provided card stats when available, otherwise compute client-side fallback
   const stats = useMemo(() => {
