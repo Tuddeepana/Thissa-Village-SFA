@@ -53,9 +53,33 @@ class InvoiceService {
     return result;
   }
 
-  async getInvoiceById(id: string): Promise<InvoiceDTO | null> {
-    const invoice = await (prisma as any).invoice.findUnique({ where: { id } });
-    return invoice as InvoiceDTO | null;
+  async getInvoiceById(id: string): Promise<InvoiceWithProductsDTO | null> {
+    const invoice = await (prisma as any).invoice.findUnique({
+      where: { id },
+      include: { inventoryRecords: { include: { product: { include: { category: true } } } } },
+    });
+    if (!invoice) return null;
+
+    return {
+      id: invoice.id,
+      in_number: invoice.in_number,
+      invoiceDate: invoice.invoiceDate instanceof Date ? invoice.invoiceDate.toISOString() : String(invoice.invoiceDate),
+      createdAt: invoice.createdAt instanceof Date ? invoice.createdAt.toISOString() : String(invoice.createdAt),
+      updatedAt: invoice.updatedAt instanceof Date ? invoice.updatedAt.toISOString() : String(invoice.updatedAt),
+      subtotal: invoice.subtotal !== undefined ? String(invoice.subtotal) : '0',
+      discount: invoice.discount !== undefined ? String(invoice.discount) : '0',
+      paid_status: invoice.paid_status ?? 'PENDING',
+      itemCount: (invoice.inventoryRecords || []).length,
+      products: (invoice.inventoryRecords || []).map((rec: any) => ({
+        productId: rec.productId,
+        name: rec.product?.name ?? null,
+        categoryName: rec.product?.category?.name ?? null,
+        cost_price: rec.product?.cost_price !== undefined ? String(rec.product.cost_price) : null,
+        foreigner_price: rec.product?.foreigner_price !== undefined ? String(rec.product.foreigner_price) : null,
+        local_price: rec.product?.local_price !== undefined ? String(rec.product.local_price) : null,
+        quantity_moved: rec.quantity_moved,
+      })),
+    } as InvoiceWithProductsDTO;
   }
 
   async listInvoices(query: { page?: number; limit?: number; search?: string }): Promise<PaginatedResult<InvoiceDTO>> {
