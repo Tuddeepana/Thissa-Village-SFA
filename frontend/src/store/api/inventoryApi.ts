@@ -63,7 +63,7 @@ export const inventoryApiSlice = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['Inventory', 'Product'],
+      invalidatesTags: ['Inventory', 'Product', 'Dashboard'],
       transformResponse: (response: any) => response.data ?? response,
     }),
 

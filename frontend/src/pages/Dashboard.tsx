@@ -15,7 +15,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { useGetDashboardSummaryQuery } from '@/store/api/dashboardApi';
+import { useGetDashboardSummaryQuery, getCachedDashboardData } from '@/store/api/dashboardApi';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LoadingState } from '@/components/common/LoadingState';
 
@@ -35,8 +35,11 @@ const MONTH_KEYS = ['jan','feb','march','april','may','june','july','aug','sep',
 const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 const Dashboard = () => {
-  // Use RTK Query to fetch dashboard data
-  const { data: dashboardData, isLoading, error, refetch } = useGetDashboardSummaryQuery();
+  // Use RTK Query to fetch dashboard data, with localStorage cache as instant initial fallback
+  const { data: queryData, isLoading, isFetching, error, refetch } = useGetDashboardSummaryQuery();
+  const cachedFallback = useMemo(() => getCachedDashboardData(), []);
+  const dashboardData = queryData ?? cachedFallback;
+  const showInitialSkeleton = isLoading && !dashboardData;
 
   // State for category search/filter
   const [categorySearchQuery, setCategorySearchQuery] = useState('');
@@ -83,7 +86,7 @@ const Dashboard = () => {
   const weeklyIncome = dashboardData?.weeklyIncome ?? '0';
   const monthlyIncome = dashboardData?.monthlyIncome ?? '0';
   const totalProducts = dashboardData?.TotalProduct ?? 0;
-  const lowStockCount = dashboardData?.lowStockItems?.length ?? 0;
+  const lowStockCount = dashboardData?.lowStockItemsCount ?? dashboardData?.lowStockItems?.length ?? 0;
 
   // Handle manual refresh
   const handleRefresh = async () => {
@@ -131,13 +134,13 @@ const Dashboard = () => {
           </div>
           <Button
             onClick={handleRefresh}
-            disabled={isRefreshing || isLoading}
+            disabled={isRefreshing || isFetching}
             variant="outline"
             size="sm"
             className="gap-2"
           >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            <RefreshCw className={`h-4 w-4 ${isRefreshing || isFetching ? 'animate-spin' : ''}`} />
+            {isRefreshing || isFetching ? 'Refreshing...' : 'Refresh'}
           </Button>
         </div>
       </div>
@@ -149,7 +152,7 @@ const Dashboard = () => {
       )}
 
       {/* Stat Cards with Loading */}
-      {isLoading ? (
+      {showInitialSkeleton ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>

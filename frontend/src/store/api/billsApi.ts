@@ -226,7 +226,7 @@ export const billsApiSlice = apiSlice.injectEndpoints({
         method: 'POST',
         body: billData,
       }),
-      invalidatesTags: ['Bill', 'Product', 'Inventory', 'SalesSummary'],
+      invalidatesTags: ['Bill', 'Product', 'Inventory', 'SalesSummary', 'Dashboard'],
       transformResponse: (response: unknown): Bill => {
         const resp = response as { data?: Bill } | Bill;
         return (resp && typeof resp === 'object' && 'data' in resp && resp.data) ? resp.data : resp as Bill;
@@ -253,6 +253,7 @@ export const billsApiSlice = apiSlice.injectEndpoints({
         { type: 'Bill', id },
         'Bill',
         'SalesSummary',
+        'Dashboard',
       ],
       transformResponse: (response: unknown): Bill => {
         const resp = response as { data?: Bill } | Bill;
@@ -271,6 +272,7 @@ export const billsApiSlice = apiSlice.injectEndpoints({
         'Product',
         'Inventory',
         'SalesSummary',
+        'Dashboard',
       ],
     }),
   }),
