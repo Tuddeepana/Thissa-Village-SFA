@@ -76,6 +76,7 @@ model Product {
 
   @@map("products")
   @@index([name])
+  @@index([categoryId])
 }
 
 model Invoice {
@@ -112,6 +113,7 @@ model Inventory {
   updatedAt DateTime @updatedAt
 
   @@map("inventory")
+  @@index([productId, createdAt(sort: Desc)])
 }
 
 model Bill {
@@ -136,4 +138,5 @@ model Bill {
   updatedAt DateTime @updatedAt
 
   @@map("bills")
+  @@index([date])
 }

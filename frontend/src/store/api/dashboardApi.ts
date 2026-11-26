@@ -43,6 +43,7 @@ export const dashboardApiSlice = apiSlice.injectEndpoints({
     getDashboardSummary: builder.query<DashboardSummary, void>({
       query: () => '/dashboard/summary',
       providesTags: ['Dashboard'],
+      keepUnusedDataFor: 300, // Keep cached in Redux store for 5 minutes
       transformResponse: (response: unknown): DashboardSummary => {
         const resp = response as { success: boolean; response: DashboardSummary } | DashboardSummary;
         // Backend returns { success: true, response: { ... } }
@@ -74,6 +75,7 @@ export const dashboardApiSlice = apiSlice.injectEndpoints({
     getProductCategoryDistribution: builder.query<ProductCategoryDistribution, void>({
       query: () => '/dashboard/product-category',
       providesTags: ['Dashboard'],
+      keepUnusedDataFor: 300,
       transformResponse: (response: unknown): ProductCategoryDistribution => {
         const resp = response as { success: boolean; data: ProductCategoryDistribution } | ProductCategoryDistribution;
         if (resp && typeof resp === 'object' && 'data' in resp && resp.data) {

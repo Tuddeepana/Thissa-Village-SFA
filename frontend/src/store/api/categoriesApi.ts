@@ -48,7 +48,7 @@ export const categoriesApiSlice = apiSlice.injectEndpoints({
         method: 'POST',
         body: categoryData,
       }),
-      invalidatesTags: ['Category'],
+      invalidatesTags: ['Category', 'Dashboard'],
       transformResponse: (response: any) => response.data ?? response,
     }),
 
@@ -62,6 +62,7 @@ export const categoriesApiSlice = apiSlice.injectEndpoints({
         { type: 'Category', id },
         'Category',
         'Product', // Categories affect products
+        'Dashboard',
       ],
       transformResponse: (response: any) => response.data ?? response,
     }),
@@ -86,6 +87,7 @@ export const categoriesApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, id) => [
         { type: 'Category', id },
         'Category',
+        'Dashboard',
       ],
       transformResponse: (response: any) => response.data ?? response,
     }),

@@ -49,7 +49,7 @@ export const productsApiSlice = apiSlice.injectEndpoints({
         method: 'POST',
         body: productData,
       }),
-      invalidatesTags: ['Product'],
+      invalidatesTags: ['Product', 'Dashboard'],
       transformResponse: (response: any) => response.data ?? response,
     }),
 
@@ -62,6 +62,7 @@ export const productsApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, { id }) => [
         { type: 'Product', id },
         'Product',
+        'Dashboard',
       ],
       transformResponse: (response: any) => response.data ?? response,
     }),
@@ -75,6 +76,7 @@ export const productsApiSlice = apiSlice.injectEndpoints({
         { type: 'Product', id },
         'Product',
         'Inventory', // Products affect inventory
+        'Dashboard',
       ],
     }),
 

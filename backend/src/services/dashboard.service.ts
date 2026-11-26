@@ -3,38 +3,109 @@ import prisma from '../lib/prisma';
 const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wensday', 'thursday', 'friday', 'saturday'];
 const MONTH_NAMES = ['jan','feb','march','april','may','june','july','aug','sep','oct','nov','dec'];
 
+interface WeeklyRow {
+  dow: number;
+  total: string | number;
+}
+
+interface MonthlyRow {
+  month_num: number;
+  total: string | number;
+}
+
+interface LowStockRow {
+  id: string;
+  name: string;
+  available_quantity: number;
+  low_stock: number;
+}
+
+interface CategoryCountRow {
+  categoryId: string;
+  categoryName: string;
+  productCount: number;
+}
+
 class DashboardService {
   /**
-   * Return aggregated dashboard metrics
+   * Return aggregated dashboard metrics using parallel SQL queries
    */
   async getSummary() {
     const now = new Date();
+    const tzOffsetMinutes = -now.getTimezoneOffset();
 
-    // Weekly window: last 7 days (including today)
-    const days: { date: Date; start: Date; end: Date }[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(now.getDate() - i);
-      d.setHours(0, 0, 0, 0);
-      const start = new Date(d);
-      const end = new Date(d);
-      end.setHours(23, 59, 59, 999);
-      days.push({ date: d, start, end });
-    }
+    // Weekly window: last 7 days (including today) in local server time
+    const weeklyStart = new Date(now);
+    weeklyStart.setDate(now.getDate() - 6);
+    weeklyStart.setHours(0, 0, 0, 0);
 
-    // Monthly window: months of current year
+    const weeklyEnd = new Date(now);
+    weeklyEnd.setHours(23, 59, 59, 999);
+
+    // Monthly window: full current year in local server time
     const year = now.getFullYear();
-    const months: { monthIndex: number; start: Date; end: Date }[] = [];
-    for (let m = 0; m < 12; m++) {
-      const start = new Date(year, m, 1, 0, 0, 0, 0);
-      const end = new Date(year, m + 1, 0, 23, 59, 59, 999); // last day of month
-      months.push({ monthIndex: m, start, end });
-    }
+    const yearStart = new Date(year, 0, 1, 0, 0, 0, 0);
+    const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999);
 
-    // Basic aggregates
-    const totalProducts = await (prisma as any).product.count();
+    // Execute all dashboard queries in parallel (1 single DB round-trip window)
+    const [
+      totalProducts,
+      weeklyRows,
+      monthlyRows,
+      lowStockItems,
+      categoryRows,
+    ] = await Promise.all([
+      prisma.product.count(),
 
-    // Compute weekly sums per day
+      prisma.$queryRaw<WeeklyRow[]>`
+        SELECT
+          EXTRACT(DOW FROM ("date" + (${tzOffsetMinutes}::int * INTERVAL '1 minute')))::int AS dow,
+          COALESCE(SUM("total"), 0) AS total
+        FROM "bills"
+        WHERE "date" >= ${weeklyStart} AND "date" <= ${weeklyEnd}
+        GROUP BY dow
+      `,
+
+      prisma.$queryRaw<MonthlyRow[]>`
+        SELECT
+          EXTRACT(MONTH FROM ("date" + (${tzOffsetMinutes}::int * INTERVAL '1 minute')))::int AS month_num,
+          COALESCE(SUM("total"), 0) AS total
+        FROM "bills"
+        WHERE "date" >= ${yearStart} AND "date" <= ${yearEnd}
+        GROUP BY month_num
+      `,
+
+      prisma.$queryRaw<LowStockRow[]>`
+        WITH LatestInventory AS (
+          SELECT DISTINCT ON ("productId")
+            "productId",
+            "available_quantity"
+          FROM "inventory"
+          ORDER BY "productId", "createdAt" DESC
+        )
+        SELECT
+          p.id,
+          p.name,
+          COALESCE(li.available_quantity, 0)::int AS available_quantity,
+          p.low_stock::int AS low_stock
+        FROM "products" p
+        LEFT JOIN LatestInventory li ON p.id = li."productId"
+        WHERE COALESCE(li.available_quantity, 0) <= COALESCE(p.low_stock, 0)
+        ORDER BY p.name ASC
+      `,
+
+      prisma.$queryRaw<CategoryCountRow[]>`
+        SELECT
+          c.id AS "categoryId",
+          c.name AS "categoryName",
+          COUNT(p.id)::int AS "productCount"
+        FROM "categories" c
+        LEFT JOIN "products" p ON p."categoryId" = c.id
+        GROUP BY c.id, c.name
+      `,
+    ]);
+
+    // Map weekly sums per day and compute weekly total
     const weeklySums: Record<string, string> = {
       monday: '0',
       tuesday: '0',
@@ -45,63 +116,46 @@ class DashboardService {
       sunday: '0',
     };
 
-    for (const d of days) {
-      const agg = await (prisma as any).bill.aggregate({ where: { date: { gte: d.start, lte: d.end } }, _sum: { total: true } });
-      const sum = agg?._sum?.total ? Number(agg._sum.total) : 0;
-      const dayName = DAY_NAMES[d.date.getDay()];
-      // normalize spelling for wednesday -> 'wensday' per user's request (they typed 'wensday')
-      const key = dayName === 'wednesday' ? 'wensday' : dayName;
-      weeklySums[key] = String(sum.toFixed(2));
-    }
-
-    // Compute monthly sums per month (current year)
-    const monthlySums: Record<string, string> = {} as any;
-    for (const m of months) {
-      const agg = await (prisma as any).bill.aggregate({ where: { date: { gte: m.start, lte: m.end } }, _sum: { total: true } });
-      const sum = agg?._sum?.total ? Number(agg._sum.total) : 0;
-      const key = MONTH_NAMES[m.monthIndex] || `m${m.monthIndex + 1}`;
-      monthlySums[key] = String(sum.toFixed(2));
-    }
-
-    // Low stock items (reuse existing logic)
-    const products = await (prisma as any).product.findMany({ select: { id: true, low_stock: true, name: true } });
-    const lowStockItems: Array<{ id: string; name?: string; available_quantity: number; low_stock: number }> = [];
-
-    for (const p of products) {
-      const inv = await (prisma as any).inventory.findFirst({
-        where: { productId: p.id },
-        orderBy: { createdAt: 'desc' },
-        select: { available_quantity: true },
-      });
-      const available = inv?.available_quantity ?? 0;
-      if (available <= (p.low_stock ?? 0)) {
-        lowStockItems.push({ id: p.id, name: p.name, available_quantity: available, low_stock: p.low_stock });
+    let weeklyTotalNum = 0;
+    for (const row of weeklyRows) {
+      const sum = Number(row.total) || 0;
+      weeklyTotalNum += sum;
+      const dayName = DAY_NAMES[row.dow];
+      if (dayName) {
+        const key = dayName === 'wednesday' ? 'wensday' : dayName;
+        weeklySums[key] = sum.toFixed(2);
       }
     }
 
-    // Product category distribution (by product count)
-    const categories = await (prisma as any).category.findMany({
-      select: {
-        id: true,
-        name: true,
-        _count: {
-          select: { products: true },
-        },
-      },
-    });
+    // Initialize and map monthly sums per month and compute monthly total
+    const monthlySums: Record<string, string> = {};
+    for (let m = 0; m < 12; m++) {
+      monthlySums[MONTH_NAMES[m]] = '0.00';
+    }
 
-    const categoryDistribution = categories.map((c: any) => {
-      const count = c._count?.products ?? 0;
+    let monthlyTotalNum = 0;
+    for (const row of monthlyRows) {
+      const sum = Number(row.total) || 0;
+      monthlyTotalNum += sum;
+      const monthIndex = Number(row.month_num) - 1;
+      const key = MONTH_NAMES[monthIndex] || `m${monthIndex + 1}`;
+      monthlySums[key] = sum.toFixed(2);
+    }
+
+    // Format category distribution
+    const categoryDistribution = categoryRows.map((c) => {
+      const count = Number(c.productCount) || 0;
       const percentage = totalProducts > 0 ? Number(((count / totalProducts) * 100).toFixed(2)) : 0;
-      return { categoryId: c.id, categoryName: c.name, productCount: count, percentage };
+      return {
+        categoryId: c.categoryId,
+        categoryName: c.categoryName,
+        productCount: count,
+        percentage,
+      };
     });
 
-    // Weekly and monthly totals (overall)
-    const weeklyTotalAgg = await (prisma as any).bill.aggregate({ where: { date: { gte: days[0].start, lte: days[6].end } }, _sum: { total: true } });
-    const monthlyTotalAgg = await (prisma as any).bill.aggregate({ where: { date: { gte: months[0].start, lte: months[11].end } }, _sum: { total: true } });
-
-    const weeklyIncome = weeklyTotalAgg?._sum?.total ? String(Number(weeklyTotalAgg._sum.total).toFixed(2)) : '0';
-    const monthlyIncome = monthlyTotalAgg?._sum?.total ? String(Number(monthlyTotalAgg._sum.total).toFixed(2)) : '0';
+    const weeklyIncome = weeklyTotalNum > 0 ? weeklyTotalNum.toFixed(2) : '0';
+    const monthlyIncome = monthlyTotalNum > 0 ? monthlyTotalNum.toFixed(2) : '0';
 
     return {
       weeklyIncome,
@@ -116,21 +170,28 @@ class DashboardService {
   }
 
   async getProductCategoryDistribution() {
-    const totalProducts = await (prisma as any).product.count();
-    const categories = await (prisma as any).category.findMany({
-      select: {
-        id: true,
-        name: true,
-        _count: { select: { products: true } },
-      },
-    });
+    const [totalProducts, categoryRows] = await Promise.all([
+      prisma.product.count(),
+      prisma.$queryRaw<CategoryCountRow[]>`
+        SELECT
+          c.id AS "categoryId",
+          c.name AS "categoryName",
+          COUNT(p.id)::int AS "productCount"
+        FROM "categories" c
+        LEFT JOIN "products" p ON p."categoryId" = c.id
+        GROUP BY c.id, c.name
+      `,
+    ]);
 
-    return categories.map((c: any) => ({
-      categoryId: c.id,
-      categoryName: c.name,
-      productCount: c._count?.products ?? 0,
-      percentage: totalProducts > 0 ? Number(((c._count?.products ?? 0) / totalProducts * 100).toFixed(2)) : 0,
-    }));
+    return categoryRows.map((c) => {
+      const count = Number(c.productCount) || 0;
+      return {
+        categoryId: c.categoryId,
+        categoryName: c.categoryName,
+        productCount: count,
+        percentage: totalProducts > 0 ? Number(((count / totalProducts) * 100).toFixed(2)) : 0,
+      };
+    });
   }
 }
 

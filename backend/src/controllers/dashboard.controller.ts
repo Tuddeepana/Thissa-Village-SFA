@@ -11,6 +11,7 @@ export const getSummary = async (req: Request, res: Response) => {
       weeklyIncomeResponse: data.weeklyIncomeResponse,
       monthlyIncomeResponse: data.monthlyIncomeResponse,
       TotalProduct: data.TotalProduct,
+      lowStockItemsCount: data.lowStockItemsCount,
       lowStockItems: data.lowStockItems,
       categoryDistribution: data.categoryDistribution,
     },
